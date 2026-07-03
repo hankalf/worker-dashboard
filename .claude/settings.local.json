@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s --connect-timeout 5 http://192.168.4.101:7700)",
+      "Bash(curl -s --connect-timeout 5 http://192.168.4.101:7700/api/stats)",
+      "Bash(curl -s --connect-timeout 5 http://192.168.4.101:7700/api/services)",
+      "Bash(curl -s http://192.168.4.101:7700)"
+    ]
+  }
+}
