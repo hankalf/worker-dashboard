@@ -105,7 +105,7 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
           )}
         </span>
         {member.lunchStart && (
-          <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+          <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
             Lunch {formatClock(member.lunchStart)}
           </span>
         )}
