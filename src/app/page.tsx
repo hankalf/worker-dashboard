@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const session = await auth();
 
-  const [positions, employees, jobs] = await Promise.all([
+  const [positions, employees, jobs, announcement] = await Promise.all([
     prisma.position.findMany({ orderBy: { title: "asc" } }),
     prisma.employee.findMany({
       include: { position: true, roles: true },
@@ -17,6 +17,7 @@ export default async function Home() {
       include: { assignedEmployee: { include: { position: true } } },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     }),
+    prisma.announcement.findUnique({ where: { id: "current" } }),
   ]);
 
   return (
@@ -25,6 +26,7 @@ export default async function Home() {
       employees={employees}
       jobs={jobs}
       isAdmin={!!session?.user}
+      announcement={announcement?.message ?? null}
     />
   );
 }

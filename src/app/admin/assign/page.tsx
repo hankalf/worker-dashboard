@@ -14,9 +14,10 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
-type Position = { id: string; title: string };
 type Role = { id: string; name: string };
+type Position = { id: string; title: string; requiredRole: Role | null };
 type Shift = "FIRST" | "SECOND" | "THIRD";
+type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT";
 type Employee = {
   id: string;
   name: string;
@@ -25,6 +26,7 @@ type Employee = {
   lunchStart: string | null;
   lunchEnd: string | null;
   shift: Shift | null;
+  attendance: Attendance;
 };
 
 type SaveState = "saving" | "saved" | "error";
@@ -34,6 +36,12 @@ const SHIFT_LABEL: Record<Shift, string> = {
   SECOND: "2nd Shift",
   THIRD: "3rd Shift",
 };
+
+const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
+  { value: "PRESENT", label: "Present" },
+  { value: "ABSENT", label: "Absent" },
+  { value: "CALLED_OUT", label: "Called out" },
+];
 
 const UNASSIGNED = "unassigned";
 
@@ -56,17 +64,22 @@ function EmployeeCard({
   employee,
   saveState,
   onLunchChange,
+  onAttendanceChange,
+  warnRole,
   overlay = false,
 }: {
   employee: Employee;
   saveState?: SaveState;
   onLunchChange?: (id: string, value: string) => void;
+  onAttendanceChange?: (id: string, value: Attendance) => void;
+  warnRole?: string | null;
   overlay?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: employee.id,
     disabled: overlay,
   });
+  const out = employee.attendance !== "PRESENT";
 
   return (
     <div
@@ -77,7 +90,7 @@ function EmployeeCard({
           ? "border-blue-500 bg-zinc-800 shadow-lg shadow-black/50"
           : isDragging
             ? "border-zinc-700 bg-zinc-800/40 opacity-40"
-            : "cursor-grab border-zinc-700 bg-zinc-800 hover:border-zinc-500 active:cursor-grabbing"
+            : `cursor-grab border-zinc-700 bg-zinc-800 hover:border-zinc-500 active:cursor-grabbing ${out ? "opacity-60" : ""}`
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -104,26 +117,53 @@ function EmployeeCard({
           {employee.roles.map((role) => role.name).join(" · ")}
         </div>
       )}
-      {!overlay && onLunchChange && (
+      {warnRole && (
+        <div className="mt-1 text-xs font-medium text-amber-400">
+          ⚠ Missing role: {warnRole}
+        </div>
+      )}
+      {!overlay && (onLunchChange || onAttendanceChange) && (
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
-          className="mt-2 flex items-center gap-2 text-xs text-zinc-500"
+          className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500"
         >
-          <span>Lunch</span>
-          <select
-            value={employee.lunchStart ?? ""}
-            onChange={(e) => onLunchChange(employee.id, e.target.value)}
-            style={{ colorScheme: "dark" }}
-            className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
-          >
-            <option value="">None</option>
-            {LUNCH_TIMES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          {onLunchChange && (
+            <>
+              <span>Lunch</span>
+              <select
+                value={employee.lunchStart ?? ""}
+                onChange={(e) => onLunchChange(employee.id, e.target.value)}
+                style={{ colorScheme: "dark" }}
+                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                <option value="">None</option>
+                {LUNCH_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          {onAttendanceChange && (
+            <select
+              value={employee.attendance}
+              onChange={(e) =>
+                onAttendanceChange(employee.id, e.target.value as Attendance)
+              }
+              style={{ colorScheme: "dark" }}
+              className={`rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 ${
+                out ? "text-red-300" : "text-zinc-100"
+              }`}
+            >
+              {ATTENDANCE_OPTIONS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
     </div>
@@ -133,15 +173,19 @@ function EmployeeCard({
 function PositionColumn({
   id,
   title,
+  requiredRole,
   employees,
   saveStates,
   onLunchChange,
+  onAttendanceChange,
 }: {
   id: string;
   title: string;
+  requiredRole: Role | null;
   employees: Employee[];
   saveStates: Record<string, SaveState>;
   onLunchChange: (id: string, value: string) => void;
+  onAttendanceChange: (id: string, value: Attendance) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -154,8 +198,15 @@ function PositionColumn({
           : "border-zinc-800 bg-zinc-900"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-white">{title}</h3>
+          {requiredRole && (
+            <div className="text-xs text-zinc-500">
+              needs {requiredRole.name}
+            </div>
+          )}
+        </div>
         <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
           {employees.length}
         </span>
@@ -167,6 +218,13 @@ function PositionColumn({
             employee={employee}
             saveState={saveStates[employee.id]}
             onLunchChange={onLunchChange}
+            onAttendanceChange={onAttendanceChange}
+            warnRole={
+              requiredRole &&
+              !employee.roles.some((r) => r.id === requiredRole.id)
+                ? requiredRole.name
+                : null
+            }
           />
         ))}
         {employees.length === 0 && (
@@ -253,6 +311,20 @@ export default function AssignPage() {
     flashSaved(employeeId, res.ok);
   };
 
+  const setAttendance = async (employeeId: string, value: Attendance) => {
+    setEmployees((current) =>
+      current.map((e) => (e.id === employeeId ? { ...e, attendance: value } : e))
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attendance: value }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
   const resetAll = async () => {
     if (
       !confirm(
@@ -295,8 +367,12 @@ export default function AssignPage() {
     : null;
 
   const columns = [
-    { id: UNASSIGNED, title: "Unassigned" },
-    ...positions.map((p) => ({ id: p.id, title: p.title })),
+    { id: UNASSIGNED, title: "Unassigned", requiredRole: null as Role | null },
+    ...positions.map((p) => ({
+      id: p.id,
+      title: p.title,
+      requiredRole: p.requiredRole,
+    })),
   ];
 
   return (
@@ -333,6 +409,7 @@ export default function AssignPage() {
               key={column.id}
               id={column.id}
               title={column.title}
+              requiredRole={column.requiredRole}
               employees={employees.filter((e) =>
                 column.id === UNASSIGNED
                   ? !e.positionId
@@ -340,6 +417,7 @@ export default function AssignPage() {
               )}
               saveStates={saveStates}
               onLunchChange={setLunch}
+              onAttendanceChange={setAttendance}
             />
           ))}
         </div>

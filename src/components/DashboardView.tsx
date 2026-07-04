@@ -16,11 +16,13 @@ export function DashboardView({
   employees,
   jobs,
   isAdmin,
+  announcement,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   isAdmin: boolean;
+  announcement: string | null;
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -76,6 +78,7 @@ export function DashboardView({
           employees={employees}
           jobs={jobs}
           now={now}
+          announcement={announcement}
         />
       </main>
     </div>

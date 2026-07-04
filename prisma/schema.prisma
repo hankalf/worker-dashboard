@@ -24,6 +24,13 @@ enum Shift {
   THIRD
 }
 
+// Daily attendance state for an employee.
+enum Attendance {
+  PRESENT
+  ABSENT
+  CALLED_OUT
+}
+
 // Every person in the warehouse. Employees with admin access get a
 // username + password and can sign in to the admin panel.
 model Employee {
@@ -40,22 +47,34 @@ model Employee {
   lunchStart   String?
   lunchEnd     String?
   shift        Shift?
+  attendance   Attendance @default(PRESENT)
   createdAt    DateTime  @default(now())
 }
 
 // A capability an employee has — the kinds of job they can perform.
 model Role {
-  id          String     @id @default(cuid())
-  name        String     @unique
-  description String?
-  employees   Employee[] @relation("EmployeeRoles")
+  id                   String     @id @default(cuid())
+  name                 String     @unique
+  description          String?
+  employees            Employee[] @relation("EmployeeRoles")
+  requiredForPositions Position[] @relation("PositionRequiredRole")
 }
 
 model Position {
-  id          String     @id @default(cuid())
-  title       String     @unique
-  description String?
-  employees   Employee[]
+  id             String     @id @default(cuid())
+  title          String     @unique
+  description    String?
+  employees      Employee[]
+  // Optional role a person should hold to work this position (assign warning).
+  requiredRole   Role?      @relation("PositionRequiredRole", fields: [requiredRoleId], references: [id])
+  requiredRoleId String?
+}
+
+// Single pinned message shown on the dashboards (id is always "current").
+model Announcement {
+  id        String   @id
+  message   String
+  updatedAt DateTime @updatedAt
 }
 
 model Job {

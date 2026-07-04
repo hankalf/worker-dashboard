@@ -10,6 +10,12 @@ const SHIFT_LABEL: Record<string, string> = {
   THIRD: "3rd Shift",
 };
 
+const ATTENDANCE_LABEL: Record<string, string> = {
+  PRESENT: "Present",
+  ABSENT: "Absent",
+  CALLED_OUT: "Called out",
+};
+
 const clock = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
   const h12 = ((h + 11) % 12) + 1;
@@ -50,6 +56,7 @@ export async function PATCH(
   if (body.lunchStart !== undefined) data.lunchStart = body.lunchStart || null;
   if (body.lunchEnd !== undefined) data.lunchEnd = body.lunchEnd || null;
   if (body.shift !== undefined) data.shift = body.shift || null;
+  if (body.attendance !== undefined) data.attendance = body.attendance || "PRESENT";
   if (body.roleIds !== undefined) {
     data.roles = { set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })) };
   }
@@ -80,6 +87,8 @@ export async function PATCH(
       changes.push(
         employee.lunchStart ? `lunch → ${clock(employee.lunchStart)}` : "lunch cleared"
       );
+    if (body.attendance !== undefined)
+      changes.push(`marked ${ATTENDANCE_LABEL[employee.attendance] ?? employee.attendance}`);
     if (body.roleIds !== undefined)
       changes.push(
         employee.roles.length

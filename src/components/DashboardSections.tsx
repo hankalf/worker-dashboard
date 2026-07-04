@@ -90,14 +90,25 @@ export function useNow() {
   return now;
 }
 
+const ATTENDANCE_LABEL: Record<string, string> = {
+  ABSENT: "Absent",
+  CALLED_OUT: "Called out",
+};
+
 // Card body for one employee: name + shift chip beside it, roles and lunch
-// underneath. Shared by the grouped (admin) and flat (public) team views.
+// underneath. Absent / called-out people are dimmed with a red badge.
 function MemberBody({ member }: { member: EmployeeWithRelations }) {
+  const out = member.attendance !== "PRESENT";
   return (
-    <>
+    <div className={out ? "opacity-60" : undefined}>
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-medium">{member.name}</span>
+          {out && (
+            <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+              {ATTENDANCE_LABEL[member.attendance]}
+            </span>
+          )}
           {member.shift && (
             <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               {SHIFTS[member.shift].label}
@@ -115,7 +126,7 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
           {member.roles.map((role) => role.name).join(" · ")}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -129,25 +140,39 @@ export function DashboardSections({
   jobs,
   now,
   showPositions = false,
+  announcement = null,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   now: Date | null;
   showPositions?: boolean;
+  announcement?: string | null;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
   const shiftKey = now ? currentShift(now) : null;
   const onShift = (e: EmployeeWithRelations) =>
     !shiftKey || e.shift === null || e.shift === shiftKey;
+  const present = (e: EmployeeWithRelations) => e.attendance === "PRESENT";
 
-  const columns = positions.map((position) => ({
-    id: position.id,
-    title: position.title,
-    members: employees.filter((e) => e.positionId === position.id && onShift(e)),
-  }));
+  const columns = positions.map((position) => {
+    const members = employees.filter(
+      (e) => e.positionId === position.id && onShift(e)
+    );
+    return {
+      id: position.id,
+      title: position.title,
+      members,
+      presentCount: members.filter(present).length,
+    };
+  });
   const roster = employees.filter(onShift);
+
+  // Positions with nobody present on the current shift (admin view only).
+  const understaffed = columns
+    .filter((c) => c.presentCount === 0)
+    .map((c) => c.title);
 
   const onLunch = now
     ? employees.filter((emp) => {
@@ -160,6 +185,22 @@ export function DashboardSections({
 
   return (
     <>
+      {announcement && (
+        <div className="mb-8 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200">
+          <span className="mr-2 font-semibold uppercase tracking-wide">
+            Notice
+          </span>
+          {announcement}
+        </div>
+      )}
+
+      {showPositions && understaffed.length > 0 && (
+        <div className="mb-8 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
+          <span className="font-semibold">Understaffed this shift:</span>{" "}
+          {understaffed.join(", ")}
+        </div>
+      )}
+
       <section className="mb-10">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
@@ -212,8 +253,14 @@ export function DashboardSections({
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="font-semibold">{column.title}</h3>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                      {column.members.length}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        column.presentCount === 0
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      {column.presentCount} present
                     </span>
                   </div>
                   {column.members.length === 0 ? (

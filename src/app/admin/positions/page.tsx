@@ -2,22 +2,31 @@
 
 import { useEffect, useState } from "react";
 
+type Role = { id: string; name: string };
 type Position = {
   id: string;
   title: string;
   description: string | null;
+  requiredRoleId: string | null;
+  requiredRole: Role | null;
 };
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [requiredRoleId, setRequiredRoleId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const res = await fetch("/api/positions");
-    setPositions(await res.json());
+    const [positionsRes, rolesRes] = await Promise.all([
+      fetch("/api/positions"),
+      fetch("/api/roles"),
+    ]);
+    setPositions(await positionsRes.json());
+    setRoles(await rolesRes.json());
   };
 
   useEffect(() => {
@@ -27,6 +36,7 @@ export default function PositionsPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
+    setRequiredRoleId("");
     setEditingId(null);
   };
 
@@ -39,7 +49,7 @@ export default function PositionsPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, requiredRoleId }),
     });
 
     if (!res.ok) {
@@ -56,6 +66,7 @@ export default function PositionsPage() {
     setEditingId(position.id);
     setTitle(position.title);
     setDescription(position.description ?? "");
+    setRequiredRoleId(position.requiredRoleId ?? "");
   };
 
   const handleDelete = async (id: string) => {
@@ -85,6 +96,21 @@ export default function PositionsPage() {
           onChange={(e) => setDescription(e.target.value)}
           className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
         />
+        <label className="text-xs text-zinc-400">
+          Required role (optional — warns when assigning someone without it)
+          <select
+            value={requiredRoleId}
+            onChange={(e) => setRequiredRoleId(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+          >
+            <option value="">No required role</option>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+        </label>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button
@@ -115,6 +141,11 @@ export default function PositionsPage() {
               <div className="font-medium text-white">{position.title}</div>
               {position.description && (
                 <div className="text-sm text-zinc-400">{position.description}</div>
+              )}
+              {position.requiredRole && (
+                <div className="text-xs text-zinc-500">
+                  Requires: {position.requiredRole.name}
+                </div>
               )}
             </div>
             <div className="flex gap-3 text-sm">

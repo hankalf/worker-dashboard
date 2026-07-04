@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
+type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT";
 type Employee = {
   id: string;
   name: string;
@@ -14,6 +15,7 @@ type Employee = {
   position: Position | null;
   roles: Role[];
   shift: Shift | null;
+  attendance: Attendance;
 };
 
 const SHIFT_OPTIONS: { value: Shift; label: string }[] = [
@@ -25,6 +27,17 @@ const SHIFT_SHORT: Record<Shift, string> = {
   FIRST: "1st Shift",
   SECOND: "2nd Shift",
   THIRD: "3rd Shift",
+};
+
+const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
+  { value: "PRESENT", label: "Present" },
+  { value: "ABSENT", label: "Absent" },
+  { value: "CALLED_OUT", label: "Called out" },
+];
+const ATTENDANCE_LABEL: Record<Attendance, string> = {
+  PRESENT: "Present",
+  ABSENT: "Absent",
+  CALLED_OUT: "Called out",
 };
 
 const inputClass =
@@ -41,6 +54,8 @@ export default function EmployeesPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [shift, setShift] = useState<Shift | "">("");
+  const [attendance, setAttendance] = useState<Attendance>("PRESENT");
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
@@ -75,6 +90,7 @@ export default function EmployeesPage() {
     setUsername("");
     setPassword("");
     setShift("");
+    setAttendance("PRESENT");
     setEditingId(null);
   };
 
@@ -103,6 +119,7 @@ export default function EmployeesPage() {
         username,
         password,
         shift,
+        attendance,
       }),
     });
 
@@ -125,6 +142,7 @@ export default function EmployeesPage() {
     setUsername(employee.username ?? "");
     setPassword("");
     setShift(employee.shift ?? "");
+    setAttendance(employee.attendance ?? "PRESENT");
   };
 
   const handleDelete = async (id: string) => {
@@ -247,6 +265,17 @@ export default function EmployeesPage() {
               </option>
             ))}
           </select>
+          <select
+            value={attendance}
+            onChange={(e) => setAttendance(e.target.value as Attendance)}
+            className={`col-span-2 ${inputClass}`}
+          >
+            {ATTENDANCE_OPTIONS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -334,8 +363,25 @@ export default function EmployeesPage() {
         </div>
       </form>
 
+      <input
+        placeholder="Search employees by name, position, or role…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className={`mb-3 w-full ${inputClass}`}
+      />
+
       <ul className="flex flex-col gap-2">
-        {employees.map((employee) => (
+        {employees
+          .filter((employee) => {
+            const q = search.trim().toLowerCase();
+            if (!q) return true;
+            return (
+              employee.name.toLowerCase().includes(q) ||
+              (employee.position?.title ?? "").toLowerCase().includes(q) ||
+              employee.roles.some((r) => r.name.toLowerCase().includes(q))
+            );
+          })
+          .map((employee) => (
           <li
             key={employee.id}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
@@ -346,6 +392,11 @@ export default function EmployeesPage() {
                 {employee.isAdmin && (
                   <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
                     Admin
+                  </span>
+                )}
+                {employee.attendance !== "PRESENT" && (
+                  <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
+                    {ATTENDANCE_LABEL[employee.attendance]}
                   </span>
                 )}
               </div>

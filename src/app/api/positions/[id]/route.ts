@@ -11,10 +11,10 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { title, description } = await req.json();
+  const { title, description, requiredRoleId } = await req.json();
   const position = await prisma.position.update({
     where: { id },
-    data: { title, description },
+    data: { title, description, requiredRoleId: requiredRoleId || null },
   });
   await logActivity("Position", `Renamed position to ${position.title}`);
   return NextResponse.json(position);

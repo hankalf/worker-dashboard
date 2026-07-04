@@ -13,9 +13,19 @@ type ActivityLog = {
 const csvCell = (value: string) =>
   /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 
+const RANGES: { value: string; label: string; days: number | null }[] = [
+  { value: "all", label: "All (2 weeks)", days: null },
+  { value: "today", label: "Today", days: 1 },
+  { value: "3", label: "Last 3 days", days: 3 },
+  { value: "7", label: "Last 7 days", days: 7 },
+];
+
 export default function ActivityPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [range, setRange] = useState("all");
 
   useEffect(() => {
     (async () => {
@@ -29,9 +39,27 @@ export default function ActivityPage() {
     })();
   }, []);
 
+  const categories = Array.from(new Set(logs.map((l) => l.category))).sort();
+
+  const filtered = logs.filter((log) => {
+    if (category !== "all" && log.category !== category) return false;
+    const rangeDays = RANGES.find((r) => r.value === range)?.days ?? null;
+    if (rangeDays !== null) {
+      const cutoff =
+        range === "today"
+          ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+          : Date.now() - rangeDays * 24 * 60 * 60 * 1000;
+      if (new Date(log.createdAt).getTime() < cutoff) return false;
+    }
+    const q = search.trim().toLowerCase();
+    if (q && !`${log.category} ${log.action}`.toLowerCase().includes(q))
+      return false;
+    return true;
+  });
+
   const exportCsv = () => {
     const header = ["Date", "Time", "Category", "Change"];
-    const rows = logs.map((log) => {
+    const rows = filtered.map((log) => {
       const d = new Date(log.createdAt);
       return [
         d.toLocaleDateString(),
@@ -57,7 +85,7 @@ export default function ActivityPage() {
         <h2 className="text-lg font-semibold text-white">Activity Log</h2>
         <button
           onClick={exportCsv}
-          disabled={logs.length === 0}
+          disabled={filtered.length === 0}
           className="shrink-0 rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
         >
           Export to Excel
@@ -68,10 +96,46 @@ export default function ActivityPage() {
         tasks) is recorded here and kept for 2 weeks.
       </p>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        <input
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="min-w-40 flex-1 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+        />
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+        >
+          <option value="all">All categories</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+        >
+          {RANGES.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {loading ? (
         <p className="text-sm text-zinc-500">Loading…</p>
-      ) : logs.length === 0 ? (
-        <p className="text-sm text-zinc-500">No activity recorded yet.</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-zinc-500">
+          {logs.length === 0
+            ? "No activity recorded yet."
+            : "No activity matches these filters."}
+        </p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-zinc-800">
           <table className="w-full text-left text-sm">
@@ -83,7 +147,7 @@ export default function ActivityPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {logs.map((log) => (
+              {filtered.map((log) => (
                 <tr key={log.id} className="bg-zinc-950/40">
                   <td className="whitespace-nowrap px-4 py-2 text-xs text-zinc-500">
                     {new Date(log.createdAt).toLocaleString(undefined, {

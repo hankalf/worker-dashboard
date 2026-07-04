@@ -4,7 +4,7 @@ import { AdminDashboard } from "@/components/AdminDashboard";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [positions, employees, jobs] = await Promise.all([
+  const [positions, employees, jobs, announcement] = await Promise.all([
     prisma.position.findMany({ orderBy: { title: "asc" } }),
     prisma.employee.findMany({
       include: { position: true, roles: true },
@@ -14,9 +14,15 @@ export default async function AdminDashboardPage() {
       include: { assignedEmployee: { include: { position: true } } },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     }),
+    prisma.announcement.findUnique({ where: { id: "current" } }),
   ]);
 
   return (
-    <AdminDashboard positions={positions} employees={employees} jobs={jobs} />
+    <AdminDashboard
+      positions={positions}
+      employees={employees}
+      jobs={jobs}
+      announcement={announcement?.message ?? null}
+    />
   );
 }
