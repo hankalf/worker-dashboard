@@ -133,7 +133,7 @@ function PositionColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col rounded-lg border p-3 transition-colors ${
+      className={`flex flex-col rounded-lg border p-3 transition-colors ${
         isOver
           ? "border-blue-500 bg-blue-950/30"
           : "border-zinc-800 bg-zinc-900"
@@ -312,7 +312,7 @@ export default function AssignPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="flex items-start gap-4 overflow-x-auto pb-4">
+        <div className="grid grid-cols-2 gap-4 pb-4 sm:grid-cols-5">
           {columns.map((column) => (
             <PositionColumn
               key={column.id}
