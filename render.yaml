@@ -4,8 +4,9 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npm run start
-    preDeployCommand: npx prisma migrate deploy
+    # Free plan has no preDeployCommand and builds can't reach the private
+    # network, so migrations + idempotent seed run at startup instead.
+    startCommand: npx prisma migrate deploy && npx prisma db seed && npm run start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
