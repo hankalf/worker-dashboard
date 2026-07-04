@@ -21,19 +21,28 @@ type Employee = {
   name: string;
   positionId: string | null;
   roles: Role[];
+  lunchStart: string | null;
+  lunchEnd: string | null;
 };
 
 type SaveState = "saving" | "saved" | "error";
+type LunchField = "lunchStart" | "lunchEnd";
 
 const UNASSIGNED = "unassigned";
+
+// Stop pointer/keyboard events on the lunch controls from starting a drag
+const stopDrag = (e: React.PointerEvent | React.KeyboardEvent) =>
+  e.stopPropagation();
 
 function EmployeeCard({
   employee,
   saveState,
+  onLunchChange,
   overlay = false,
 }: {
   employee: Employee;
   saveState?: SaveState;
+  onLunchChange?: (id: string, field: LunchField, value: string) => void;
   overlay?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -70,6 +79,34 @@ function EmployeeCard({
           {employee.roles.map((role) => role.name).join(" · ")}
         </div>
       )}
+      {!overlay && onLunchChange && (
+        <div
+          onPointerDown={stopDrag}
+          onKeyDown={stopDrag}
+          className="mt-2 flex items-center gap-1 text-xs text-zinc-500"
+        >
+          <span>Lunch</span>
+          <input
+            type="time"
+            value={employee.lunchStart ?? ""}
+            onChange={(e) =>
+              onLunchChange(employee.id, "lunchStart", e.target.value)
+            }
+            style={{ colorScheme: "dark" }}
+            className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+          />
+          <span className="text-zinc-600">–</span>
+          <input
+            type="time"
+            value={employee.lunchEnd ?? ""}
+            onChange={(e) =>
+              onLunchChange(employee.id, "lunchEnd", e.target.value)
+            }
+            style={{ colorScheme: "dark" }}
+            className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -79,18 +116,20 @@ function PositionColumn({
   title,
   employees,
   saveStates,
+  onLunchChange,
 }: {
   id: string;
   title: string;
   employees: Employee[];
   saveStates: Record<string, SaveState>;
+  onLunchChange: (id: string, field: LunchField, value: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-60 shrink-0 flex-col rounded-lg border p-3 transition-colors ${
+      className={`flex w-64 shrink-0 flex-col rounded-lg border p-3 transition-colors ${
         isOver
           ? "border-blue-500 bg-blue-950/30"
           : "border-zinc-800 bg-zinc-900"
@@ -108,6 +147,7 @@ function PositionColumn({
             key={employee.id}
             employee={employee}
             saveState={saveStates[employee.id]}
+            onLunchChange={onLunchChange}
           />
         ))}
         {employees.length === 0 && (
@@ -148,6 +188,21 @@ export default function AssignPage() {
     })();
   }, []);
 
+  const flashSaved = (employeeId: string, ok: boolean) => {
+    setSaveStates((s) => ({ ...s, [employeeId]: ok ? "saved" : "error" }));
+    if (ok) {
+      setTimeout(
+        () =>
+          setSaveStates((s) => {
+            const next = { ...s };
+            if (next[employeeId] === "saved") delete next[employeeId];
+            return next;
+          }),
+        1500
+      );
+    }
+  };
+
   const assign = async (employeeId: string, positionId: string | null) => {
     setEmployees((current) =>
       current.map((e) => (e.id === employeeId ? { ...e, positionId } : e))
@@ -159,18 +214,46 @@ export default function AssignPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ positionId: positionId ?? "" }),
     });
+    flashSaved(employeeId, res.ok);
+  };
 
-    setSaveStates((s) => ({ ...s, [employeeId]: res.ok ? "saved" : "error" }));
+  const setLunch = async (
+    employeeId: string,
+    field: LunchField,
+    value: string
+  ) => {
+    setEmployees((current) =>
+      current.map((e) =>
+        e.id === employeeId ? { ...e, [field]: value || null } : e
+      )
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
+  const resetAll = async () => {
+    if (
+      !confirm(
+        "Clear every employee's position? This moves everyone back to Unassigned."
+      )
+    )
+      return;
+
+    const res = await fetch("/api/employees/reset-positions", {
+      method: "POST",
+    });
     if (res.ok) {
-      setTimeout(
-        () =>
-          setSaveStates((s) => {
-            const next = { ...s };
-            if (next[employeeId] === "saved") delete next[employeeId];
-            return next;
-          }),
-        1500
+      setEmployees((current) =>
+        current.map((e) => ({ ...e, positionId: null }))
       );
+    } else {
+      alert("Could not reset positions. Please try again.");
     }
   };
 
@@ -202,9 +285,18 @@ export default function AssignPage() {
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-semibold text-white">Assign Positions</h2>
+      <div className="mb-1 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold text-white">Assign Positions</h2>
+        <button
+          onClick={resetAll}
+          className="shrink-0 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
+        >
+          Reset all to Unassigned
+        </button>
+      </div>
       <p className="mb-4 text-sm text-zinc-400">
-        Drag an employee onto a position — every drop saves instantly.
+        Drag an employee onto a position, and set each person&apos;s lunch time
+        — every change saves instantly.
       </p>
 
       {positions.length === 0 && employees.length > 0 && (
@@ -231,6 +323,7 @@ export default function AssignPage() {
                   : e.positionId === column.id
               )}
               saveStates={saveStates}
+              onLunchChange={setLunch}
             />
           ))}
         </div>

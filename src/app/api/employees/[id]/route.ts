@@ -34,6 +34,8 @@ export async function PATCH(
   if (body.positionId !== undefined) data.positionId = body.positionId || null;
   if (body.isAdmin !== undefined) data.isAdmin = !!body.isAdmin;
   if (body.username !== undefined) data.username = body.username || null;
+  if (body.lunchStart !== undefined) data.lunchStart = body.lunchStart || null;
+  if (body.lunchEnd !== undefined) data.lunchEnd = body.lunchEnd || null;
   if (body.roleIds !== undefined) {
     data.roles = { set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })) };
   }

@@ -29,6 +29,9 @@ model Employee {
   positionId   String?
   roles        Role[]    @relation("EmployeeRoles")
   jobs         Job[]
+  // Lunch window as "HH:MM" strings (24h); end defaults to start+30min if unset
+  lunchStart   String?
+  lunchEnd     String?
   createdAt    DateTime  @default(now())
 }
 

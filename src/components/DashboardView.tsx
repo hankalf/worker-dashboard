@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -29,6 +30,23 @@ const STATUS_COLORS: Record<string, string> = {
   DONE: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
 };
 
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+// End of an employee's lunch: their set end, or 30 minutes after the start.
+const lunchEndMinutes = (emp: EmployeeWithRelations) => {
+  if (!emp.lunchStart) return null;
+  return emp.lunchEnd ? toMinutes(emp.lunchEnd) : toMinutes(emp.lunchStart) + 30;
+};
+
+const formatMinutes = (total: number) => {
+  const h = String(Math.floor(total / 60) % 24).padStart(2, "0");
+  const m = String(total % 60).padStart(2, "0");
+  return `${h}:${m}`;
+};
+
 export function DashboardView({
   positions,
   employees,
@@ -40,6 +58,14 @@ export function DashboardView({
   jobs: JobWithRelations[];
   isAdmin: boolean;
 }) {
+  // Live clock — initialised on mount to avoid a server/client time mismatch
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const unassigned = employees.filter((e) => !e.positionId);
   const columns = [
     ...positions.map((position) => ({
@@ -52,10 +78,37 @@ export function DashboardView({
       : []),
   ];
 
+  const onLunch = now
+    ? employees.filter((emp) => {
+        const end = lunchEndMinutes(emp);
+        if (end === null || !emp.lunchStart) return false;
+        const cur = now.getHours() * 60 + now.getMinutes();
+        return cur >= toMinutes(emp.lunchStart) && cur < end;
+      })
+    : [];
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
+        <div>
+          <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
+          {now && (
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {now.toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}{" "}
+              ·{" "}
+              {now.toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <ThemeToggle />
           {isAdmin ? (
@@ -77,6 +130,32 @@ export function DashboardView({
       </header>
 
       <main className="flex-1 px-6 py-6">
+        <section className="mb-10">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
+          </h2>
+          {onLunch.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No one is on lunch right now.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {onLunch.map((emp) => (
+                <div
+                  key={emp.id}
+                  className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40"
+                >
+                  <div className="text-sm font-medium">{emp.name}</div>
+                  <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                    {emp.position?.title ?? "Unassigned"} · back at{" "}
+                    {formatMinutes(lunchEndMinutes(emp)!)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="mb-10">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Team by Position
