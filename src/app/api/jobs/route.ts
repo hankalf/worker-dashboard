@@ -44,5 +44,16 @@ export async function POST(req: Request) {
     },
     include: { tab: true, assignedEmployee: true },
   });
+
+  await prisma.taskLog.create({
+    data: {
+      jobId: job.id,
+      jobTitle: job.title,
+      action: job.assignedEmployee
+        ? `Created and assigned to ${job.assignedEmployee.name}`
+        : "Created",
+    },
+  });
+
   return NextResponse.json(job, { status: 201 });
 }

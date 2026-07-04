@@ -29,7 +29,7 @@ function LoginForm() {
       return;
     }
 
-    const callbackUrl = searchParams.get("callbackUrl") || "/admin";
+    const callbackUrl = searchParams.get("callbackUrl") || "/admin/assign";
     router.push(callbackUrl);
     router.refresh();
   };

@@ -17,6 +17,13 @@ type Job = {
   priority: number;
 };
 
+type TaskLog = {
+  id: string;
+  jobTitle: string;
+  action: string;
+  createdAt: string;
+};
+
 const emptyForm = {
   title: "",
   description: "",
@@ -31,15 +38,17 @@ export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [logs, setLogs] = useState<TaskLog[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const [jobsRes, tabsRes, employeesRes] = await Promise.all([
+    const [jobsRes, tabsRes, employeesRes, logsRes] = await Promise.all([
       fetch("/api/jobs"),
       fetch("/api/tabs"),
       fetch("/api/employees"),
+      fetch("/api/task-logs"),
     ]);
     if (employeesRes.status === 403) {
       // Session no longer maps to an admin — send them back to sign in
@@ -49,6 +58,7 @@ export default function JobsPage() {
     setJobs(await jobsRes.json());
     setTabs(await tabsRes.json());
     setEmployees(await employeesRes.json());
+    setLogs(await logsRes.json());
   };
 
   useEffect(() => {
@@ -235,6 +245,36 @@ export default function JobsPage() {
           </li>
         ))}
       </ul>
+
+      <h3 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+        Activity Log
+      </h3>
+      {logs.length === 0 ? (
+        <p className="text-sm text-zinc-500">No activity yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {logs.map((log) => (
+            <li
+              key={log.id}
+              className="flex items-baseline justify-between gap-3 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm"
+            >
+              <span className="text-zinc-300">
+                <span className="font-medium text-white">{log.jobTitle}</span>
+                {" — "}
+                {log.action}
+              </span>
+              <span className="whitespace-nowrap text-xs text-zinc-500">
+                {new Date(log.createdAt).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

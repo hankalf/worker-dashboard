@@ -72,3 +72,15 @@ model Job {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 }
+
+// Append-only history of side-task activity (created / updated / deleted).
+// Keeps a title snapshot so entries survive the task being deleted.
+model TaskLog {
+  id        String   @id @default(cuid())
+  jobId     String?
+  jobTitle  String
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
