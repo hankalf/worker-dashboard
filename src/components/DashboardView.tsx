@@ -47,6 +47,13 @@ const formatMinutes = (total: number) => {
   return `${h}:${m}`;
 };
 
+// "13:30" -> "1:30 PM"
+const formatClock = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+};
+
 export function DashboardView({
   positions,
   employees,
@@ -187,8 +194,15 @@ export function DashboardView({
                           key={member.id}
                           className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/50"
                         >
-                          <div className="text-sm font-medium">
-                            {member.name}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium">
+                              {member.name}
+                            </span>
+                            {member.lunchStart && (
+                              <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                Lunch {formatClock(member.lunchStart)}
+                              </span>
+                            )}
                           </div>
                           {member.roles.length > 0 && (
                             <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
