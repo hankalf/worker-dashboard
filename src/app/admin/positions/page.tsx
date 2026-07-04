@@ -8,6 +8,7 @@ type Position = {
   id: string;
   title: string;
   description: string | null;
+  sortOrder: number;
   requiredRoleId: string | null;
   requiredRole: Role | null;
 };
@@ -19,6 +20,7 @@ export default function PositionsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [requiredRoleId, setRequiredRoleId] = useState("");
+  const [sortOrder, setSortOrder] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ export default function PositionsPage() {
     setTitle("");
     setDescription("");
     setRequiredRoleId("");
+    setSortOrder(0);
     setEditingId(null);
   };
 
@@ -51,7 +54,7 @@ export default function PositionsPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, requiredRoleId }),
+      body: JSON.stringify({ title, description, requiredRoleId, sortOrder }),
     });
 
     if (!res.ok) {
@@ -69,6 +72,7 @@ export default function PositionsPage() {
     setTitle(position.title);
     setDescription(position.description ?? "");
     setRequiredRoleId(position.requiredRoleId ?? "");
+    setSortOrder(position.sortOrder ?? 0);
   };
 
   const handleDelete = async (id: string) => {
@@ -117,6 +121,15 @@ export default function PositionsPage() {
             ))}
           </select>
         </label>
+        <label className="text-xs text-zinc-400">
+          Display order on the dashboard (lower shows first)
+          <input
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(Number(e.target.value))}
+            className="mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+          />
+        </label>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button
@@ -144,7 +157,12 @@ export default function PositionsPage() {
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
           >
             <div>
-              <div className="font-medium text-white">{position.title}</div>
+              <div className="flex items-center gap-2 font-medium text-white">
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-400">
+                  #{position.sortOrder}
+                </span>
+                {position.title}
+              </div>
               {position.description && (
                 <div className="text-sm text-zinc-400">{position.description}</div>
               )}

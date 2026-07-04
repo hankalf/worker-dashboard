@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
   const [positions, employees, jobs, announcement] = await Promise.all([
-    prisma.position.findMany({ orderBy: { title: "asc" } }),
+    prisma.position.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
     prisma.employee.findMany({
       include: { position: true, roles: true },
       orderBy: { name: "asc" },

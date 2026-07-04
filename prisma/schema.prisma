@@ -73,6 +73,7 @@ model Position {
   id             String     @id @default(cuid())
   title          String     @unique
   description    String?
+  sortOrder      Int        @default(0)
   employees      Employee[]
   // Optional role a person should hold to work this position (assign warning).
   requiredRole   Role?      @relation("PositionRequiredRole", fields: [requiredRoleId], references: [id])
