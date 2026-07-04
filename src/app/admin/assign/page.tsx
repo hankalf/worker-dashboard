@@ -16,6 +16,7 @@ import {
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
+type Shift = "FIRST" | "SECOND" | "THIRD";
 type Employee = {
   id: string;
   name: string;
@@ -23,9 +24,16 @@ type Employee = {
   roles: Role[];
   lunchStart: string | null;
   lunchEnd: string | null;
+  shift: Shift | null;
 };
 
 type SaveState = "saving" | "saved" | "error";
+
+const SHIFT_LABEL: Record<Shift, string> = {
+  FIRST: "1st Shift",
+  SECOND: "2nd Shift",
+  THIRD: "3rd Shift",
+};
 
 const UNASSIGNED = "unassigned";
 
@@ -74,15 +82,22 @@ function EmployeeCard({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-white">{employee.name}</span>
-        {saveState === "saving" && (
-          <span className="text-xs text-zinc-500">…</span>
-        )}
-        {saveState === "saved" && (
-          <span className="text-xs text-green-400">✓</span>
-        )}
-        {saveState === "error" && (
-          <span className="text-xs text-red-400">failed</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {employee.shift && (
+            <span className="whitespace-nowrap rounded-full bg-blue-950 px-2 py-0.5 text-xs font-medium text-blue-300">
+              {SHIFT_LABEL[employee.shift]}
+            </span>
+          )}
+          {saveState === "saving" && (
+            <span className="text-xs text-zinc-500">…</span>
+          )}
+          {saveState === "saved" && (
+            <span className="text-xs text-green-400">✓</span>
+          )}
+          {saveState === "error" && (
+            <span className="text-xs text-red-400">failed</span>
+          )}
+        </div>
       </div>
       {employee.roles.length > 0 && (
         <div className="mt-1 text-xs text-zinc-500">

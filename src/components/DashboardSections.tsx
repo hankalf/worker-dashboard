@@ -90,18 +90,51 @@ export function useNow() {
   return now;
 }
 
-// The three dashboard sections shared by the public dashboard and the admin
-// mirror. Pass the current time so "On Lunch" recomputes as the clock ticks.
+// Card body for one employee: name + shift chip beside it, roles and lunch
+// underneath. Shared by the grouped (admin) and flat (public) team views.
+function MemberBody({ member }: { member: EmployeeWithRelations }) {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{member.name}</span>
+        {member.shift && (
+          <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            {SHIFTS[member.shift].label}
+          </span>
+        )}
+      </div>
+      {(member.lunchStart || member.roles.length > 0) && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+          {member.lunchStart && (
+            <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              Lunch {formatClock(member.lunchStart)}
+            </span>
+          )}
+          {member.roles.length > 0 && (
+            <span>{member.roles.map((role) => role.name).join(" · ")}</span>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// The dashboard sections. `showPositions` groups the team into position
+// columns (admin mirror); otherwise a flat roster is shown (public display,
+// where positions are intentionally hidden). Pass `now` so shift/lunch logic
+// recomputes as the clock ticks.
 export function DashboardSections({
   positions,
   employees,
   jobs,
   now,
+  showPositions = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   now: Date | null;
+  showPositions?: boolean;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -114,6 +147,7 @@ export function DashboardSections({
     title: position.title,
     members: employees.filter((e) => e.positionId === position.id && onShift(e)),
   }));
+  const roster = employees.filter(onShift);
 
   const onLunch = now
     ? employees.filter((emp) => {
@@ -143,8 +177,10 @@ export function DashboardSections({
               >
                 <div className="text-sm font-medium">{emp.name}</div>
                 <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                  {emp.position?.title ?? "Unassigned"} · back at{" "}
-                  {formatMinutes(lunchEndMinutes(emp)!)}
+                  {emp.roles.length > 0
+                    ? `${emp.roles.map((r) => r.name).join(" · ")} · `
+                    : ""}
+                  back at {formatMinutes(lunchEndMinutes(emp)!)}
                 </div>
               </div>
             ))}
@@ -154,60 +190,64 @@ export function DashboardSections({
 
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Team by Position
+          {showPositions ? "Team by Position" : "Team"}
           {shiftKey && (
             <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
               — {SHIFTS[shiftKey].label} ({SHIFTS[shiftKey].range})
             </span>
           )}
         </h2>
-        {columns.length === 0 ? (
+
+        {showPositions ? (
+          columns.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No positions yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {columns.map((column) => (
+                <div
+                  key={column.id}
+                  className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="font-semibold">{column.title}</h3>
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                      {column.members.length}
+                    </span>
+                  </div>
+                  {column.members.length === 0 ? (
+                    <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                      No one assigned
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {column.members.map((member) => (
+                        <li
+                          key={member.id}
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/50"
+                        >
+                          <MemberBody member={member} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        ) : roster.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No positions yet.
+            No one on shift right now.
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {columns.map((column) => (
+            {roster.map((member) => (
               <div
-                key={column.id}
-                className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                key={member.id}
+                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-semibold">{column.title}</h3>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                    {column.members.length}
-                  </span>
-                </div>
-                {column.members.length === 0 ? (
-                  <p className="text-sm text-zinc-400 dark:text-zinc-600">
-                    No one assigned
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {column.members.map((member) => (
-                      <li
-                        key={member.id}
-                        className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/50"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">
-                            {member.name}
-                          </span>
-                          {member.lunchStart && (
-                            <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              Lunch {formatClock(member.lunchStart)}
-                            </span>
-                          )}
-                        </div>
-                        {member.roles.length > 0 && (
-                          <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                            {member.roles.map((role) => role.name).join(" · ")}
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <MemberBody member={member} />
               </div>
             ))}
           </div>
@@ -244,7 +284,7 @@ export function DashboardSections({
                 )}
                 <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
                   Assigned to: {job.assignedEmployee?.name ?? "Unassigned"}
-                  {job.assignedEmployee?.position
+                  {showPositions && job.assignedEmployee?.position
                     ? ` (${job.assignedEmployee.position.title})`
                     : ""}
                 </div>

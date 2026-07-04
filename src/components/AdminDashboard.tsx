@@ -54,6 +54,7 @@ export function AdminDashboard({
           employees={employees}
           jobs={jobs}
           now={now}
+          showPositions
         />
       </div>
     </div>
