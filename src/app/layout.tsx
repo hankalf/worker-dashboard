@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Warehouse Dashboard",
-  description: "Warehouse job dashboard and admin panel",
+  description: "Warehouse dashboard and admin panel",
 };
 
 export default async function RootLayout({

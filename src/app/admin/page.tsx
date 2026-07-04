@@ -9,7 +9,7 @@ export default async function AdminOverview() {
   const tabCount = await prisma.tab.count();
 
   const stats = [
-    { label: "Jobs", value: jobCount },
+    { label: "Side Tasks", value: jobCount },
     { label: "Employees", value: employeeCount },
     { label: "Admins", value: adminCount },
     { label: "Positions", value: positionCount },

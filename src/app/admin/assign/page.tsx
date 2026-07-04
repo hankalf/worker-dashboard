@@ -26,9 +26,19 @@ type Employee = {
 };
 
 type SaveState = "saving" | "saved" | "error";
-type LunchField = "lunchStart" | "lunchEnd";
 
 const UNASSIGNED = "unassigned";
+
+// Lunch start times in 15-minute steps across the day. Lunch is always 30
+// minutes, so only the start is chosen; the end is start + 30 everywhere.
+const LUNCH_TIMES = Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const h12 = ((h + 11) % 12) + 1;
+  const label = `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  return { value, label };
+});
 
 // Stop pointer/keyboard events on the lunch controls from starting a drag
 const stopDrag = (e: React.PointerEvent | React.KeyboardEvent) =>
@@ -42,7 +52,7 @@ function EmployeeCard({
 }: {
   employee: Employee;
   saveState?: SaveState;
-  onLunchChange?: (id: string, field: LunchField, value: string) => void;
+  onLunchChange?: (id: string, value: string) => void;
   overlay?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -83,28 +93,22 @@ function EmployeeCard({
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
-          className="mt-2 flex items-center gap-1 text-xs text-zinc-500"
+          className="mt-2 flex items-center gap-2 text-xs text-zinc-500"
         >
           <span>Lunch</span>
-          <input
-            type="time"
+          <select
             value={employee.lunchStart ?? ""}
-            onChange={(e) =>
-              onLunchChange(employee.id, "lunchStart", e.target.value)
-            }
+            onChange={(e) => onLunchChange(employee.id, e.target.value)}
             style={{ colorScheme: "dark" }}
             className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
-          />
-          <span className="text-zinc-600">–</span>
-          <input
-            type="time"
-            value={employee.lunchEnd ?? ""}
-            onChange={(e) =>
-              onLunchChange(employee.id, "lunchEnd", e.target.value)
-            }
-            style={{ colorScheme: "dark" }}
-            className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
-          />
+          >
+            <option value="">None</option>
+            {LUNCH_TIMES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
     </div>
@@ -122,7 +126,7 @@ function PositionColumn({
   title: string;
   employees: Employee[];
   saveStates: Record<string, SaveState>;
-  onLunchChange: (id: string, field: LunchField, value: string) => void;
+  onLunchChange: (id: string, value: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -217,14 +221,11 @@ export default function AssignPage() {
     flashSaved(employeeId, res.ok);
   };
 
-  const setLunch = async (
-    employeeId: string,
-    field: LunchField,
-    value: string
-  ) => {
+  const setLunch = async (employeeId: string, value: string) => {
+    // Lunch is always 30 min; store the start and clear any old explicit end.
     setEmployees((current) =>
       current.map((e) =>
-        e.id === employeeId ? { ...e, [field]: value || null } : e
+        e.id === employeeId ? { ...e, lunchStart: value || null, lunchEnd: null } : e
       )
     );
     setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
@@ -232,7 +233,7 @@ export default function AssignPage() {
     const res = await fetch(`/api/employees/${employeeId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify({ lunchStart: value, lunchEnd: "" }),
     });
     flashSaved(employeeId, res.ok);
   };

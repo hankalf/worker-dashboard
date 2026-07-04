@@ -63,7 +63,7 @@ export default function TabsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this tab? Jobs assigned to it must be moved first.")) return;
+    if (!confirm("Delete this tab? Side tasks assigned to it must be moved first.")) return;
     await fetch(`/api/tabs/${id}`, { method: "DELETE" });
     load();
   };

@@ -208,11 +208,11 @@ export function DashboardView({
 
         <section>
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Jobs
+            Side Tasks
           </h2>
           {jobs.length === 0 ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No jobs yet.
+              No side tasks yet.
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

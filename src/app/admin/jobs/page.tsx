@@ -100,7 +100,7 @@ export default function JobsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this job?")) return;
+    if (!confirm("Delete this side task?")) return;
     await fetch(`/api/jobs/${id}`, { method: "DELETE" });
     load();
   };
@@ -110,7 +110,7 @@ export default function JobsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="mb-4 text-lg font-semibold text-white">Jobs</h2>
+      <h2 className="mb-4 text-lg font-semibold text-white">Side Tasks</h2>
 
       <form
         onSubmit={handleSubmit}
@@ -191,7 +191,7 @@ export default function JobsPage() {
             type="submit"
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
           >
-            {editingId ? "Save changes" : "Add job"}
+            {editingId ? "Save changes" : "Add side task"}
           </button>
           {editingId && (
             <button
