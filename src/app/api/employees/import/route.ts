@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
 import { parseCsv } from "@/lib/csv";
+import { logActivity } from "@/lib/activity";
 
 // Expected CSV columns (header row required, in any order):
 //   name        required
@@ -116,6 +117,13 @@ export async function POST(req: Request) {
           : "could not be saved";
       errors.push(`Row ${i + 1} (${name}): ${message}`);
     }
+  }
+
+  if (created > 0) {
+    await logActivity(
+      "Employee",
+      `Imported ${created} employee${created === 1 ? "" : "s"} from CSV`
+    );
   }
 
   return NextResponse.json({ created, errors });

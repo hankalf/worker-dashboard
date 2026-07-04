@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const jobs = await prisma.job.findMany({
@@ -37,15 +38,13 @@ export async function POST(req: Request) {
     include: { assignedEmployee: true },
   });
 
+  const createdAction = job.assignedEmployee
+    ? `Created and assigned to ${job.assignedEmployee.name}`
+    : "Created";
   await prisma.taskLog.create({
-    data: {
-      jobId: job.id,
-      jobTitle: job.title,
-      action: job.assignedEmployee
-        ? `Created and assigned to ${job.assignedEmployee.name}`
-        : "Created",
-    },
+    data: { jobId: job.id, jobTitle: job.title, action: createdAction },
   });
+  await logActivity("Side Task", `${job.title}: ${createdAction}`);
 
   return NextResponse.json(job, { status: 201 });
 }

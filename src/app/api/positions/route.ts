@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const positions = await prisma.position.findMany({ orderBy: { title: "asc" } });
@@ -17,5 +18,6 @@ export async function POST(req: Request) {
   }
 
   const position = await prisma.position.create({ data: { title, description } });
+  await logActivity("Position", `Added position ${position.title}`);
   return NextResponse.json(position, { status: 201 });
 }

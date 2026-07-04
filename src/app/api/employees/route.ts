@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const session = await requireAdmin();
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
       },
       include: { position: true, roles: true },
     });
+    await logActivity("Employee", `Added ${employee.name}`);
     return NextResponse.json(employee, { status: 201 });
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") {

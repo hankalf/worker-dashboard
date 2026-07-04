@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 const STATUS_ACTIONS: Record<string, string> = {
   UNASSIGNED: "Unassigned",
@@ -34,15 +35,13 @@ export async function PATCH(
   });
 
   const base = STATUS_ACTIONS[job.status] ?? "Updated";
+  const action = job.assignedEmployee
+    ? `${base} — ${job.assignedEmployee.name}`
+    : base;
   await prisma.taskLog.create({
-    data: {
-      jobId: job.id,
-      jobTitle: job.title,
-      action: job.assignedEmployee
-        ? `${base} — ${job.assignedEmployee.name}`
-        : base,
-    },
+    data: { jobId: job.id, jobTitle: job.title, action },
   });
+  await logActivity("Side Task", `${job.title}: ${action}`);
 
   return NextResponse.json(job);
 }
@@ -62,6 +61,7 @@ export async function DELETE(
     await prisma.taskLog.create({
       data: { jobId: null, jobTitle: job.title, action: "Deleted" },
     });
+    await logActivity("Side Task", `${job.title}: Deleted`);
   }
 
   return NextResponse.json({ ok: true });
