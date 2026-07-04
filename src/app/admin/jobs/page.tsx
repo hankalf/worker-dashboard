@@ -227,7 +227,10 @@ export default function JobsPage() {
                 </span>
                 {job.dueDate && (
                   <span>
-                    Due {new Date(job.dueDate).toLocaleDateString()}
+                    Due{" "}
+                    {new Date(job.dueDate).toLocaleDateString(undefined, {
+                      timeZone: "UTC",
+                    })}
                   </span>
                 )}
                 {job.priority > 0 && <span>Priority {job.priority}</span>}

@@ -378,7 +378,10 @@ export function DashboardSections({
                 </div>
                 {job.dueDate && (
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Due: {new Date(job.dueDate).toLocaleDateString()}
+                    Due:{" "}
+                    {new Date(job.dueDate).toLocaleDateString(undefined, {
+                      timeZone: "UTC",
+                    })}
                   </div>
                 )}
               </div>
