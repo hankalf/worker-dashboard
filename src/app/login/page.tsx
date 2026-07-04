@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,14 +18,14 @@ function LoginForm() {
     setError(null);
 
     const result = await signIn("credentials", {
-      email,
+      username,
       password,
       redirect: false,
     });
 
     setLoading(false);
     if (result?.error) {
-      setError("Invalid email or password");
+      setError("Invalid username or password");
       return;
     }
 
@@ -44,13 +44,14 @@ function LoginForm() {
         <p className="mb-6 text-sm text-zinc-400">Warehouse Dashboard</p>
 
         <label className="mb-1 block text-sm font-medium text-zinc-300">
-          Email
+          Username
         </label>
         <input
-          type="email"
+          type="text"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="mb-4 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
         />
 
@@ -60,6 +61,7 @@ function LoginForm() {
         <input
           type="password"
           required
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="mb-4 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"

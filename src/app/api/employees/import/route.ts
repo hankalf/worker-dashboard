@@ -8,8 +8,8 @@ import { parseCsv } from "@/lib/csv";
 //   name        required
 //   position    optional — created automatically if it doesn't exist
 //   roles       optional — semicolon-separated, created automatically
-//   admin       optional — "yes" grants admin access (requires email + password)
-//   email       required when admin is yes
+//   admin       optional — "yes" grants admin access (requires username + password)
+//   username    required when admin is yes
 //   password    required when admin is yes
 export async function POST(req: Request) {
   const session = await requireAdmin();
@@ -54,10 +54,10 @@ export async function POST(req: Request) {
     }
 
     const isAdmin = ["yes", "true", "y", "1"].includes(get("admin").toLowerCase());
-    const email = get("email");
+    const username = get("username");
     const password = get("password");
-    if (isAdmin && (!email || !password)) {
-      errors.push(`Row ${i + 1} (${name}): admin access requires email and password`);
+    if (isAdmin && (!username || !password)) {
+      errors.push(`Row ${i + 1} (${name}): admin access requires username and password`);
       continue;
     }
 
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
           name,
           positionId,
           isAdmin,
-          email: email || null,
+          username: username || null,
           passwordHash: password ? await bcrypt.hash(password, 10) : null,
           roles: { connect: roleIds.map((id) => ({ id })) },
         },
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
     } catch (error) {
       const message =
         error instanceof Error && error.message.includes("Unique constraint")
-          ? "email already in use"
+          ? "username already in use"
           : "could not be saved";
       errors.push(`Row ${i + 1} (${name}): ${message}`);
     }

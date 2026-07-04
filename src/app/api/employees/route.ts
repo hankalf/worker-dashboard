@@ -18,13 +18,13 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { name, positionId, roleIds, isAdmin, email, password } = await req.json();
+  const { name, positionId, roleIds, isAdmin, username, password } = await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
-  if (isAdmin && (!email || !password)) {
+  if (isAdmin && (!username || !password)) {
     return NextResponse.json(
-      { error: "Admin access requires an email and password" },
+      { error: "Admin access requires a username and password" },
       { status: 400 }
     );
   }
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       name,
       positionId: positionId || null,
       isAdmin: !!isAdmin,
-      email: email || null,
+      username: username || null,
       passwordHash: password ? await bcrypt.hash(password, 10) : null,
       roles: {
         connect: (roleIds ?? []).map((id: string) => ({ id })),

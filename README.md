@@ -4,9 +4,9 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
 
 - **Dashboard** (`/`) — public, no login needed, with a light/dark mode toggle. Shows jobs grouped into tabs (e.g. Receiving, Shipping, Inventory) with status, assigned employee, and due date. Put it on a wall screen or let anyone open it on any device.
 - **Admin panel** (`/admin`) — login required, dark themed. Full CRUD for jobs, employees, positions, roles, and tabs, plus job assignment and status updates.
-- **Employees** are managed by admins. Each employee has a position and a set of **roles** (what they can do — e.g. Picking, Forklift). Employees who need admin access get an email + password and can sign in; everyone else has no account.
+- **Employees** are managed by admins. Each employee has a position and a set of **roles** (what they can do — e.g. Picking, Forklift). Employees who need admin access get a username + password and can sign in; everyone else has no account.
 - **CSV import** — bulk-add employees from a CSV file (Admin Panel > Employees), with a downloadable sample showing the format. Unknown positions and roles are created automatically.
-- **Stack** — Next.js (App Router, TypeScript), Prisma + PostgreSQL, Auth.js (NextAuth v5) with email/password credentials.
+- **Stack** — Next.js (App Router, TypeScript), Prisma + PostgreSQL, Auth.js (NextAuth v5) with username/password credentials.
 
 ## Local development
 
@@ -22,7 +22,7 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
    npx prisma migrate deploy
    npx prisma generate
    ```
-4. Seed the first admin account (defaults to `admin@warehouse.local` / `admin123` unless you set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`):
+4. Seed the first admin account (defaults to `admin` / `admin123` unless you set `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`):
    ```bash
    npx prisma db seed
    ```
@@ -42,7 +42,7 @@ This repo includes a `render.yaml` Blueprint that provisions both services in on
 2. In the Render dashboard, choose **New > Blueprint** and point it at the repo. Render will read `render.yaml` and create:
    - a **web service** (`warehouse-dashboard`) running `npm run build` / `npm run start`, with `prisma migrate deploy` run automatically as a pre-deploy step
    - a **PostgreSQL database** (`warehouse-db`), wired to the web service's `DATABASE_URL` automatically
-3. `NEXTAUTH_SECRET` is generated automatically by Render. Set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in the web service's environment variables if you want a specific first admin login, then run the seed once from the Render shell:
+3. `NEXTAUTH_SECRET` is generated automatically by Render. Set `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` in the web service's environment variables if you want a specific first admin login, then run the seed once from the Render shell:
    ```bash
    npx prisma db seed
    ```

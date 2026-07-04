@@ -11,11 +11,11 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { name, positionId, roleIds, isAdmin, email, password } = await req.json();
+  const { name, positionId, roleIds, isAdmin, username, password } = await req.json();
 
-  if (isAdmin && !email) {
+  if (isAdmin && !username) {
     return NextResponse.json(
-      { error: "Admin access requires an email" },
+      { error: "Admin access requires a username" },
       { status: 400 }
     );
   }
@@ -30,7 +30,7 @@ export async function PATCH(
     name,
     positionId: positionId || null,
     isAdmin: !!isAdmin,
-    email: email || null,
+    username: username || null,
     roles: {
       set: ((roleIds ?? []) as string[]).map((roleId) => ({ id: roleId })),
     },

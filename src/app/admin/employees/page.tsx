@@ -8,7 +8,7 @@ type Employee = {
   id: string;
   name: string;
   isAdmin: boolean;
-  email: string | null;
+  username: string | null;
   positionId: string | null;
   position: Position | null;
   roles: Role[];
@@ -25,7 +25,7 @@ export default function EmployeesPage() {
   const [positionId, setPositionId] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export default function EmployeesPage() {
     setPositionId("");
     setRoleIds([]);
     setIsAdmin(false);
-    setEmail("");
+    setUsername("");
     setPassword("");
     setEditingId(null);
   };
@@ -80,7 +80,7 @@ export default function EmployeesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, positionId, roleIds, isAdmin, email, password }),
+      body: JSON.stringify({ name, positionId, roleIds, isAdmin, username, password }),
     });
 
     if (!res.ok) {
@@ -99,7 +99,7 @@ export default function EmployeesPage() {
     setPositionId(employee.positionId ?? "");
     setRoleIds(employee.roles.map((role) => role.id));
     setIsAdmin(employee.isAdmin);
-    setEmail(employee.email ?? "");
+    setUsername(employee.username ?? "");
     setPassword("");
   };
 
@@ -152,7 +152,7 @@ export default function EmployeesPage() {
           <code className="text-zinc-300">position</code>,{" "}
           <code className="text-zinc-300">roles</code> (separate multiple with
           semicolons), <code className="text-zinc-300">admin</code> (yes/no),{" "}
-          <code className="text-zinc-300">email</code> and{" "}
+          <code className="text-zinc-300">username</code> and{" "}
           <code className="text-zinc-300">password</code> (required for admins).
           Positions and roles that don&apos;t exist yet are created automatically.{" "}
           <a
@@ -255,10 +255,10 @@ export default function EmployeesPage() {
         {isAdmin && (
           <div className="grid grid-cols-2 gap-3">
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               className={inputClass}
             />
@@ -312,7 +312,7 @@ export default function EmployeesPage() {
               </div>
               <div className="text-sm text-zinc-400">
                 {employee.position?.title ?? "No position"}
-                {employee.email ? ` · ${employee.email}` : ""}
+                {employee.username ? ` · ${employee.username}` : ""}
               </div>
               {employee.roles.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
