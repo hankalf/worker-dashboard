@@ -1,0 +1,71 @@
+// Prisma schema for the warehouse dashboard
+// learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobStatus {
+  UNASSIGNED
+  ASSIGNED
+  IN_PROGRESS
+  DONE
+}
+
+// Every person in the warehouse. Employees with admin access get an
+// email + password and can sign in to the admin panel.
+model Employee {
+  id           String    @id @default(cuid())
+  name         String
+  isAdmin      Boolean   @default(false)
+  email        String?   @unique
+  passwordHash String?
+  position     Position? @relation(fields: [positionId], references: [id])
+  positionId   String?
+  roles        Role[]    @relation("EmployeeRoles")
+  jobs         Job[]
+  createdAt    DateTime  @default(now())
+}
+
+// A capability an employee has — the kinds of job they can perform.
+model Role {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  employees   Employee[] @relation("EmployeeRoles")
+}
+
+model Position {
+  id          String     @id @default(cuid())
+  title       String     @unique
+  description String?
+  employees   Employee[]
+}
+
+model Tab {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  sortOrder   Int     @default(0)
+  jobs        Job[]
+}
+
+model Job {
+  id                 String    @id @default(cuid())
+  title              String
+  description        String?
+  status             JobStatus @default(UNASSIGNED)
+  tab                Tab       @relation(fields: [tabId], references: [id])
+  tabId              String
+  assignedEmployee   Employee? @relation(fields: [assignedEmployeeId], references: [id])
+  assignedEmployeeId String?
+  dueDate            DateTime?
+  priority           Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
