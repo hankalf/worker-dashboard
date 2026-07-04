@@ -57,6 +57,7 @@ model Employee {
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)
+  terminatedAt DateTime?
   createdAt    DateTime  @default(now())
 }
 
@@ -119,6 +120,7 @@ model ActivityLog {
   category  String
   action    String
   subjectId String?
+  archived  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([createdAt])

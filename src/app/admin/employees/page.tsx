@@ -19,6 +19,7 @@ type Employee = {
   shift: Shift | null;
   attendance: Attendance;
   isLead: boolean;
+  terminatedAt: string | null;
 };
 
 const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
@@ -81,15 +82,16 @@ export default function EmployeesPage() {
   const [attendance, setAttendance] = useState<Attendance>("PRESENT");
   const [isLead, setIsLead] = useState(false);
   const [search, setSearch] = useState("");
+  const [showTerminated, setShowTerminated] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const load = async () => {
+  const load = async (withTerminated = showTerminated) => {
     const [employeesRes, positionsRes, rolesRes] = await Promise.all([
-      fetch("/api/employees"),
+      fetch(`/api/employees${withTerminated ? "?includeTerminated=1" : ""}`),
       fetch("/api/positions"),
       fetch("/api/roles"),
     ]);
@@ -105,7 +107,29 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const toggleTerminated = (next: boolean) => {
+    setShowTerminated(next);
+    load(next);
+  };
+
+  const terminate = async (employee: Employee, terminated: boolean) => {
+    const verb = terminated ? "Terminate" : "Reactivate";
+    if (!confirm(`${verb} ${employee.name}?`)) return;
+    const res = await fetch(`/api/employees/${employee.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ terminated }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "Something went wrong");
+      return;
+    }
+    load();
+  };
 
   const resetForm = () => {
     setName("");
@@ -416,12 +440,23 @@ export default function EmployeesPage() {
         </div>
       </form>
 
-      <input
-        placeholder="Search employees by name, position, or role…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className={`mb-3 w-full ${inputClass}`}
-      />
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <input
+          placeholder="Search employees by name, position, or role…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={`min-w-40 flex-1 ${inputClass}`}
+        />
+        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-zinc-400">
+          <input
+            type="checkbox"
+            checked={showTerminated}
+            onChange={(e) => toggleTerminated(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Show terminated
+        </label>
+      </div>
 
       <ul className="flex flex-col gap-2">
         {employees
@@ -437,11 +472,18 @@ export default function EmployeesPage() {
           .map((employee) => (
           <li
             key={employee.id}
-            className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+            className={`flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
+              employee.terminatedAt ? "opacity-60" : ""
+            }`}
           >
             <div>
               <div className="flex items-center gap-2 font-medium text-white">
                 {employee.name}
+                {employee.terminatedAt && (
+                  <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                    Terminated
+                  </span>
+                )}
                 {employee.isLead && (
                   <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
                     Lead
@@ -476,19 +518,36 @@ export default function EmployeesPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-3 text-sm">
+            <div className="flex shrink-0 gap-3 text-sm">
               <button
                 onClick={() => openHistory(employee)}
                 className="text-zinc-400 hover:text-white"
               >
                 History
               </button>
-              <button
-                onClick={() => handleEdit(employee)}
-                className="text-zinc-400 hover:text-white"
-              >
-                Edit
-              </button>
+              {employee.terminatedAt ? (
+                <button
+                  onClick={() => terminate(employee, false)}
+                  className="text-green-400 hover:text-green-300"
+                >
+                  Reactivate
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleEdit(employee)}
+                    className="text-zinc-400 hover:text-white"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => terminate(employee, true)}
+                    className="text-amber-400 hover:text-amber-300"
+                  >
+                    Terminate
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => handleDelete(employee.id)}
                 className="text-red-400 hover:text-red-300"

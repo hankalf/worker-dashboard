@@ -15,6 +15,7 @@ export default async function Home({
   const [positions, employees, jobs, announcement] = await Promise.all([
     prisma.position.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
     prisma.employee.findMany({
+      where: { terminatedAt: null },
       include: { position: true, roles: true },
       orderBy: { name: "asc" },
     }),

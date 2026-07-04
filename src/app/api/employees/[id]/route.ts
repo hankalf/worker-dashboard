@@ -37,6 +37,46 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
+  // Terminate / reactivate is an admin-only action with side effects.
+  if (body.terminated !== undefined) {
+    if (!isAdmin)
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (body.terminated && id === session.user.id)
+      return NextResponse.json(
+        { error: "You cannot terminate your own account" },
+        { status: 400 }
+      );
+
+    if (body.terminated) {
+      const employee = await prisma.employee.update({
+        where: { id },
+        data: {
+          terminatedAt: new Date(),
+          accessLevel: "NONE",
+          positionId: null,
+          isLead: false,
+        },
+        include: { position: true, roles: true },
+      });
+      await logActivity("Employee", `Terminated ${employee.name}`, id);
+      // Archive their logs (incl. the termination entry) so they survive the
+      // 14-day purge.
+      await prisma.activityLog.updateMany({
+        where: { subjectId: id },
+        data: { archived: true },
+      });
+      return NextResponse.json(employee);
+    } else {
+      const employee = await prisma.employee.update({
+        where: { id },
+        data: { terminatedAt: null },
+        include: { position: true, roles: true },
+      });
+      await logActivity("Employee", `Reactivated ${employee.name}`, id);
+      return NextResponse.json(employee);
+    }
+  }
+
   const data: Record<string, unknown> = {};
 
   // Assignment fields — allowed for supervisors and admins.

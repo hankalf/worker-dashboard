@@ -189,6 +189,11 @@ export function DashboardSections({
       })
     : [];
 
+  // Everyone on shift with a lunch time, ordered by when they go.
+  const lunchSchedule = roster
+    .filter((e) => e.lunchStart && e.attendance === "PRESENT")
+    .sort((a, b) => toMinutes(a.lunchStart!) - toMinutes(b.lunchStart!));
+
   return (
     <>
       {announcement && (
@@ -234,6 +239,36 @@ export function DashboardSections({
           </div>
         )}
       </section>
+
+      {lunchSchedule.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Lunch Schedule
+          </h2>
+          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            {lunchSchedule.map((emp) => (
+              <li
+                key={emp.id}
+                className="flex items-center justify-between gap-3 px-4 py-2"
+              >
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-700 dark:text-teal-300">
+                    {formatClock(emp.lunchStart!)}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {emp.name}
+                  </span>
+                </span>
+                {emp.position && (
+                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                    {emp.position.title}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

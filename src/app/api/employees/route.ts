@@ -6,12 +6,16 @@ import { logActivity } from "@/lib/activity";
 
 const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
 
-export async function GET() {
+export async function GET(req: Request) {
   // Supervisors need the roster to run the Assign board.
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const includeTerminated =
+    new URL(req.url).searchParams.get("includeTerminated") === "1";
+
   const employees = await prisma.employee.findMany({
+    where: includeTerminated ? undefined : { terminatedAt: null },
     include: { position: true, roles: true },
     orderBy: { name: "asc" },
   });
