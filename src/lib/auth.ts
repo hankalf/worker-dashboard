@@ -21,7 +21,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { username },
           omit: { passwordHash: false },
         });
-        if (!employee?.isAdmin || !employee.passwordHash) return null;
+        if (
+          !employee ||
+          employee.accessLevel === "NONE" ||
+          !employee.passwordHash
+        )
+          return null;
 
         const isValid = await bcrypt.compare(password, employee.passwordHash);
         if (!isValid) return null;
@@ -29,6 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return {
           id: employee.id,
           name: employee.name,
+          accessLevel: employee.accessLevel,
         };
       },
     }),

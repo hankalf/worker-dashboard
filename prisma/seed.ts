@@ -10,14 +10,19 @@ async function main() {
   const password = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
   const passwordHash = await bcrypt.hash(password, 10);
 
+  // When SEED_ADMIN_PASSWORD is set we also reset an existing admin's password
+  // and restore ADMIN access — this is the account-recovery path (set the env
+  // var and redeploy to regain access if a password is lost).
   const admin = await prisma.employee.upsert({
     where: { username },
-    update: {},
+    update: process.env.SEED_ADMIN_PASSWORD
+      ? { passwordHash, accessLevel: "ADMIN" }
+      : {},
     create: {
       name: "Admin",
       username,
       passwordHash,
-      isAdmin: true,
+      accessLevel: "ADMIN",
     },
   });
 

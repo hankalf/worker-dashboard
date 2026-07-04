@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/rbac";
+import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+
+const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
 
 const SHIFT_LABEL: Record<string, string> = {
   FIRST: "1st Shift",
@@ -22,46 +24,56 @@ const clock = (hhmm: string) => {
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 
-// Partial update: only fields present in the body are changed, so quick
-// single-field edits (e.g. the assign board setting positionId) don't
-// clobber admin access, username, or roles.
+// Partial update. Supervisors may change only assignment fields (position,
+// attendance, lunch, shift); full admins may also change identity/access/roles.
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const staff = await requireStaff();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { session, isAdmin } = staff;
 
   const { id } = await params;
   const body = await req.json();
 
-  if (body.isAdmin === true && body.username !== undefined && !body.username) {
-    return NextResponse.json(
-      { error: "Admin access requires a username" },
-      { status: 400 }
-    );
-  }
-  if (id === session.user.id && body.isAdmin === false) {
-    return NextResponse.json(
-      { error: "You cannot remove your own admin access" },
-      { status: 400 }
-    );
-  }
-
   const data: Record<string, unknown> = {};
-  if (body.name !== undefined) data.name = body.name;
+
+  // Assignment fields — allowed for supervisors and admins.
   if (body.positionId !== undefined) data.positionId = body.positionId || null;
-  if (body.isAdmin !== undefined) data.isAdmin = !!body.isAdmin;
-  if (body.username !== undefined) data.username = body.username || null;
+  if (body.attendance !== undefined) data.attendance = body.attendance || "PRESENT";
   if (body.lunchStart !== undefined) data.lunchStart = body.lunchStart || null;
   if (body.lunchEnd !== undefined) data.lunchEnd = body.lunchEnd || null;
   if (body.shift !== undefined) data.shift = body.shift || null;
-  if (body.attendance !== undefined) data.attendance = body.attendance || "PRESENT";
-  if (body.roleIds !== undefined) {
-    data.roles = { set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })) };
-  }
-  if (body.password) {
-    data.passwordHash = await bcrypt.hash(body.password, 10);
+
+  // Identity / access / roles — admins only.
+  if (isAdmin) {
+    if (body.name !== undefined) data.name = body.name;
+    if (body.username !== undefined) data.username = body.username || null;
+    if (body.roleIds !== undefined) {
+      data.roles = {
+        set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })),
+      };
+    }
+    if (body.password) {
+      data.passwordHash = await bcrypt.hash(body.password, 10);
+    }
+    if (body.accessLevel !== undefined) {
+      const level = LEVELS.includes(body.accessLevel) ? body.accessLevel : "NONE";
+      if (id === session.user.id && level !== "ADMIN") {
+        return NextResponse.json(
+          { error: "You cannot remove your own admin access" },
+          { status: 400 }
+        );
+      }
+      if (level !== "NONE" && body.username !== undefined && !body.username) {
+        return NextResponse.json(
+          { error: "Panel access requires a username" },
+          { status: 400 }
+        );
+      }
+      data.accessLevel = level;
+    }
   }
 
   try {
@@ -89,23 +101,25 @@ export async function PATCH(
       );
     if (body.attendance !== undefined)
       changes.push(`marked ${ATTENDANCE_LABEL[employee.attendance] ?? employee.attendance}`);
-    if (body.roleIds !== undefined)
+    if (isAdmin && body.roleIds !== undefined)
       changes.push(
         employee.roles.length
           ? `roles → ${employee.roles.map((r) => r.name).join(", ")}`
           : "roles cleared"
       );
     if (
-      body.name !== undefined ||
-      body.username !== undefined ||
-      body.isAdmin !== undefined ||
-      body.password
+      isAdmin &&
+      (body.name !== undefined ||
+        body.username !== undefined ||
+        body.accessLevel !== undefined ||
+        body.password)
     )
       changes.push("details updated");
 
     await logActivity(
       "Employee",
-      `${employee.name}: ${changes.length ? changes.join(", ") : "updated"}`
+      `${employee.name}: ${changes.length ? changes.join(", ") : "updated"}`,
+      employee.id
     );
     return NextResponse.json(employee);
   } catch (error) {
@@ -140,6 +154,6 @@ export async function DELETE(
 
   const employee = await prisma.employee.findUnique({ where: { id } });
   await prisma.employee.delete({ where: { id } });
-  if (employee) await logActivity("Employee", `Removed ${employee.name}`);
+  if (employee) await logActivity("Employee", `Removed ${employee.name}`, id);
   return NextResponse.json({ ok: true });
 }

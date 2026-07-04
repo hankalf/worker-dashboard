@@ -17,18 +17,23 @@ export function DashboardView({
   jobs,
   isAdmin,
   announcement,
+  tv = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   isAdmin: boolean;
   announcement: string | null;
+  tv?: boolean;
 }) {
   const now = useNow();
   useAutoRefresh();
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div
+      className="flex flex-1 flex-col"
+      style={tv ? ({ zoom: 1.35 } as React.CSSProperties) : undefined}
+    >
       <header className="grid grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
         <div className="text-center">
@@ -53,21 +58,38 @@ export function DashboardView({
           )}
         </div>
         <div className="flex items-center justify-end gap-4 text-sm">
-          <ThemeToggle />
-          {isAdmin ? (
+          {tv ? (
             <Link
-              href="/admin/assign"
-              className="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+              href="/"
+              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-white"
             >
-              Admin Panel
+              Exit TV
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
-            >
-              Admin login
-            </Link>
+            <>
+              <ThemeToggle />
+              <Link
+                href="/?tv=1"
+                className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+              >
+                TV mode
+              </Link>
+              {isAdmin ? (
+                <Link
+                  href="/admin/assign"
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  Admin Panel
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+                >
+                  Admin login
+                </Link>
+              )}
+            </>
           )}
         </div>
       </header>

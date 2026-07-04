@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/rbac";
+import { requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 
 const ID = "current";
@@ -13,8 +13,8 @@ export async function GET() {
 
 // Admin sets (or clears) the single pinned message.
 export async function PUT(req: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const staff = await requireStaff();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { message } = await req.json();
   const trimmed = typeof message === "string" ? message.trim() : "";

@@ -4,8 +4,13 @@ import { DashboardView } from "@/components/DashboardView";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ tv?: string }>;
+}) {
   const session = await auth();
+  const tv = (await searchParams).tv === "1";
 
   const [positions, employees, jobs, announcement] = await Promise.all([
     prisma.position.findMany({ orderBy: { title: "asc" } }),
@@ -27,6 +32,7 @@ export default async function Home() {
       jobs={jobs}
       isAdmin={!!session?.user}
       announcement={announcement?.message ?? null}
+      tv={tv}
     />
   );
 }

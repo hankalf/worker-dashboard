@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 type Role = { id: string; name: string };
 type Position = {
@@ -12,6 +13,7 @@ type Position = {
 };
 
 export default function PositionsPage() {
+  const guarded = useAdminGuard();
   const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [title, setTitle] = useState("");
@@ -74,6 +76,10 @@ export default function PositionsPage() {
     await fetch(`/api/positions/${id}`, { method: "DELETE" });
     load();
   };
+
+  if (!guarded) {
+    return <p className="text-sm text-zinc-500">Checking access…</p>;
+  }
 
   return (
     <div className="max-w-2xl">

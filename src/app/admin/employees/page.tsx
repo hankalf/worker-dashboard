@@ -1,21 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
 type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT";
+type AccessLevel = "NONE" | "SUPERVISOR" | "ADMIN";
 type Employee = {
   id: string;
   name: string;
-  isAdmin: boolean;
+  accessLevel: AccessLevel;
   username: string | null;
   positionId: string | null;
   position: Position | null;
   roles: Role[];
   shift: Shift | null;
   attendance: Attendance;
+};
+
+const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
+  { value: "NONE", label: "No login" },
+  { value: "SUPERVISOR", label: "Supervisor (assign only)" },
+  { value: "ADMIN", label: "Admin (full access)" },
+];
+const ACCESS_LABEL: Record<AccessLevel, string> = {
+  NONE: "",
+  SUPERVISOR: "Supervisor",
+  ADMIN: "Admin",
+};
+
+type ActivityLog = {
+  id: string;
+  category: string;
+  action: string;
+  createdAt: string;
 };
 
 const SHIFT_OPTIONS: { value: Shift; label: string }[] = [
@@ -44,13 +64,16 @@ const inputClass =
   "rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500";
 
 export default function EmployeesPage() {
+  const guarded = useAdminGuard();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [historyFor, setHistoryFor] = useState<Employee | null>(null);
+  const [history, setHistory] = useState<ActivityLog[] | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [name, setName] = useState("");
   const [positionId, setPositionId] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>("NONE");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [shift, setShift] = useState<Shift | "">("");
@@ -86,7 +109,7 @@ export default function EmployeesPage() {
     setName("");
     setPositionId("");
     setRoleIds([]);
-    setIsAdmin(false);
+    setAccessLevel("NONE");
     setUsername("");
     setPassword("");
     setShift("");
@@ -115,7 +138,7 @@ export default function EmployeesPage() {
         name,
         positionId,
         roleIds,
-        isAdmin,
+        accessLevel,
         username,
         password,
         shift,
@@ -138,11 +161,18 @@ export default function EmployeesPage() {
     setName(employee.name);
     setPositionId(employee.positionId ?? "");
     setRoleIds(employee.roles.map((role) => role.id));
-    setIsAdmin(employee.isAdmin);
+    setAccessLevel(employee.accessLevel);
     setUsername(employee.username ?? "");
     setPassword("");
     setShift(employee.shift ?? "");
     setAttendance(employee.attendance ?? "PRESENT");
+  };
+
+  const openHistory = async (employee: Employee) => {
+    setHistoryFor(employee);
+    setHistory(null);
+    const res = await fetch(`/api/activity-logs?subjectId=${employee.id}`);
+    setHistory(res.ok ? await res.json() : []);
   };
 
   const handleDelete = async (id: string) => {
@@ -182,6 +212,10 @@ export default function EmployeesPage() {
     setImportResult(parts.join(" "));
     load();
   };
+
+  if (!guarded) {
+    return <p className="text-sm text-zinc-500">Checking access…</p>;
+  }
 
   return (
     <div className="max-w-3xl">
@@ -310,17 +344,22 @@ export default function EmployeesPage() {
           )}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={isAdmin}
-            onChange={(e) => setIsAdmin(e.target.checked)}
-            className="h-4 w-4"
-          />
-          Admin access (can sign in and manage everything)
+        <label className="text-xs text-zinc-400">
+          Panel access
+          <select
+            value={accessLevel}
+            onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
+            className={`mt-1 block w-full ${inputClass}`}
+          >
+            {ACCESS_OPTIONS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </select>
         </label>
 
-        {isAdmin && (
+        {accessLevel !== "NONE" && (
           <div className="grid grid-cols-2 gap-3">
             <input
               type="text"
@@ -389,9 +428,9 @@ export default function EmployeesPage() {
             <div>
               <div className="flex items-center gap-2 font-medium text-white">
                 {employee.name}
-                {employee.isAdmin && (
+                {employee.accessLevel !== "NONE" && (
                   <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
-                    Admin
+                    {ACCESS_LABEL[employee.accessLevel]}
                   </span>
                 )}
                 {employee.attendance !== "PRESENT" && (
@@ -420,6 +459,12 @@ export default function EmployeesPage() {
             </div>
             <div className="flex gap-3 text-sm">
               <button
+                onClick={() => openHistory(employee)}
+                className="text-zinc-400 hover:text-white"
+              >
+                History
+              </button>
+              <button
                 onClick={() => handleEdit(employee)}
                 className="text-zinc-400 hover:text-white"
               >
@@ -435,6 +480,54 @@ export default function EmployeesPage() {
           </li>
         ))}
       </ul>
+
+      {historyFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setHistoryFor(null)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-lg border border-zinc-800 bg-zinc-900 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-white">
+                History — {historyFor.name}
+              </h3>
+              <button
+                onClick={() => setHistoryFor(null)}
+                className="text-sm text-zinc-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            {history === null ? (
+              <p className="text-sm text-zinc-500">Loading…</p>
+            ) : history.length === 0 ? (
+              <p className="text-sm text-zinc-500">No recorded history.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {history.map((log) => (
+                  <li
+                    key={log.id}
+                    className="flex items-baseline justify-between gap-3 rounded-md border border-zinc-800 px-3 py-2 text-sm"
+                  >
+                    <span className="text-zinc-200">{log.action}</span>
+                    <span className="whitespace-nowrap text-xs text-zinc-500">
+                      {new Date(log.createdAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

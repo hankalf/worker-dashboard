@@ -48,6 +48,10 @@ This repo includes a `render.yaml` Blueprint that provisions both services in on
    ```
 4. Once deployed, Render gives you a public URL (`https://<service-name>.onrender.com`) — that's your live dashboard + admin panel.
 
+**Locked out?** Set `SEED_ADMIN_USERNAME` (defaults to `admin`) and a new `SEED_ADMIN_PASSWORD` in the web service's environment, then redeploy. On startup the seed resets that account's password and restores full admin access — the account-recovery path when no admin can sign in.
+
+**Access levels:** each employee's *Panel access* is No login, **Supervisor** (assign positions, attendance, lunches, shifts, side tasks, announcements — no employee/position/role management), or **Admin** (full control).
+
 **Note:** Render's free PostgreSQL databases expire after 30 days. For anything beyond a demo, upgrade `warehouse-db` to a paid plan in `render.yaml` (or the dashboard) before that happens.
 
 ## Project structure

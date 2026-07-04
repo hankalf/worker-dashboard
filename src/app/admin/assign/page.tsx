@@ -242,6 +242,9 @@ export default function AssignPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [undoSnapshot, setUndoSnapshot] = useState<
+    { id: string; positionId: string }[] | null
+  >(null);
 
   // Small movement threshold so taps/scrolls on touchscreens don't start a
   // drag; keyboard sensor lets cards be moved with Enter + arrow keys too.
@@ -333,16 +336,40 @@ export default function AssignPage() {
     )
       return;
 
+    const snapshot = employees
+      .filter((e) => e.positionId)
+      .map((e) => ({ id: e.id, positionId: e.positionId as string }));
+
     const res = await fetch("/api/employees/reset-positions", {
       method: "POST",
     });
     if (res.ok) {
-      setEmployees((current) =>
-        current.map((e) => ({ ...e, positionId: null }))
-      );
+      setEmployees((current) => current.map((e) => ({ ...e, positionId: null })));
+      setUndoSnapshot(snapshot.length ? snapshot : null);
     } else {
       alert("Could not reset positions. Please try again.");
     }
+  };
+
+  const undoReset = async () => {
+    if (!undoSnapshot) return;
+    setEmployees((current) =>
+      current.map((e) => {
+        const s = undoSnapshot.find((x) => x.id === e.id);
+        return s ? { ...e, positionId: s.positionId } : e;
+      })
+    );
+    const toRestore = undoSnapshot;
+    setUndoSnapshot(null);
+    await Promise.all(
+      toRestore.map((s) =>
+        fetch(`/api/employees/${s.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ positionId: s.positionId }),
+        })
+      )
+    );
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -390,6 +417,29 @@ export default function AssignPage() {
         Drag an employee onto a position, and set each person&apos;s lunch time
         — every change saves instantly.
       </p>
+
+      {undoSnapshot && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-200">
+          <span>
+            Positions cleared for {undoSnapshot.length} employee
+            {undoSnapshot.length === 1 ? "" : "s"}.
+          </span>
+          <div className="flex gap-3">
+            <button
+              onClick={undoReset}
+              className="font-medium text-amber-100 underline hover:text-white"
+            >
+              Undo
+            </button>
+            <button
+              onClick={() => setUndoSnapshot(null)}
+              className="text-amber-400 hover:text-amber-200"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {positions.length === 0 && employees.length > 0 && (
         <p className="mb-4 text-sm text-amber-400">

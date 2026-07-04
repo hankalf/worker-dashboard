@@ -67,11 +67,22 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const isAdmin = ["yes", "true", "y", "1"].includes(get("admin").toLowerCase());
+    const adminCell = get("admin").toLowerCase();
+    const accessLevel: "NONE" | "SUPERVISOR" | "ADMIN" = [
+      "yes",
+      "true",
+      "y",
+      "1",
+      "admin",
+    ].includes(adminCell)
+      ? "ADMIN"
+      : adminCell === "supervisor"
+        ? "SUPERVISOR"
+        : "NONE";
     const username = get("username");
     const password = get("password");
-    if (isAdmin && (!username || !password)) {
-      errors.push(`Row ${i + 1} (${name}): admin access requires username and password`);
+    if (accessLevel !== "NONE" && (!username || !password)) {
+      errors.push(`Row ${i + 1} (${name}): panel access requires username and password`);
       continue;
     }
 
@@ -102,7 +113,7 @@ export async function POST(req: Request) {
         data: {
           name,
           positionId,
-          isAdmin,
+          accessLevel,
           username: username || null,
           passwordHash: password ? await bcrypt.hash(password, 10) : null,
           shift: SHIFT_MAP[get("shift").toLowerCase()] ?? null,

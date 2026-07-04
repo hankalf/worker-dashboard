@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/rbac";
+import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 
+const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
+
 export async function GET() {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Supervisors need the roster to run the Assign board.
+  const staff = await requireStaff();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const employees = await prisma.employee.findMany({
     include: { position: true, roles: true },
@@ -19,14 +22,15 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { name, positionId, roleIds, isAdmin, username, password, shift, attendance } =
+  const { name, positionId, roleIds, accessLevel, username, password, shift, attendance } =
     await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
-  if (isAdmin && (!username || !password)) {
+  const level = LEVELS.includes(accessLevel) ? accessLevel : "NONE";
+  if (level !== "NONE" && (!username || !password)) {
     return NextResponse.json(
-      { error: "Admin access requires a username and password" },
+      { error: "Panel access requires a username and password" },
       { status: 400 }
     );
   }
@@ -36,7 +40,7 @@ export async function POST(req: Request) {
       data: {
         name,
         positionId: positionId || null,
-        isAdmin: !!isAdmin,
+        accessLevel: level,
         username: username || null,
         passwordHash: password ? await bcrypt.hash(password, 10) : null,
         shift: shift || null,
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
       },
       include: { position: true, roles: true },
     });
-    await logActivity("Employee", `Added ${employee.name}`);
+    await logActivity("Employee", `Added ${employee.name}`, employee.id);
     return NextResponse.json(employee, { status: 201 });
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") {

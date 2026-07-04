@@ -31,13 +31,21 @@ enum Attendance {
   CALLED_OUT
 }
 
+// Admin-panel access. NONE = no login; SUPERVISOR = limited (assign, attendance,
+// lunch, shift, side tasks, announcements); ADMIN = full control.
+enum AccessLevel {
+  NONE
+  SUPERVISOR
+  ADMIN
+}
+
 // Every person in the warehouse. Employees with admin access get a
 // username + password and can sign in to the admin panel.
 model Employee {
-  id           String    @id @default(cuid())
+  id           String      @id @default(cuid())
   name         String
-  isAdmin      Boolean   @default(false)
-  username     String?   @unique
+  accessLevel  AccessLevel @default(NONE)
+  username     String?     @unique
   passwordHash String?
   position     Position? @relation(fields: [positionId], references: [id])
   positionId   String?
@@ -108,7 +116,9 @@ model ActivityLog {
   id        String   @id @default(cuid())
   category  String
   action    String
+  subjectId String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([subjectId])
 }
