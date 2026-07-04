@@ -66,17 +66,13 @@ export function DashboardView({
     return () => clearInterval(timer);
   }, []);
 
-  const unassigned = employees.filter((e) => !e.positionId);
-  const columns = [
-    ...positions.map((position) => ({
-      id: position.id,
-      title: position.title,
-      members: employees.filter((e) => e.positionId === position.id),
-    })),
-    ...(unassigned.length > 0
-      ? [{ id: "unassigned", title: "Unassigned", members: unassigned }]
-      : []),
-  ];
+  // Only real positions on the public dashboard; unassigned staff are managed
+  // on the admin Assign board.
+  const columns = positions.map((position) => ({
+    id: position.id,
+    title: position.title,
+    members: employees.filter((e) => e.positionId === position.id),
+  }));
 
   const onLunch = now
     ? employees.filter((emp) => {
@@ -89,27 +85,30 @@ export function DashboardView({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div>
-          <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
+      <header className="grid grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
+        <div className="text-center">
           {now && (
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              {now.toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}{" "}
-              ·{" "}
-              {now.toLocaleTimeString(undefined, {
-                hour: "numeric",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </p>
+            <>
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {now.toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+              <div className="text-3xl font-semibold tabular-nums">
+                {now.toLocaleTimeString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </div>
+            </>
           )}
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center justify-end gap-4 text-sm">
           <ThemeToggle />
           {isAdmin ? (
             <Link
