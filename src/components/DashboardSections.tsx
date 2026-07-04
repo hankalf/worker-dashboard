@@ -96,23 +96,23 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{member.name}</span>
-        {member.shift && (
-          <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-            {SHIFTS[member.shift].label}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium">{member.name}</span>
+          {member.shift && (
+            <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {SHIFTS[member.shift].label}
+            </span>
+          )}
+        </span>
+        {member.lunchStart && (
+          <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            Lunch {formatClock(member.lunchStart)}
           </span>
         )}
       </div>
-      {(member.lunchStart || member.roles.length > 0) && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-          {member.lunchStart && (
-            <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-              Lunch {formatClock(member.lunchStart)}
-            </span>
-          )}
-          {member.roles.length > 0 && (
-            <span>{member.roles.map((role) => role.name).join(" · ")}</span>
-          )}
+      {member.roles.length > 0 && (
+        <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          {member.roles.map((role) => role.name).join(" · ")}
         </div>
       )}
     </>
@@ -190,8 +190,8 @@ export function DashboardSections({
 
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {showPositions ? "Team by Position" : "Team"}
-          {shiftKey && (
+          {showPositions ? "Team by Position" : "Position"}
+          {showPositions && shiftKey && (
             <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
               — {SHIFTS[shiftKey].label} ({SHIFTS[shiftKey].range})
             </span>
