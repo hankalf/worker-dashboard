@@ -18,7 +18,8 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { name, positionId, roleIds, isAdmin, username, password } = await req.json();
+  const { name, positionId, roleIds, isAdmin, username, password, shift } =
+    await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         isAdmin: !!isAdmin,
         username: username || null,
         passwordHash: password ? await bcrypt.hash(password, 10) : null,
+        shift: shift || null,
         roles: {
           connect: (roleIds ?? []).map((id: string) => ({ id })),
         },

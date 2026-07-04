@@ -17,6 +17,13 @@ enum JobStatus {
   DONE
 }
 
+// Work shifts: FIRST 6am-2pm, SECOND 2pm-10pm, THIRD 10pm-6am.
+enum Shift {
+  FIRST
+  SECOND
+  THIRD
+}
+
 // Every person in the warehouse. Employees with admin access get a
 // username + password and can sign in to the admin panel.
 model Employee {
@@ -32,6 +39,7 @@ model Employee {
   // Lunch window as "HH:MM" strings (24h); end defaults to start+30min if unset
   lunchStart   String?
   lunchEnd     String?
+  shift        Shift?
   createdAt    DateTime  @default(now())
 }
 

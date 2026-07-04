@@ -52,6 +52,22 @@ export const formatClock = (hhmm: string) => {
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 
+type ShiftKey = "FIRST" | "SECOND" | "THIRD";
+
+const SHIFTS: Record<ShiftKey, { label: string; range: string }> = {
+  FIRST: { label: "1st Shift", range: "6:00 AM – 2:00 PM" },
+  SECOND: { label: "2nd Shift", range: "2:00 PM – 10:00 PM" },
+  THIRD: { label: "3rd Shift", range: "10:00 PM – 6:00 AM" },
+};
+
+// Which shift is active right now (FIRST 6-14, SECOND 14-22, THIRD 22-6).
+const currentShift = (now: Date): ShiftKey => {
+  const cur = now.getHours() * 60 + now.getMinutes();
+  if (cur >= 6 * 60 && cur < 14 * 60) return "FIRST";
+  if (cur >= 14 * 60 && cur < 22 * 60) return "SECOND";
+  return "THIRD";
+};
+
 // Periodically soft-refreshes the current route's server data so displays
 // pick up admin-panel changes without a manual reload (no full-page refresh,
 // so client state like the clock is preserved).
@@ -87,10 +103,16 @@ export function DashboardSections({
   jobs: JobWithRelations[];
   now: Date | null;
 }) {
+  // Show only the crew whose shift is active now (employees with no shift set
+  // are always shown). Recomputes as the clock crosses a shift boundary.
+  const shiftKey = now ? currentShift(now) : null;
+  const onShift = (e: EmployeeWithRelations) =>
+    !shiftKey || e.shift === null || e.shift === shiftKey;
+
   const columns = positions.map((position) => ({
     id: position.id,
     title: position.title,
-    members: employees.filter((e) => e.positionId === position.id),
+    members: employees.filter((e) => e.positionId === position.id && onShift(e)),
   }));
 
   const onLunch = now
@@ -131,8 +153,13 @@ export function DashboardSections({
       </section>
 
       <section className="mb-10">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Team by Position
+          {shiftKey && (
+            <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
+              — {SHIFTS[shiftKey].label} ({SHIFTS[shiftKey].range})
+            </span>
+          )}
         </h2>
         {columns.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

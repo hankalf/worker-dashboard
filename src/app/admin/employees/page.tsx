@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
+type Shift = "FIRST" | "SECOND" | "THIRD";
 type Employee = {
   id: string;
   name: string;
@@ -12,6 +13,18 @@ type Employee = {
   positionId: string | null;
   position: Position | null;
   roles: Role[];
+  shift: Shift | null;
+};
+
+const SHIFT_OPTIONS: { value: Shift; label: string }[] = [
+  { value: "FIRST", label: "1st Shift (6am–2pm)" },
+  { value: "SECOND", label: "2nd Shift (2pm–10pm)" },
+  { value: "THIRD", label: "3rd Shift (10pm–6am)" },
+];
+const SHIFT_SHORT: Record<Shift, string> = {
+  FIRST: "1st Shift",
+  SECOND: "2nd Shift",
+  THIRD: "3rd Shift",
 };
 
 const inputClass =
@@ -27,6 +40,7 @@ export default function EmployeesPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [shift, setShift] = useState<Shift | "">("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
@@ -60,6 +74,7 @@ export default function EmployeesPage() {
     setIsAdmin(false);
     setUsername("");
     setPassword("");
+    setShift("");
     setEditingId(null);
   };
 
@@ -80,7 +95,15 @@ export default function EmployeesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, positionId, roleIds, isAdmin, username, password }),
+      body: JSON.stringify({
+        name,
+        positionId,
+        roleIds,
+        isAdmin,
+        username,
+        password,
+        shift,
+      }),
     });
 
     if (!res.ok) {
@@ -101,6 +124,7 @@ export default function EmployeesPage() {
     setIsAdmin(employee.isAdmin);
     setUsername(employee.username ?? "");
     setPassword("");
+    setShift(employee.shift ?? "");
   };
 
   const handleDelete = async (id: string) => {
@@ -153,7 +177,8 @@ export default function EmployeesPage() {
           <code className="text-zinc-300">roles</code> (separate multiple with
           semicolons), <code className="text-zinc-300">admin</code> (yes/no),{" "}
           <code className="text-zinc-300">username</code> and{" "}
-          <code className="text-zinc-300">password</code> (required for admins).
+          <code className="text-zinc-300">password</code> (required for admins),
+          and <code className="text-zinc-300">shift</code> (1, 2, or 3).
           Positions and roles that don&apos;t exist yet are created automatically.{" "}
           <a
             href="/employee-import-sample.csv"
@@ -197,18 +222,32 @@ export default function EmployeesPage() {
           required
           className={inputClass}
         />
-        <select
-          value={positionId}
-          onChange={(e) => setPositionId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">No position</option>
-          {positions.map((position) => (
-            <option key={position.id} value={position.id}>
-              {position.title}
-            </option>
-          ))}
-        </select>
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={positionId}
+            onChange={(e) => setPositionId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">No position</option>
+            {positions.map((position) => (
+              <option key={position.id} value={position.id}>
+                {position.title}
+              </option>
+            ))}
+          </select>
+          <select
+            value={shift}
+            onChange={(e) => setShift(e.target.value as Shift | "")}
+            className={inputClass}
+          >
+            <option value="">No shift</option>
+            {SHIFT_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
           <div className="mb-1 text-xs font-medium text-zinc-400">
@@ -312,6 +351,7 @@ export default function EmployeesPage() {
               </div>
               <div className="text-sm text-zinc-400">
                 {employee.position?.title ?? "No position"}
+                {employee.shift ? ` · ${SHIFT_SHORT[employee.shift]}` : ""}
                 {employee.username ? ` · ${employee.username}` : ""}
               </div>
               {employee.roles.length > 0 && (

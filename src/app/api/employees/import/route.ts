@@ -11,6 +11,19 @@ import { parseCsv } from "@/lib/csv";
 //   admin       optional — "yes" grants admin access (requires username + password)
 //   username    required when admin is yes
 //   password    required when admin is yes
+//   shift       optional — 1/2/3 (or 1st/2nd/3rd) for the work shift
+const SHIFT_MAP: Record<string, "FIRST" | "SECOND" | "THIRD"> = {
+  "1": "FIRST",
+  "1st": "FIRST",
+  first: "FIRST",
+  "2": "SECOND",
+  "2nd": "SECOND",
+  second: "SECOND",
+  "3": "THIRD",
+  "3rd": "THIRD",
+  third: "THIRD",
+};
+
 export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -91,6 +104,7 @@ export async function POST(req: Request) {
           isAdmin,
           username: username || null,
           passwordHash: password ? await bcrypt.hash(password, 10) : null,
+          shift: SHIFT_MAP[get("shift").toLowerCase()] ?? null,
           roles: { connect: roleIds.map((id) => ({ id })) },
         },
       });

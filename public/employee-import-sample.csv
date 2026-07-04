@@ -1,4 +1,4 @@
-name,position,roles,admin,username,password
-Jamie Smith,Forklift Operator,Picking;Packing,no,,
-Alex Chen,Receiving Clerk,Receiving;Inventory Count,no,,
-Sam Rivera,Warehouse Manager,Scheduling;Receiving,yes,samr,ChangeMe123
+name,position,roles,admin,username,password,shift
+Jamie Smith,Forklift Operator,Picking;Packing,no,,,1
+Alex Chen,Receiving Clerk,Receiving;Inventory Count,no,,,2
+Sam Rivera,Warehouse Manager,Scheduling;Receiving,yes,samr,ChangeMe123,3
