@@ -18,6 +18,7 @@ type Employee = {
   roles: Role[];
   shift: Shift | null;
   attendance: Attendance;
+  isLead: boolean;
 };
 
 const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
@@ -78,6 +79,7 @@ export default function EmployeesPage() {
   const [password, setPassword] = useState("");
   const [shift, setShift] = useState<Shift | "">("");
   const [attendance, setAttendance] = useState<Attendance>("PRESENT");
+  const [isLead, setIsLead] = useState(false);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +116,7 @@ export default function EmployeesPage() {
     setPassword("");
     setShift("");
     setAttendance("PRESENT");
+    setIsLead(false);
     setEditingId(null);
   };
 
@@ -143,6 +146,7 @@ export default function EmployeesPage() {
         password,
         shift,
         attendance,
+        isLead,
       }),
     });
 
@@ -166,6 +170,7 @@ export default function EmployeesPage() {
     setPassword("");
     setShift(employee.shift ?? "");
     setAttendance(employee.attendance ?? "PRESENT");
+    setIsLead(employee.isLead ?? false);
   };
 
   const openHistory = async (employee: Employee) => {
@@ -310,6 +315,15 @@ export default function EmployeesPage() {
               </option>
             ))}
           </select>
+          <label className="col-span-2 flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={isLead}
+              onChange={(e) => setIsLead(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Lead (shown first in their position)
+          </label>
         </div>
 
         <div>
@@ -428,6 +442,11 @@ export default function EmployeesPage() {
             <div>
               <div className="flex items-center gap-2 font-medium text-white">
                 {employee.name}
+                {employee.isLead && (
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                    Lead
+                  </span>
+                )}
                 {employee.accessLevel !== "NONE" && (
                   <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
                     {ACCESS_LABEL[employee.accessLevel]}

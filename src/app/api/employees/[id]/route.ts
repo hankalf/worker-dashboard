@@ -45,6 +45,7 @@ export async function PATCH(
   if (body.lunchStart !== undefined) data.lunchStart = body.lunchStart || null;
   if (body.lunchEnd !== undefined) data.lunchEnd = body.lunchEnd || null;
   if (body.shift !== undefined) data.shift = body.shift || null;
+  if (body.isLead !== undefined) data.isLead = !!body.isLead;
 
   // Identity / access / roles — admins only.
   if (isAdmin) {
@@ -101,6 +102,8 @@ export async function PATCH(
       );
     if (body.attendance !== undefined)
       changes.push(`marked ${ATTENDANCE_LABEL[employee.attendance] ?? employee.attendance}`);
+    if (body.isLead !== undefined)
+      changes.push(employee.isLead ? "set as lead" : "removed as lead");
     if (isAdmin && body.roleIds !== undefined)
       changes.push(
         employee.roles.length

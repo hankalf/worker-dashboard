@@ -27,6 +27,7 @@ type Employee = {
   lunchEnd: string | null;
   shift: Shift | null;
   attendance: Attendance;
+  isLead: boolean;
 };
 
 type SaveState = "saving" | "saved" | "error";
@@ -65,6 +66,7 @@ function EmployeeCard({
   saveState,
   onLunchChange,
   onAttendanceChange,
+  onLeadToggle,
   warnRole,
   overlay = false,
 }: {
@@ -72,6 +74,7 @@ function EmployeeCard({
   saveState?: SaveState;
   onLunchChange?: (id: string, value: string) => void;
   onAttendanceChange?: (id: string, value: Attendance) => void;
+  onLeadToggle?: (id: string, value: boolean) => void;
   warnRole?: string | null;
   overlay?: boolean;
 }) {
@@ -94,7 +97,16 @@ function EmployeeCard({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-white">{employee.name}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-white">
+            {employee.name}
+          </span>
+          {employee.isLead && (
+            <span className="whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+              Lead
+            </span>
+          )}
+        </span>
         <div className="flex items-center gap-1.5">
           {employee.shift && (
             <span className="whitespace-nowrap rounded-full bg-blue-950 px-2 py-0.5 text-xs font-medium text-blue-300">
@@ -122,7 +134,7 @@ function EmployeeCard({
           ⚠ Missing role: {warnRole}
         </div>
       )}
-      {!overlay && (onLunchChange || onAttendanceChange) && (
+      {!overlay && (onLunchChange || onAttendanceChange || onLeadToggle) && (
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
@@ -164,6 +176,17 @@ function EmployeeCard({
               ))}
             </select>
           )}
+          {onLeadToggle && (
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={employee.isLead}
+                onChange={(e) => onLeadToggle(employee.id, e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Lead
+            </label>
+          )}
         </div>
       )}
     </div>
@@ -178,6 +201,7 @@ function PositionColumn({
   saveStates,
   onLunchChange,
   onAttendanceChange,
+  onLeadToggle,
 }: {
   id: string;
   title: string;
@@ -186,8 +210,12 @@ function PositionColumn({
   saveStates: Record<string, SaveState>;
   onLunchChange: (id: string, value: string) => void;
   onAttendanceChange: (id: string, value: Attendance) => void;
+  onLeadToggle: (id: string, value: boolean) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const ordered = [...employees].sort(
+    (a, b) => Number(b.isLead) - Number(a.isLead)
+  );
 
   return (
     <div
@@ -212,13 +240,14 @@ function PositionColumn({
         </span>
       </div>
       <div className="flex min-h-16 flex-1 flex-col gap-2">
-        {employees.map((employee) => (
+        {ordered.map((employee) => (
           <EmployeeCard
             key={employee.id}
             employee={employee}
             saveState={saveStates[employee.id]}
             onLunchChange={onLunchChange}
             onAttendanceChange={onAttendanceChange}
+            onLeadToggle={onLeadToggle}
             warnRole={
               requiredRole &&
               !employee.roles.some((r) => r.id === requiredRole.id)
@@ -324,6 +353,20 @@ export default function AssignPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ attendance: value }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
+  const setLead = async (employeeId: string, value: boolean) => {
+    setEmployees((current) =>
+      current.map((e) => (e.id === employeeId ? { ...e, isLead: value } : e))
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isLead: value }),
     });
     flashSaved(employeeId, res.ok);
   };
@@ -468,6 +511,7 @@ export default function AssignPage() {
               saveStates={saveStates}
               onLunchChange={setLunch}
               onAttendanceChange={setAttendance}
+              onLeadToggle={setLead}
             />
           ))}
         </div>

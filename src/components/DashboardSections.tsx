@@ -104,6 +104,11 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-medium">{member.name}</span>
+          {member.isLead && (
+            <span className="whitespace-nowrap rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-300">
+              Lead
+            </span>
+          )}
           {out && (
             <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
               {ATTENDANCE_LABEL[member.attendance]}
@@ -157,9 +162,10 @@ export function DashboardSections({
   const present = (e: EmployeeWithRelations) => e.attendance === "PRESENT";
 
   const columns = positions.map((position) => {
-    const members = employees.filter(
-      (e) => e.positionId === position.id && onShift(e)
-    );
+    const members = employees
+      .filter((e) => e.positionId === position.id && onShift(e))
+      // Lead(s) first, everyone else keeps the incoming name order.
+      .sort((a, b) => Number(b.isLead) - Number(a.isLead));
     return {
       id: position.id,
       title: position.title,

@@ -101,6 +101,7 @@ export function DashboardView({
           jobs={jobs}
           now={now}
           announcement={announcement}
+          showPositions
         />
       </main>
     </div>
