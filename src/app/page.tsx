@@ -7,13 +7,24 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const session = await auth();
 
-  const [tabs, jobs] = await Promise.all([
-    prisma.tab.findMany({ orderBy: { sortOrder: "asc" } }),
+  const [positions, employees, jobs] = await Promise.all([
+    prisma.position.findMany({ orderBy: { title: "asc" } }),
+    prisma.employee.findMany({
+      include: { position: true, roles: true },
+      orderBy: { name: "asc" },
+    }),
     prisma.job.findMany({
-      include: { tab: true, assignedEmployee: { include: { position: true } } },
+      include: { assignedEmployee: { include: { position: true } } },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     }),
   ]);
 
-  return <DashboardView tabs={tabs} jobs={jobs} isAdmin={!!session?.user} />;
+  return (
+    <DashboardView
+      positions={positions}
+      employees={employees}
+      jobs={jobs}
+      isAdmin={!!session?.user}
+    />
+  );
 }

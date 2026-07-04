@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Tab, Job, Employee, Position } from "@/generated/prisma/client";
+import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+type EmployeeWithRelations = Employee & {
+  position: Position | null;
+  roles: Role[];
+};
+
 type JobWithRelations = Job & {
-  tab: Tab;
   assignedEmployee: (Employee & { position: Position | null }) | null;
 };
 
@@ -27,23 +30,27 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function DashboardView({
-  tabs,
+  positions,
+  employees,
   jobs,
   isAdmin,
 }: {
-  tabs: Tab[];
+  positions: Position[];
+  employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   isAdmin: boolean;
 }) {
-  const [selectedTabId, setSelectedTabId] = useState<string>("all");
-
-  const visibleJobs = useMemo(
-    () =>
-      selectedTabId === "all"
-        ? jobs
-        : jobs.filter((job) => job.tabId === selectedTabId),
-    [jobs, selectedTabId]
-  );
+  const unassigned = employees.filter((e) => !e.positionId);
+  const columns = [
+    ...positions.map((position) => ({
+      id: position.id,
+      title: position.title,
+      members: employees.filter((e) => e.positionId === position.id),
+    })),
+    ...(unassigned.length > 0
+      ? [{ id: "unassigned", title: "Unassigned", members: unassigned }]
+      : []),
+  ];
 
   return (
     <div className="flex flex-1 flex-col">
@@ -69,75 +76,101 @@ export function DashboardView({
         </div>
       </header>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-        <button
-          onClick={() => setSelectedTabId("all")}
-          className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${
-            selectedTabId === "all"
-              ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          }`}
-        >
-          All
-        </button>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setSelectedTabId(tab.id)}
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${
-              selectedTabId === tab.id
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-            }`}
-          >
-            {tab.name}
-          </button>
-        ))}
-      </nav>
-
       <main className="flex-1 px-6 py-6">
-        {visibleJobs.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No jobs in this tab yet.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleJobs.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="font-medium">{job.title}</h3>
-                  <span
-                    className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[job.status]}`}
-                  >
-                    {STATUS_LABELS[job.status]}
-                  </span>
-                </div>
-                {job.description && (
-                  <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {job.description}
-                  </p>
-                )}
-                <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Tab: {job.tab.name}
-                </div>
-                <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Assigned to: {job.assignedEmployee?.name ?? "Unassigned"}
-                  {job.assignedEmployee?.position
-                    ? ` (${job.assignedEmployee.position.title})`
-                    : ""}
-                </div>
-                {job.dueDate && (
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Due: {new Date(job.dueDate).toLocaleDateString()}
+        <section className="mb-10">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Team by Position
+          </h2>
+          {columns.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No positions yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {columns.map((column) => (
+                <div
+                  key={column.id}
+                  className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="font-semibold">{column.title}</h3>
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                      {column.members.length}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                  {column.members.length === 0 ? (
+                    <p className="text-sm text-zinc-400 dark:text-zinc-600">
+                      No one assigned
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {column.members.map((member) => (
+                        <li
+                          key={member.id}
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/50"
+                        >
+                          <div className="text-sm font-medium">
+                            {member.name}
+                          </div>
+                          {member.roles.length > 0 && (
+                            <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                              {member.roles.map((role) => role.name).join(" · ")}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Jobs
+          </h2>
+          {jobs.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No jobs yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <h3 className="font-medium">{job.title}</h3>
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[job.status]}`}
+                    >
+                      {STATUS_LABELS[job.status]}
+                    </span>
+                  </div>
+                  {job.description && (
+                    <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+                      {job.description}
+                    </p>
+                  )}
+                  <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Assigned to: {job.assignedEmployee?.name ?? "Unassigned"}
+                    {job.assignedEmployee?.position
+                      ? ` (${job.assignedEmployee.position.title})`
+                      : ""}
+                  </div>
+                  {job.dueDate && (
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Due: {new Date(job.dueDate).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
