@@ -29,18 +29,32 @@ export async function POST(req: Request) {
     );
   }
 
-  const employee = await prisma.employee.create({
-    data: {
-      name,
-      positionId: positionId || null,
-      isAdmin: !!isAdmin,
-      username: username || null,
-      passwordHash: password ? await bcrypt.hash(password, 10) : null,
-      roles: {
-        connect: (roleIds ?? []).map((id: string) => ({ id })),
+  try {
+    const employee = await prisma.employee.create({
+      data: {
+        name,
+        positionId: positionId || null,
+        isAdmin: !!isAdmin,
+        username: username || null,
+        passwordHash: password ? await bcrypt.hash(password, 10) : null,
+        roles: {
+          connect: (roleIds ?? []).map((id: string) => ({ id })),
+        },
       },
-    },
-    include: { position: true, roles: true },
-  });
-  return NextResponse.json(employee, { status: 201 });
+      include: { position: true, roles: true },
+    });
+    return NextResponse.json(employee, { status: 201 });
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") {
+      return NextResponse.json(
+        { error: `The username "${username}" is already taken` },
+        { status: 400 }
+      );
+    }
+    console.error("Failed to create employee:", error);
+    return NextResponse.json(
+      { error: "Could not save the employee — check the values and try again" },
+      { status: 500 }
+    );
+  }
 }
