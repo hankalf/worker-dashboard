@@ -102,7 +102,7 @@ function EmployeeCard({
             {employee.name}
           </span>
           {employee.isLead && (
-            <span className="whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+            <span className="whitespace-nowrap rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
               Lead
             </span>
           )}

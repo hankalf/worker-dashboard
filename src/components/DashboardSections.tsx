@@ -105,7 +105,7 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-medium">{member.name}</span>
           {member.isLead && (
-            <span className="whitespace-nowrap rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-300">
+            <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
               Lead
             </span>
           )}

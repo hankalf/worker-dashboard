@@ -443,7 +443,7 @@ export default function EmployeesPage() {
               <div className="flex items-center gap-2 font-medium text-white">
                 {employee.name}
                 {employee.isLead && (
-                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                  <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
                     Lead
                   </span>
                 )}

@@ -21,6 +21,20 @@ type TaskLog = {
   createdAt: string;
 };
 
+const STATUS_LABELS: Record<Job["status"], string> = {
+  UNASSIGNED: "Unassigned",
+  ASSIGNED: "Assigned",
+  IN_PROGRESS: "In Progress",
+  DONE: "Done",
+};
+
+const STATUS_COLORS: Record<Job["status"], string> = {
+  UNASSIGNED: "bg-zinc-800 text-zinc-300",
+  ASSIGNED: "bg-blue-950 text-blue-300",
+  IN_PROGRESS: "bg-amber-950 text-amber-300",
+  DONE: "bg-green-950 text-green-300",
+};
+
 const emptyForm = {
   title: "",
   description: "",
@@ -200,10 +214,23 @@ export default function JobsPage() {
             key={job.id}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
           >
-            <div>
+            <div className="min-w-0">
               <div className="font-medium text-white">{job.title}</div>
-              <div className="text-xs text-zinc-400">
-                {job.status} · {job.assignedEmployee?.name ?? "Unassigned"}
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                <span
+                  className={`rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[job.status]}`}
+                >
+                  {STATUS_LABELS[job.status]}
+                </span>
+                <span>
+                  {job.assignedEmployee?.name ?? "Unassigned"}
+                </span>
+                {job.dueDate && (
+                  <span>
+                    Due {new Date(job.dueDate).toLocaleDateString()}
+                  </span>
+                )}
+                {job.priority > 0 && <span>Priority {job.priority}</span>}
               </div>
             </div>
             <div className="flex gap-3 text-sm">
