@@ -17,28 +17,20 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const {
-    title,
-    description,
-    tabId,
-    assignedEmployeeId,
-    status,
-    dueDate,
-    priority,
-  } = await req.json();
+  const { title, description, assignedEmployeeId, status, dueDate, priority } =
+    await req.json();
 
   const job = await prisma.job.update({
     where: { id },
     data: {
       title,
       description,
-      tabId,
       assignedEmployeeId: assignedEmployeeId || null,
       status,
       dueDate: dueDate ? new Date(dueDate) : null,
       priority,
     },
-    include: { tab: true, assignedEmployee: true },
+    include: { assignedEmployee: true },
   });
 
   const base = STATUS_ACTIONS[job.status] ?? "Updated";

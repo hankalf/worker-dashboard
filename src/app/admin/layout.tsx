@@ -4,13 +4,12 @@ import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 export const dynamic = "force-dynamic";
 
 const NAV_ITEMS = [
-  { href: "/admin/assign", label: "Assign" },
   { href: "/admin", label: "Admin Dashboard" },
+  { href: "/admin/assign", label: "Assign" },
   { href: "/admin/jobs", label: "Side Tasks" },
   { href: "/admin/employees", label: "Employees" },
   { href: "/admin/positions", label: "Positions" },
   { href: "/admin/roles", label: "Roles" },
-  { href: "/admin/tabs", label: "Tabs" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

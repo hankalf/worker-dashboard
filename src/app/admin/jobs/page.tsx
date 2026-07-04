@@ -2,15 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-type Tab = { id: string; name: string };
 type Employee = { id: string; name: string };
 type Job = {
   id: string;
   title: string;
   description: string | null;
   status: "UNASSIGNED" | "ASSIGNED" | "IN_PROGRESS" | "DONE";
-  tabId: string;
-  tab: Tab;
   assignedEmployeeId: string | null;
   assignedEmployee: Employee | null;
   dueDate: string | null;
@@ -27,7 +24,6 @@ type TaskLog = {
 const emptyForm = {
   title: "",
   description: "",
-  tabId: "",
   assignedEmployeeId: "",
   status: "UNASSIGNED" as Job["status"],
   dueDate: "",
@@ -36,7 +32,6 @@ const emptyForm = {
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [tabs, setTabs] = useState<Tab[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -44,9 +39,8 @@ export default function JobsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const [jobsRes, tabsRes, employeesRes, logsRes] = await Promise.all([
+    const [jobsRes, employeesRes, logsRes] = await Promise.all([
       fetch("/api/jobs"),
-      fetch("/api/tabs"),
       fetch("/api/employees"),
       fetch("/api/task-logs"),
     ]);
@@ -56,7 +50,6 @@ export default function JobsPage() {
       return;
     }
     setJobs(await jobsRes.json());
-    setTabs(await tabsRes.json());
     setEmployees(await employeesRes.json());
     setLogs(await logsRes.json());
   };
@@ -101,7 +94,6 @@ export default function JobsPage() {
     setForm({
       title: job.title,
       description: job.description ?? "",
-      tabId: job.tabId,
       assignedEmployeeId: job.assignedEmployeeId ?? "",
       status: job.status,
       dueDate: job.dueDate ? job.dueDate.slice(0, 10) : "",
@@ -140,19 +132,6 @@ export default function JobsPage() {
           className={inputClass}
         />
         <div className="grid grid-cols-2 gap-3">
-          <select
-            value={form.tabId}
-            onChange={(e) => setForm({ ...form, tabId: e.target.value })}
-            required
-            className={inputClass}
-          >
-            <option value="">Select tab...</option>
-            {tabs.map((tab) => (
-              <option key={tab.id} value={tab.id}>
-                {tab.name}
-              </option>
-            ))}
-          </select>
           <select
             value={form.assignedEmployeeId}
             onChange={(e) =>
@@ -224,8 +203,7 @@ export default function JobsPage() {
             <div>
               <div className="font-medium text-white">{job.title}</div>
               <div className="text-xs text-zinc-400">
-                {job.tab.name} · {job.status} ·{" "}
-                {job.assignedEmployee?.name ?? "Unassigned"}
+                {job.status} · {job.assignedEmployee?.name ?? "Unassigned"}
               </div>
             </div>
             <div className="flex gap-3 text-sm">

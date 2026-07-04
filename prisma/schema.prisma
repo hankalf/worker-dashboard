@@ -50,21 +50,11 @@ model Position {
   employees   Employee[]
 }
 
-model Tab {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String?
-  sortOrder   Int     @default(0)
-  jobs        Job[]
-}
-
 model Job {
   id                 String    @id @default(cuid())
   title              String
   description        String?
   status             JobStatus @default(UNASSIGNED)
-  tab                Tab       @relation(fields: [tabId], references: [id])
-  tabId              String
   assignedEmployee   Employee? @relation(fields: [assignedEmployeeId], references: [id])
   assignedEmployeeId String?
   dueDate            DateTime?
