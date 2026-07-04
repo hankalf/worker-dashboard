@@ -312,7 +312,7 @@ export default function AssignPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="grid grid-cols-2 gap-4 pb-4 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 pb-4 sm:grid-cols-4">
           {columns.map((column) => (
             <PositionColumn
               key={column.id}
