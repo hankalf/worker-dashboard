@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 
 export type EmployeeWithRelations = Employee & {
@@ -50,6 +51,17 @@ export const formatClock = (hhmm: string) => {
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
+
+// Periodically soft-refreshes the current route's server data so displays
+// pick up admin-panel changes without a manual reload (no full-page refresh,
+// so client state like the clock is preserved).
+export function useAutoRefresh(intervalMs = 15000) {
+  const router = useRouter();
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), intervalMs);
+    return () => clearInterval(id);
+  }, [router, intervalMs]);
+}
 
 // Live clock, initialised on mount to avoid a server/client time mismatch.
 export function useNow() {

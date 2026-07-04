@@ -4,6 +4,7 @@ import type { Position } from "@/generated/prisma/client";
 import {
   DashboardSections,
   useNow,
+  useAutoRefresh,
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
@@ -18,6 +19,7 @@ export function AdminDashboard({
   jobs: JobWithRelations[];
 }) {
   const now = useNow();
+  useAutoRefresh();
 
   return (
     <div>

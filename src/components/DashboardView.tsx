@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DashboardSections,
   useNow,
+  useAutoRefresh,
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
@@ -22,6 +23,7 @@ export function DashboardView({
   isAdmin: boolean;
 }) {
   const now = useNow();
+  useAutoRefresh();
 
   return (
     <div className="flex flex-1 flex-col">
