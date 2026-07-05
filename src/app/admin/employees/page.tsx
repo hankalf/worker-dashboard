@@ -465,6 +465,8 @@ export default function EmployeesPage() {
 
       <ul className="flex flex-col gap-2">
         {employees
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
           .filter((employee) => {
             const q = search.trim().toLowerCase();
             if (!q) return true;

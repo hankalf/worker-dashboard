@@ -18,7 +18,8 @@ export async function PATCH(
       title,
       description,
       requiredRoleId: requiredRoleId || null,
-      sortOrder: Number(sortOrder) || 0,
+      // Leave the display order untouched unless explicitly provided.
+      ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) || 0 } : {}),
     },
   });
   await logActivity("Position", `Renamed position to ${position.title}`);
