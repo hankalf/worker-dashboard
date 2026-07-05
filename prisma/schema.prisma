@@ -29,6 +29,7 @@ enum Attendance {
   PRESENT
   ABSENT
   CALLED_OUT
+  PTO
 }
 
 // Admin-panel access. NONE = no login; SUPERVISOR = limited (assign, attendance,

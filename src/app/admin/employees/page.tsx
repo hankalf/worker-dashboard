@@ -7,7 +7,7 @@ import { APP_TZ } from "@/lib/time";
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
-type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT";
+type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
 type AccessLevel = "NONE" | "SUPERVISOR" | "ADMIN";
 type Employee = {
   id: string;
@@ -57,11 +57,13 @@ const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
   { value: "PRESENT", label: "Present" },
   { value: "ABSENT", label: "Absent" },
   { value: "CALLED_OUT", label: "Called out" },
+  { value: "PTO", label: "PTO" },
 ];
 const ATTENDANCE_LABEL: Record<Attendance, string> = {
   PRESENT: "Present",
   ABSENT: "Absent",
   CALLED_OUT: "Called out",
+  PTO: "PTO",
 };
 
 const inputClass =

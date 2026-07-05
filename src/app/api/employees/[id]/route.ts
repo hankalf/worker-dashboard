@@ -16,6 +16,7 @@ const ATTENDANCE_LABEL: Record<string, string> = {
   PRESENT: "Present",
   ABSENT: "Absent",
   CALLED_OUT: "Called out",
+  PTO: "PTO",
 };
 
 const clock = (hhmm: string) => {

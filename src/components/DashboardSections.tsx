@@ -115,6 +115,7 @@ export function useNow() {
 const ATTENDANCE_LABEL: Record<string, string> = {
   ABSENT: "Absent",
   CALLED_OUT: "Called out",
+  PTO: "PTO",
 };
 
 // Card body for one employee: name on its own line, then all badges/chips and
@@ -139,7 +140,13 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
               </span>
             )}
             {out && (
-              <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                  member.attendance === "PTO"
+                    ? "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                    : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                }`}
+              >
                 {ATTENDANCE_LABEL[member.attendance]}
               </span>
             )}

@@ -19,7 +19,7 @@ import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 type Role = { id: string; name: string };
 type Position = { id: string; title: string; requiredRole: Role | null };
 type Shift = "FIRST" | "SECOND" | "THIRD";
-type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT";
+type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
 type Employee = {
   id: string;
   name: string;
@@ -45,6 +45,7 @@ const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
   { value: "PRESENT", label: "Present" },
   { value: "ABSENT", label: "Absent" },
   { value: "CALLED_OUT", label: "Called out" },
+  { value: "PTO", label: "PTO" },
 ];
 
 const UNASSIGNED = "unassigned";
@@ -260,6 +261,7 @@ function PositionColumn({
   onBreakChange,
   onAttendanceChange,
   onLeadToggle,
+  horizontal = false,
 }: {
   id: string;
   title: string;
@@ -272,6 +274,7 @@ function PositionColumn({
   onBreakChange: (id: string, value: string) => void;
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
+  horizontal?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const ordered = [...employees].sort(
@@ -300,7 +303,13 @@ function PositionColumn({
           {employees.length}
         </span>
       </div>
-      <div className="flex min-h-16 flex-1 flex-col gap-2">
+      <div
+        className={
+          horizontal
+            ? "grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+            : "flex min-h-16 flex-1 flex-col gap-2"
+        }
+      >
         {ordered.map((employee) => (
           <EmployeeCard
             key={employee.id}
@@ -321,7 +330,11 @@ function PositionColumn({
           />
         ))}
         {employees.length === 0 && (
-          <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-zinc-800 p-3 text-xs text-zinc-600">
+          <div
+            className={`flex items-center justify-center rounded-md border border-dashed border-zinc-800 p-3 text-xs text-zinc-600 ${
+              horizontal ? "col-span-full min-h-12" : "min-h-16 flex-1"
+            }`}
+          >
             Drop here
           </div>
         )}
@@ -612,13 +625,14 @@ export default function AssignPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-col gap-4 pb-4">
           {columns.map((column) => (
             <PositionColumn
               key={column.id}
               id={column.id}
               title={column.title}
               requiredRole={column.requiredRole}
+              horizontal
               employees={employees.filter(
                 (e) =>
                   e.attendance === "PRESENT" &&
@@ -642,7 +656,7 @@ export default function AssignPage() {
         {absentEmployees.length > 0 && (
           <div className="mt-8 border-t border-zinc-800 pt-6">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-              Absent / Called out ({absentEmployees.length})
+              Absent / Called out / PTO ({absentEmployees.length})
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {absentEmployees.map((e) => (
