@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
-import { appMinutes } from "@/lib/time";
+import { appMinutes, APP_TZ } from "@/lib/time";
 import { currentShift, SHIFTS } from "@/lib/shift";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 import { AutoScroll } from "@/components/AutoScroll";
@@ -162,9 +162,14 @@ function MemberBody({
                 {SHIFTS[member.shift].label}
               </span>
             )}
-            {stayingOver && (
+            {stayingOver && member.stayOverUntil && (
               <span className="whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
-                Staying over
+                Staying over til{" "}
+                {new Date(member.stayOverUntil).toLocaleTimeString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZone: APP_TZ,
+                })}
               </span>
             )}
           </span>

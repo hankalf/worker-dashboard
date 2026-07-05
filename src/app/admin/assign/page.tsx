@@ -15,7 +15,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
-import { shiftEndDate } from "@/lib/shift";
+import { shiftEndDate, currentShift } from "@/lib/shift";
 
 type Role = { id: string; name: string };
 type Position = { id: string; title: string; requiredRole: Role | null };
@@ -89,6 +89,7 @@ function EmployeeCard({
   warnRole,
   overlay = false,
   noDrag = false,
+  active = false,
 }: {
   employee: Employee;
   saveState?: SaveState;
@@ -102,6 +103,7 @@ function EmployeeCard({
   warnRole?: string | null;
   overlay?: boolean;
   noDrag?: boolean;
+  active?: boolean;
 }) {
   // Reconstruct the currently-selected stay-over duration from stayOverUntil.
   const stayOverValue = (() => {
@@ -118,6 +120,11 @@ function EmployeeCard({
   });
   const out = employee.attendance !== "PRESENT";
   const fixed = overlay || noDrag;
+  // Active (on the current shift / staying over) cards get the violet highlight,
+  // matching the ACTIVE shift-handoff card.
+  const base = active
+    ? "border-violet-700 bg-violet-950/30"
+    : "border-zinc-700 bg-zinc-800";
 
   return (
     <div
@@ -129,8 +136,8 @@ function EmployeeCard({
           : isDragging
             ? "border-zinc-700 bg-zinc-800/40 opacity-40"
             : noDrag
-              ? `border-zinc-700 bg-zinc-800 ${out ? "opacity-60" : ""}`
-              : `cursor-grab border-zinc-700 bg-zinc-800 hover:border-zinc-500 active:cursor-grabbing ${out ? "opacity-60" : ""}`
+              ? `${base} ${out ? "opacity-60" : ""}`
+              : `cursor-grab ${base} hover:border-zinc-500 active:cursor-grabbing ${out ? "opacity-60" : ""}`
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -181,16 +188,16 @@ function EmployeeCard({
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
-          className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500"
+          className="mt-2 flex flex-col gap-1.5 text-xs text-zinc-400"
         >
           {onPositionChange && positions && (
-            <>
-              <span>Position</span>
+            <label className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-zinc-500">Position</span>
               <select
                 value={employee.positionId ?? ""}
                 onChange={(e) => onPositionChange(employee.id, e.target.value)}
                 style={{ colorScheme: "dark" }}
-                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+                className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
               >
                 <option value="">Unassigned</option>
                 {positions.map((p) => (
@@ -199,34 +206,16 @@ function EmployeeCard({
                   </option>
                 ))}
               </select>
-            </>
-          )}
-          {onLunchChange && (
-            <>
-              <span>Lunch</span>
-              <select
-                value={employee.lunchStart ?? ""}
-                onChange={(e) => onLunchChange(employee.id, e.target.value)}
-                style={{ colorScheme: "dark" }}
-                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
-              >
-                <option value="">None</option>
-                {LUNCH_TIMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </>
+            </label>
           )}
           {onBreakChange && (
-            <>
-              <span>Break</span>
+            <label className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-zinc-500">Break</span>
               <select
                 value={employee.breakStart ?? ""}
                 onChange={(e) => onBreakChange(employee.id, e.target.value)}
                 style={{ colorScheme: "dark" }}
-                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+                className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
               >
                 <option value="">None</option>
                 {LUNCH_TIMES.map((t) => (
@@ -235,18 +224,36 @@ function EmployeeCard({
                   </option>
                 ))}
               </select>
-            </>
+            </label>
+          )}
+          {onLunchChange && (
+            <label className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-zinc-500">Lunch</span>
+              <select
+                value={employee.lunchStart ?? ""}
+                onChange={(e) => onLunchChange(employee.id, e.target.value)}
+                style={{ colorScheme: "dark" }}
+                className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                <option value="">None</option>
+                {LUNCH_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           {onStayOverChange && employee.shift && (
-            <>
-              <span>Stay over</span>
+            <label className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-zinc-500">Stay over</span>
               <select
                 value={stayOverValue}
                 onChange={(e) =>
                   onStayOverChange(employee.id, Number(e.target.value))
                 }
                 style={{ colorScheme: "dark" }}
-                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+                className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
               >
                 {STAY_OVER_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -254,36 +261,34 @@ function EmployeeCard({
                   </option>
                 ))}
               </select>
-            </>
-          )}
-          {onAttendanceChange && (
-            <select
-              value={employee.attendance}
-              onChange={(e) =>
-                onAttendanceChange(employee.id, e.target.value as Attendance)
-              }
-              style={{ colorScheme: "dark" }}
-              className={`rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 ${
-                out ? "text-red-300" : "text-zinc-100"
-              }`}
-            >
-              {ATTENDANCE_OPTIONS.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          )}
-          {onLeadToggle && (
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={employee.isLead}
-                onChange={(e) => onLeadToggle(employee.id, e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              Lead
             </label>
+          )}
+          {(onAttendanceChange || onLeadToggle) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-700/60 pt-1.5">
+              {onAttendanceChange &&
+                ATTENDANCE_OPTIONS.map((a) => (
+                  <label key={a.value} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={employee.attendance === a.value}
+                      onChange={() => onAttendanceChange(employee.id, a.value)}
+                      className="h-3.5 w-3.5"
+                    />
+                    {a.label}
+                  </label>
+                ))}
+              {onLeadToggle && (
+                <label className="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={employee.isLead}
+                    onChange={(e) => onLeadToggle(employee.id, e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Lead
+                </label>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -304,6 +309,7 @@ function PositionColumn({
   onAttendanceChange,
   onLeadToggle,
   onStayOverChange,
+  isActive,
   horizontal = false,
 }: {
   id: string;
@@ -318,6 +324,7 @@ function PositionColumn({
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
   onStayOverChange: (id: string, minutes: number) => void;
+  isActive: (e: Employee) => boolean;
   horizontal?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -366,6 +373,7 @@ function PositionColumn({
             onAttendanceChange={onAttendanceChange}
             onLeadToggle={onLeadToggle}
             onStayOverChange={onStayOverChange}
+            active={isActive(employee)}
             warnRole={
               requiredRole &&
               !employee.roles.some((r) => r.id === requiredRole.id)
@@ -396,6 +404,20 @@ export default function AssignPage() {
   const [undoSnapshot, setUndoSnapshot] = useState<
     { id: string; positionId: string }[] | null
   >(null);
+
+  // Live-ish clock (30s) so the "active shift" highlight tracks the time.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const nowShift = currentShift(now);
+  // Active = present and either on the current shift or still within a stay-over
+  // window — i.e. the people showing as active on the main dashboard.
+  const isActive = (e: Employee) =>
+    e.attendance === "PRESENT" &&
+    (e.shift === nowShift ||
+      (!!e.stayOverUntil && new Date(e.stayOverUntil) > now));
 
   // Separate mouse/touch sensors: mouse drags after a small move, while touch
   // requires a short press-and-hold — so a quick finger swipe still scrolls the
@@ -653,6 +675,7 @@ export default function AssignPage() {
       onAttendanceChange={setAttendance}
       onLeadToggle={setLead}
       onStayOverChange={setStayOver}
+      isActive={isActive}
     />
   );
 
