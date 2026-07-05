@@ -22,6 +22,8 @@ type Employee = {
   shift: Shift | null;
   attendance: Attendance;
   isLead: boolean;
+  breakStart: string | null;
+  lunchStart: string | null;
   terminatedAt: string | null;
 };
 
@@ -86,6 +88,13 @@ const ATTENDANCE_LABEL: Record<Attendance, string> = {
 
 const inputClass =
   "rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500";
+
+// "13:30" -> "1:30 PM"
+const formatClock = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+};
 
 export default function EmployeesPage() {
   const guarded = useAdminGuard();
@@ -580,58 +589,62 @@ export default function EmployeesPage() {
                             employee.terminatedAt ? "opacity-60" : ""
                           }`}
                         >
-            <div>
-              {/* Name + shift badge + status, all on the left */}
-              <div className="flex flex-wrap items-center gap-2 font-medium text-white">
-                {employee.name}
-                {employee.shift && (
-                  <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
-                    {SHIFT_SHORT[employee.shift]}
-                  </span>
-                )}
-                {employee.terminatedAt && (
-                  <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
-                    Terminated
-                  </span>
-                )}
-                {employee.isLead && (
-                  <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
-                    Lead
-                  </span>
-                )}
-                {employee.accessLevel !== "NONE" && (
-                  <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
-                    {ACCESS_LABEL[employee.accessLevel]}
-                  </span>
-                )}
-                {employee.attendance !== "PRESENT" && (
-                  <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
-                    {ATTENDANCE_LABEL[employee.attendance]}
-                  </span>
-                )}
-              </div>
-              {/* Position */}
-              <div className="mt-0.5 text-sm text-zinc-400">
-                {employee.position?.title ?? "No position"}
-                {employee.username ? ` · ${employee.username}` : ""}
-              </div>
-              {/* Roles (capabilities) — plain text list */}
-              {employee.capabilities.length > 0 && (
-                <div className="mt-1 text-xs text-zinc-400">
-                  {employee.capabilities.map((cap) => cap.name).join(" · ")}
-                </div>
-              )}
-              {/* Equipment — bold tags */}
-              {employee.roles.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {employee.roles.map((role) => (
-                    <span
-                      key={role.id}
-                      className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-bold text-zinc-200"
-                    >
-                      {role.name}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                {/* Name + status */}
+                <div className="flex flex-wrap items-center gap-2 font-medium text-white">
+                  {employee.name}
+                  {employee.terminatedAt && (
+                    <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                      Terminated
                     </span>
-                  ))}
+                  )}
+                  {employee.isLead && (
+                    <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
+                      Lead
+                    </span>
+                  )}
+                  {employee.accessLevel !== "NONE" && (
+                    <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+                      {ACCESS_LABEL[employee.accessLevel]}
+                    </span>
+                  )}
+                  {employee.attendance !== "PRESENT" && (
+                    <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
+                      {ATTENDANCE_LABEL[employee.attendance]}
+                    </span>
+                  )}
+                </div>
+                {/* Position */}
+                <div className="mt-0.5 text-sm text-zinc-400">
+                  {employee.position?.title ?? "No position"}
+                  {employee.username ? ` · ${employee.username}` : ""}
+                </div>
+                {/* Roles (capabilities) — bold list */}
+                {employee.capabilities.length > 0 && (
+                  <div className="mt-1 text-xs font-bold text-zinc-200">
+                    {employee.capabilities.map((cap) => cap.name).join(" · ")}
+                  </div>
+                )}
+              </div>
+              {/* Right corner: shift, then break, then lunch */}
+              {(employee.shift || employee.breakStart || employee.lunchStart) && (
+                <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
+                  {employee.shift && (
+                    <span className="whitespace-nowrap rounded-full bg-blue-600/20 px-2 py-0.5 font-medium text-blue-300">
+                      {SHIFT_SHORT[employee.shift]}
+                    </span>
+                  )}
+                  {employee.breakStart && (
+                    <span className="whitespace-nowrap rounded-full bg-orange-500/20 px-2 py-0.5 font-medium text-orange-300">
+                      Break {formatClock(employee.breakStart)}
+                    </span>
+                  )}
+                  {employee.lunchStart && (
+                    <span className="whitespace-nowrap rounded-full bg-green-800 px-2 py-0.5 font-medium text-green-100">
+                      Lunch {formatClock(employee.lunchStart)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

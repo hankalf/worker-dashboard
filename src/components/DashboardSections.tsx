@@ -133,14 +133,9 @@ function MemberBody({
     <div className={out ? "opacity-60" : undefined}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {/* Name + shift badge + status, all on the left */}
+          {/* Name + status */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium">{member.name}</span>
-            {member.shift && (
-              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                {SHIFTS[member.shift].label}
-              </span>
-            )}
             {member.isLead && (
               <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
                 Lead
@@ -172,29 +167,21 @@ function MemberBody({
           <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             {member.position?.title ?? "No position"}
           </div>
-          {/* Roles (capabilities) — plain text list */}
+          {/* Roles (capabilities) — bold list */}
           {member.capabilities.length > 0 && (
-            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="mt-1 text-xs font-bold text-zinc-700 dark:text-zinc-200">
               {member.capabilities.map((c) => c.name).join(" · ")}
             </div>
           )}
-          {/* Equipment — bold tags */}
-          {member.roles.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {member.roles.map((r) => (
-                <span
-                  key={r.id}
-                  className="whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                >
-                  {r.name}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
-        {/* Break / lunch on the right */}
-        {(member.breakStart || member.lunchStart) && (
+        {/* Right corner: shift, then break, then lunch */}
+        {(member.shift || member.breakStart || member.lunchStart) && (
           <span className="flex shrink-0 flex-col items-end gap-1">
+            {member.shift && (
+              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                {SHIFTS[member.shift].label}
+              </span>
+            )}
             {member.breakStart && (
               <span className="whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
                 Break {formatClock(member.breakStart)}
