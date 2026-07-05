@@ -561,6 +561,33 @@ export default function AssignPage() {
   // own section so the board shows only who's actually working.
   const absentEmployees = employees.filter((e) => e.attendance !== "PRESENT");
 
+  const renderColumn = (
+    column: (typeof columns)[number],
+    horizontal: boolean
+  ) => (
+    <PositionColumn
+      key={column.id}
+      id={column.id}
+      title={column.title}
+      requiredRole={column.requiredRole}
+      horizontal={horizontal}
+      employees={employees.filter(
+        (e) =>
+          e.attendance === "PRESENT" &&
+          (column.id === UNASSIGNED
+            ? !e.positionId
+            : e.positionId === column.id)
+      )}
+      saveStates={saveStates}
+      positions={positions}
+      onPositionChange={(empId, value) => assign(empId, value || null)}
+      onLunchChange={setLunch}
+      onBreakChange={setBreak}
+      onAttendanceChange={setAttendance}
+      onLeadToggle={setLead}
+    />
+  );
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-4">
@@ -625,32 +652,13 @@ export default function AssignPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="flex flex-col gap-4 pb-4">
-          {columns.map((column) => (
-            <PositionColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              requiredRole={column.requiredRole}
-              horizontal
-              employees={employees.filter(
-                (e) =>
-                  e.attendance === "PRESENT" &&
-                  (column.id === UNASSIGNED
-                    ? !e.positionId
-                    : e.positionId === column.id)
-              )}
-              saveStates={saveStates}
-              positions={positions}
-              onPositionChange={(empId, value) =>
-                assign(empId, value || null)
-              }
-              onLunchChange={setLunch}
-              onBreakChange={setBreak}
-              onAttendanceChange={setAttendance}
-              onLeadToggle={setLead}
-            />
-          ))}
+        <div className="pb-4">
+          {/* Unassigned: full-width horizontal strip on top (unchanged). */}
+          {renderColumn(columns[0], true)}
+          {/* Positions: vertical columns below. */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {columns.slice(1).map((column) => renderColumn(column, false))}
+          </div>
         </div>
 
         {absentEmployees.length > 0 && (
