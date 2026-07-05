@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
+import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +59,20 @@ export default async function AdminDashboardPage() {
         update: { present, total: roster.length },
         create: { date: dateKey, shift: shiftKey, present, total: roster.length },
       });
+
+      // Record what position each present employee worked today, then prune
+      // work history older than the 2-week window.
+      await Promise.all(
+        employees
+          .filter((e) => e.attendance === "PRESENT" && e.position)
+          .map((e) =>
+            recordWorkHistory(e.id, e.name, e.positionId!, e.position!.title, now)
+          )
+      );
+      await purgeOldWorkHistory();
     }
   } catch (e) {
-    console.error("headcount snapshot failed:", e);
+    console.error("snapshot failed:", e);
   }
 
   const toDto = (n: {

@@ -124,6 +124,23 @@ model HeadcountSnapshot {
   @@index([date])
 }
 
+// Which position each employee worked on which day (Eastern date). Name/title
+// are snapshotted so history survives renames. Included in the log export and
+// auto-purged after ~2 weeks; the Employee/Position records themselves are kept.
+model WorkHistory {
+  id            String   @id @default(cuid())
+  date          String
+  employeeId    String
+  employeeName  String
+  positionId    String
+  positionTitle String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([date, employeeId, positionId])
+  @@index([createdAt])
+}
+
 model Job {
   id                 String    @id @default(cuid())
   title              String

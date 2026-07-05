@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { recordWorkHistory } from "@/lib/workHistory";
 
 const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
 
@@ -170,6 +171,20 @@ export async function PATCH(
       `${employee.name}: ${changes.length ? changes.join(", ") : "updated"}`,
       employee.id
     );
+
+    // Record what position they worked today (present + assigned).
+    if (
+      employee.positionId &&
+      employee.position &&
+      employee.attendance === "PRESENT"
+    ) {
+      await recordWorkHistory(
+        employee.id,
+        employee.name,
+        employee.positionId,
+        employee.position.title
+      );
+    }
     return NextResponse.json(employee);
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") {

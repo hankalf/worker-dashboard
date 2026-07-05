@@ -96,10 +96,11 @@ export default function ActivityPage() {
   const exportAllAndClear = async () => {
     if (
       !confirm(
-        "⚠ Export ALL logs and permanently clear the database?\n\n" +
-          "A CSV of every activity and side-task log will download first, then " +
-          "those rows will be deleted (terminated-employee history is kept). " +
-          "This cannot be undone."
+        "⚠ Export ALL logs and clear the database?\n\n" +
+          "A CSV of every activity log, side-task log, and position history entry " +
+          "downloads first. Then the activity + side-task rows are deleted. " +
+          "Position history stays (auto-deletes after 2 weeks); employees, " +
+          "positions and equipment are untouched. This cannot be undone."
       )
     )
       return;
