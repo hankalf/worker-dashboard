@@ -5,7 +5,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -65,6 +66,8 @@ const stopDrag = (e: React.PointerEvent | React.KeyboardEvent) =>
 function EmployeeCard({
   employee,
   saveState,
+  positions,
+  onPositionChange,
   onLunchChange,
   onBreakChange,
   onAttendanceChange,
@@ -74,6 +77,8 @@ function EmployeeCard({
 }: {
   employee: Employee;
   saveState?: SaveState;
+  positions?: Position[];
+  onPositionChange?: (id: string, value: string) => void;
   onLunchChange?: (id: string, value: string) => void;
   onBreakChange?: (id: string, value: string) => void;
   onAttendanceChange?: (id: string, value: Attendance) => void;
@@ -138,12 +143,34 @@ function EmployeeCard({
         </div>
       )}
       {!overlay &&
-        (onLunchChange || onBreakChange || onAttendanceChange || onLeadToggle) && (
+        (onPositionChange ||
+          onLunchChange ||
+          onBreakChange ||
+          onAttendanceChange ||
+          onLeadToggle) && (
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
           className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500"
         >
+          {onPositionChange && positions && (
+            <>
+              <span>Position</span>
+              <select
+                value={employee.positionId ?? ""}
+                onChange={(e) => onPositionChange(employee.id, e.target.value)}
+                style={{ colorScheme: "dark" }}
+                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                <option value="">Unassigned</option>
+                {positions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           {onLunchChange && (
             <>
               <span>Lunch</span>
@@ -221,6 +248,8 @@ function PositionColumn({
   requiredRole,
   employees,
   saveStates,
+  positions,
+  onPositionChange,
   onLunchChange,
   onBreakChange,
   onAttendanceChange,
@@ -231,6 +260,8 @@ function PositionColumn({
   requiredRole: Role | null;
   employees: Employee[];
   saveStates: Record<string, SaveState>;
+  positions: Position[];
+  onPositionChange: (id: string, value: string) => void;
   onLunchChange: (id: string, value: string) => void;
   onBreakChange: (id: string, value: string) => void;
   onAttendanceChange: (id: string, value: Attendance) => void;
@@ -269,6 +300,8 @@ function PositionColumn({
             key={employee.id}
             employee={employee}
             saveState={saveStates[employee.id]}
+            positions={positions}
+            onPositionChange={onPositionChange}
             onLunchChange={onLunchChange}
             onBreakChange={onBreakChange}
             onAttendanceChange={onAttendanceChange}
@@ -300,10 +333,15 @@ export default function AssignPage() {
     { id: string; positionId: string }[] | null
   >(null);
 
-  // Small movement threshold so taps/scrolls on touchscreens don't start a
-  // drag; keyboard sensor lets cards be moved with Enter + arrow keys too.
+  // Separate mouse/touch sensors: mouse drags after a small move, while touch
+  // requires a short press-and-hold — so a quick finger swipe still scrolls the
+  // board on phones instead of accidentally grabbing a card. On touch you can
+  // also just use the per-card position dropdown to reassign without dragging.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -520,8 +558,9 @@ export default function AssignPage() {
         </div>
       </div>
       <p className="mb-4 text-sm text-zinc-400">
-        Drag an employee onto a position, and set each person&apos;s lunch time
-        — every change saves instantly.
+        Drag an employee onto a position — or use each card&apos;s Position
+        dropdown (best on phones) — and set their lunch, break, and
+        attendance. Every change saves instantly.
       </p>
 
       {undoSnapshot && (
@@ -559,7 +598,7 @@ export default function AssignPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="grid grid-cols-2 gap-4 pb-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-4">
           {columns.map((column) => (
             <PositionColumn
               key={column.id}
@@ -572,6 +611,10 @@ export default function AssignPage() {
                   : e.positionId === column.id
               )}
               saveStates={saveStates}
+              positions={positions}
+              onPositionChange={(empId, value) =>
+                assign(empId, value || null)
+              }
               onLunchChange={setLunch}
               onBreakChange={setBreak}
               onAttendanceChange={setAttendance}
