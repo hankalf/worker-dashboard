@@ -21,6 +21,7 @@ export function DashboardView({
   isAdmin,
   announcements,
   renderedAt,
+  title,
   tv = false,
 }: {
   positions: Position[];
@@ -29,6 +30,7 @@ export function DashboardView({
   isAdmin: boolean;
   announcements: string[];
   renderedAt: string;
+  title: string;
   tv?: boolean;
 }) {
   const now = useNow();
@@ -41,7 +43,7 @@ export function DashboardView({
       style={tv ? ({ zoom: 1.35 } as React.CSSProperties) : undefined}
     >
       <header className="grid grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-lg font-semibold">Warehouse Dashboard</h1>
+        <h1 className="text-lg font-semibold">{title}</h1>
         <div className="text-center">
           {now && (
             <>

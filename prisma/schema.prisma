@@ -144,6 +144,13 @@ model WorkHistory {
   @@index([createdAt])
 }
 
+// Simple key/value store for editable site settings (e.g. the dashboard name
+// shown across the public board, login page, and admin panel).
+model Setting {
+  key   String @id
+  value String
+}
+
 model Job {
   id                 String    @id @default(cuid())
   title              String

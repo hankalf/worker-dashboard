@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -11,6 +11,16 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dashboardName, setDashboardName] = useState("Warehouse Dashboard");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.dashboardName) setDashboardName(data.dashboardName);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +51,7 @@ function LoginForm() {
         className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-8"
       >
         <h1 className="mb-1 text-xl font-semibold text-white">Admin Login</h1>
-        <p className="mb-6 text-sm text-zinc-400">Warehouse Dashboard</p>
+        <p className="mb-6 text-sm text-zinc-400">{dashboardName}</p>
 
         <label className="mb-1 block text-sm font-medium text-zinc-300">
           Username

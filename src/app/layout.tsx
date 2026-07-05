@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
+import { getDashboardName } from "@/lib/settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,10 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Warehouse Dashboard",
-  description: "Warehouse dashboard and admin panel",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const name = await getDashboardName();
+  return { title: name, description: `${name} and admin panel` };
+}
 
 export default async function RootLayout({
   children,

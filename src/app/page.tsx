@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardView } from "@/components/DashboardView";
 import { splitNotices } from "@/lib/announcements";
+import { getDashboardName } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ export default async function Home({
   const tv = (await searchParams).tv === "1";
 
   const now = new Date();
-  const [positions, employees, jobs, activeNotices] = await Promise.all([
+  const [positions, employees, jobs, activeNotices, dashboardName] =
+    await Promise.all([
     prisma.position.findMany({
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
     }),
@@ -40,6 +42,7 @@ export default async function Home({
       },
       orderBy: { createdAt: "asc" },
     }),
+    getDashboardName(),
   ]);
 
   const { visible } = splitNotices(activeNotices);
@@ -52,6 +55,7 @@ export default async function Home({
       isAdmin={!!session?.user}
       announcements={visible.map((n) => n.message)}
       renderedAt={now.toISOString()}
+      title={dashboardName}
       tv={tv}
     />
   );
