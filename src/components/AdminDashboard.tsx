@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Position } from "@/generated/prisma/client";
-import { APP_TZ, easternInputToUtcISO } from "@/lib/time";
+import {
+  APP_TZ,
+  easternInputToUtcISO,
+  easternDateTimeInput,
+} from "@/lib/time";
 import { currentShift, SHIFTS, type ShiftKey } from "@/lib/shift";
 import { MAX_VISIBLE_NOTICES, splitNotices } from "@/lib/announcements";
 import {
@@ -63,7 +67,11 @@ export function AdminDashboard({
   const router = useRouter();
 
   const [message, setMessage] = useState("");
-  const [expiresInput, setExpiresInput] = useState("");
+  // Prefilled with the current Eastern date/time as a starting point; the admin
+  // bumps it forward, or clears it for a notice with no expiry.
+  const [expiresInput, setExpiresInput] = useState(() =>
+    easternDateTimeInput(new Date())
+  );
   const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -119,7 +127,7 @@ export function AdminDashboard({
       }),
     });
     setMessage("");
-    setExpiresInput("");
+    setExpiresInput(easternDateTimeInput(new Date()));
     setPinNew(false);
     setPosting(false);
     router.refresh();

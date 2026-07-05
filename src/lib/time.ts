@@ -28,6 +28,22 @@ export function easternDateKey(now: Date): string {
   }).format(now);
 }
 
+// Current Eastern wall-clock time as "YYYY-MM-DDTHH:mm" for prefilling a
+// <input type="datetime-local">.
+export function easternDateTimeInput(now: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(now);
+  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
+}
+
 // Offset (ms) of the app timezone at a given instant: appTZ wall clock − UTC.
 function easternOffsetMs(at: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
