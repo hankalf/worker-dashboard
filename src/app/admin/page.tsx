@@ -23,7 +23,14 @@ export default async function AdminDashboardPage() {
       positions={positions}
       employees={employees}
       jobs={jobs}
-      announcement={announcement?.message ?? null}
+      announcement={
+        announcement
+          ? {
+              message: announcement.message,
+              expiresAt: announcement.expiresAt?.toISOString() ?? null,
+            }
+          : null
+      }
     />
   );
 }

@@ -32,7 +32,12 @@ export default async function Home({
       employees={employees}
       jobs={jobs}
       isAdmin={!!session?.user}
-      announcement={announcement?.message ?? null}
+      announcement={
+        announcement &&
+        (!announcement.expiresAt || announcement.expiresAt > new Date())
+          ? announcement.message
+          : null
+      }
       tv={tv}
     />
   );

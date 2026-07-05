@@ -26,8 +26,19 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { name, positionId, roleIds, accessLevel, username, password, shift, attendance, isLead } =
-    await req.json();
+  const {
+    name,
+    positionId,
+    roleIds,
+    accessLevel,
+    username,
+    password,
+    shift,
+    attendance,
+    isLead,
+    lunchStart,
+    breakStart,
+  } = await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
@@ -50,6 +61,8 @@ export async function POST(req: Request) {
         shift: shift || null,
         attendance: attendance || "PRESENT",
         isLead: !!isLead,
+        lunchStart: lunchStart || null,
+        breakStart: breakStart || null,
         roles: {
           connect: (roleIds ?? []).map((id: string) => ({ id })),
         },

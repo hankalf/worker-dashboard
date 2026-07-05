@@ -54,6 +54,8 @@ model Employee {
   // Lunch window as "HH:MM" strings (24h); end defaults to start+30min if unset
   lunchStart   String?
   lunchEnd     String?
+  // Optional short (15-min) break start, "HH:MM"
+  breakStart   String?
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)
@@ -83,9 +85,10 @@ model Position {
 
 // Single pinned message shown on the dashboards (id is always "current").
 model Announcement {
-  id        String   @id
+  id        String    @id
   message   String
-  updatedAt DateTime @updatedAt
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
 }
 
 model Job {

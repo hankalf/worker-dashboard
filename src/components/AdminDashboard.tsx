@@ -11,6 +11,18 @@ import {
   type JobWithRelations,
 } from "@/components/DashboardSections";
 
+type Announcement = { message: string; expiresAt: string | null };
+
+// ISO string -> value for a <input type="datetime-local">.
+function toLocalInput(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
 export function AdminDashboard({
   positions,
   employees,
@@ -20,12 +32,15 @@ export function AdminDashboard({
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
-  announcement: string | null;
+  announcement: Announcement | null;
 }) {
   const now = useNow();
   useAutoRefresh();
 
-  const [message, setMessage] = useState(announcement ?? "");
+  const [message, setMessage] = useState(announcement?.message ?? "");
+  const [expiresInput, setExpiresInput] = useState(
+    toLocalInput(announcement?.expiresAt ?? null)
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -35,12 +50,22 @@ export function AdminDashboard({
     await fetch("/api/announcement", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        expiresAt: expiresInput ? new Date(expiresInput).toISOString() : null,
+      }),
     });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  // Only show the banner if it hasn't expired.
+  const activeMessage =
+    announcement &&
+    (!announcement.expiresAt || new Date(announcement.expiresAt) > new Date())
+      ? announcement.message
+      : null;
 
   return (
     <div>
@@ -88,6 +113,25 @@ export function AdminDashboard({
             {saving ? "Saving…" : saved ? "Saved ✓" : "Post"}
           </button>
         </div>
+        <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+          Clear automatically at (optional):
+          <input
+            type="datetime-local"
+            value={expiresInput}
+            onChange={(e) => setExpiresInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+          {expiresInput && (
+            <button
+              type="button"
+              onClick={() => setExpiresInput("")}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              clear
+            </button>
+          )}
+        </label>
       </div>
 
       {/* Force dark styling — the admin panel is always dark regardless of the
@@ -100,7 +144,7 @@ export function AdminDashboard({
           now={now}
           showPositions
           showCoverage
-          announcement={announcement}
+          announcement={activeMessage}
         />
       </div>
     </div>

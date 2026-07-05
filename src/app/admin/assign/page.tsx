@@ -25,6 +25,7 @@ type Employee = {
   roles: Role[];
   lunchStart: string | null;
   lunchEnd: string | null;
+  breakStart: string | null;
   shift: Shift | null;
   attendance: Attendance;
   isLead: boolean;
@@ -65,6 +66,7 @@ function EmployeeCard({
   employee,
   saveState,
   onLunchChange,
+  onBreakChange,
   onAttendanceChange,
   onLeadToggle,
   warnRole,
@@ -73,6 +75,7 @@ function EmployeeCard({
   employee: Employee;
   saveState?: SaveState;
   onLunchChange?: (id: string, value: string) => void;
+  onBreakChange?: (id: string, value: string) => void;
   onAttendanceChange?: (id: string, value: Attendance) => void;
   onLeadToggle?: (id: string, value: boolean) => void;
   warnRole?: string | null;
@@ -134,7 +137,8 @@ function EmployeeCard({
           ⚠ Missing role: {warnRole}
         </div>
       )}
-      {!overlay && (onLunchChange || onAttendanceChange || onLeadToggle) && (
+      {!overlay &&
+        (onLunchChange || onBreakChange || onAttendanceChange || onLeadToggle) && (
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
@@ -146,6 +150,24 @@ function EmployeeCard({
               <select
                 value={employee.lunchStart ?? ""}
                 onChange={(e) => onLunchChange(employee.id, e.target.value)}
+                style={{ colorScheme: "dark" }}
+                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                <option value="">None</option>
+                {LUNCH_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          {onBreakChange && (
+            <>
+              <span>Break</span>
+              <select
+                value={employee.breakStart ?? ""}
+                onChange={(e) => onBreakChange(employee.id, e.target.value)}
                 style={{ colorScheme: "dark" }}
                 className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
               >
@@ -200,6 +222,7 @@ function PositionColumn({
   employees,
   saveStates,
   onLunchChange,
+  onBreakChange,
   onAttendanceChange,
   onLeadToggle,
 }: {
@@ -209,6 +232,7 @@ function PositionColumn({
   employees: Employee[];
   saveStates: Record<string, SaveState>;
   onLunchChange: (id: string, value: string) => void;
+  onBreakChange: (id: string, value: string) => void;
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
 }) {
@@ -246,6 +270,7 @@ function PositionColumn({
             employee={employee}
             saveState={saveStates[employee.id]}
             onLunchChange={onLunchChange}
+            onBreakChange={onBreakChange}
             onAttendanceChange={onAttendanceChange}
             onLeadToggle={onLeadToggle}
             warnRole={
@@ -341,6 +366,36 @@ export default function AssignPage() {
       body: JSON.stringify({ lunchStart: value, lunchEnd: "" }),
     });
     flashSaved(employeeId, res.ok);
+  };
+
+  const setBreak = async (employeeId: string, value: string) => {
+    setEmployees((current) =>
+      current.map((e) =>
+        e.id === employeeId ? { ...e, breakStart: value || null } : e
+      )
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ breakStart: value }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
+  const markAllPresent = async () => {
+    if (!confirm("Mark everyone Present for the start of the shift?")) return;
+    const res = await fetch("/api/employees/reset-attendance", {
+      method: "POST",
+    });
+    if (res.ok) {
+      setEmployees((current) =>
+        current.map((e) => ({ ...e, attendance: "PRESENT" as Attendance }))
+      );
+    } else {
+      alert("Could not update attendance. Please try again.");
+    }
   };
 
   const setAttendance = async (employeeId: string, value: Attendance) => {
@@ -449,12 +504,20 @@ export default function AssignPage() {
     <div>
       <div className="mb-1 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-white">Assign Positions</h2>
-        <button
-          onClick={resetAll}
-          className="shrink-0 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
-        >
-          Reset all to Unassigned
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            onClick={markAllPresent}
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-green-500 hover:text-green-400"
+          >
+            Mark all Present
+          </button>
+          <button
+            onClick={resetAll}
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
+          >
+            Reset all to Unassigned
+          </button>
+        </div>
       </div>
       <p className="mb-4 text-sm text-zinc-400">
         Drag an employee onto a position, and set each person&apos;s lunch time
@@ -510,6 +573,7 @@ export default function AssignPage() {
               )}
               saveStates={saveStates}
               onLunchChange={setLunch}
+              onBreakChange={setBreak}
               onAttendanceChange={setAttendance}
               onLeadToggle={setLead}
             />

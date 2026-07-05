@@ -122,11 +122,18 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
             </span>
           )}
         </span>
-        {member.lunchStart && (
-          <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
-            Lunch {formatClock(member.lunchStart)}
-          </span>
-        )}
+        <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          {member.breakStart && (
+            <span className="whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
+              Break {formatClock(member.breakStart)}
+            </span>
+          )}
+          {member.lunchStart && (
+            <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
+              Lunch {formatClock(member.lunchStart)}
+            </span>
+          )}
+        </span>
       </div>
       {member.roles.length > 0 && (
         <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -184,6 +191,9 @@ export function DashboardSections({
     .filter((c) => c.presentCount === 0)
     .map((c) => c.title);
 
+  const onShiftCount = roster.length;
+  const presentCount = roster.filter(present).length;
+
   const onLunch = now
     ? employees.filter((emp) => {
         const end = lunchEndMinutes(emp);
@@ -215,6 +225,20 @@ export function DashboardSections({
           {understaffed.join(", ")}
         </div>
       )}
+
+      <div className="mb-8 flex flex-wrap gap-2 text-sm">
+        <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+          <span className="font-semibold">{presentCount}</span> present
+        </span>
+        <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          {onShiftCount} on shift
+        </span>
+        {onLunch.length > 0 && (
+          <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            {onLunch.length} on lunch
+          </span>
+        )}
+      </div>
 
       <section className="mb-10">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

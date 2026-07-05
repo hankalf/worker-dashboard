@@ -84,6 +84,7 @@ export async function PATCH(
   if (body.attendance !== undefined) data.attendance = body.attendance || "PRESENT";
   if (body.lunchStart !== undefined) data.lunchStart = body.lunchStart || null;
   if (body.lunchEnd !== undefined) data.lunchEnd = body.lunchEnd || null;
+  if (body.breakStart !== undefined) data.breakStart = body.breakStart || null;
   if (body.shift !== undefined) data.shift = body.shift || null;
   if (body.isLead !== undefined) data.isLead = !!body.isLead;
 
@@ -139,6 +140,10 @@ export async function PATCH(
     if (body.lunchStart !== undefined)
       changes.push(
         employee.lunchStart ? `lunch → ${clock(employee.lunchStart)}` : "lunch cleared"
+      );
+    if (body.breakStart !== undefined)
+      changes.push(
+        employee.breakStart ? `break → ${clock(employee.breakStart)}` : "break cleared"
       );
     if (body.attendance !== undefined)
       changes.push(`marked ${ATTENDANCE_LABEL[employee.attendance] ?? employee.attendance}`);

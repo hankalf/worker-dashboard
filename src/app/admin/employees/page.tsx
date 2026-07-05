@@ -586,7 +586,32 @@ export default function EmployeesPage() {
             ) : history.length === 0 ? (
               <p className="text-sm text-zinc-500">No recorded history.</p>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <>
+                {(() => {
+                  // Summarise: total changes + most-assigned position.
+                  const counts: Record<string, number> = {};
+                  for (const log of history) {
+                    const m = log.action.match(/position → ([^,]+)/);
+                    if (m) counts[m[1].trim()] = (counts[m[1].trim()] ?? 0) + 1;
+                  }
+                  const top = Object.entries(counts).sort(
+                    (a, b) => b[1] - a[1]
+                  )[0];
+                  return (
+                    <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-zinc-800 px-2 py-1 text-zinc-300">
+                        {history.length} change
+                        {history.length === 1 ? "" : "s"} recorded
+                      </span>
+                      {top && (
+                        <span className="rounded-full bg-zinc-800 px-2 py-1 text-zinc-300">
+                          Most assigned: {top[0]} ({top[1]}×)
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+                <ul className="flex flex-col gap-1">
                 {history.map((log) => (
                   <li
                     key={log.id}
@@ -609,7 +634,8 @@ export default function EmployeesPage() {
                     </span>
                   </li>
                 ))}
-              </ul>
+                </ul>
+              </>
             )}
           </div>
         </div>

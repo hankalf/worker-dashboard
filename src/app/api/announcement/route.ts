@@ -16,7 +16,7 @@ export async function PUT(req: Request) {
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { message } = await req.json();
+  const { message, expiresAt } = await req.json();
   const trimmed = typeof message === "string" ? message.trim() : "";
 
   if (!trimmed) {
@@ -25,11 +25,15 @@ export async function PUT(req: Request) {
     return NextResponse.json(null);
   }
 
+  const expires = expiresAt ? new Date(expiresAt) : null;
   const announcement = await prisma.announcement.upsert({
     where: { id: ID },
-    update: { message: trimmed },
-    create: { id: ID, message: trimmed },
+    update: { message: trimmed, expiresAt: expires },
+    create: { id: ID, message: trimmed, expiresAt: expires },
   });
-  await logActivity("Announcement", `Set announcement: ${trimmed}`);
+  await logActivity(
+    "Announcement",
+    `Set announcement: ${trimmed}${expires ? ` (until ${expires.toLocaleString()})` : ""}`
+  );
   return NextResponse.json(announcement);
 }
