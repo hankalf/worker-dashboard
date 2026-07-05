@@ -38,6 +38,7 @@ type ActivityLog = {
   id: string;
   category: string;
   action: string;
+  actorName: string | null;
   createdAt: string;
 };
 
@@ -591,7 +592,12 @@ export default function EmployeesPage() {
                     key={log.id}
                     className="flex items-baseline justify-between gap-3 rounded-md border border-zinc-800 px-3 py-2 text-sm"
                   >
-                    <span className="text-zinc-200">{log.action}</span>
+                    <span className="text-zinc-200">
+                      {log.action}
+                      {log.actorName && (
+                        <span className="text-zinc-500"> · by {log.actorName}</span>
+                      )}
+                    </span>
                     <span className="whitespace-nowrap text-xs text-zinc-500">
                       {new Date(log.createdAt).toLocaleString(undefined, {
                         month: "short",

@@ -7,6 +7,7 @@ type ActivityLog = {
   id: string;
   category: string;
   action: string;
+  actorName: string | null;
   createdAt: string;
 };
 
@@ -53,13 +54,18 @@ export default function ActivityPage() {
       if (new Date(log.createdAt).getTime() < cutoff) return false;
     }
     const q = search.trim().toLowerCase();
-    if (q && !`${log.category} ${log.action}`.toLowerCase().includes(q))
+    if (
+      q &&
+      !`${log.category} ${log.action} ${log.actorName ?? ""}`
+        .toLowerCase()
+        .includes(q)
+    )
       return false;
     return true;
   });
 
   const exportCsv = () => {
-    const header = ["Date", "Time", "Category", "Change"];
+    const header = ["Date", "Time", "Category", "Change", "By"];
     const rows = filtered.map((log) => {
       const d = new Date(log.createdAt);
       return [
@@ -67,6 +73,7 @@ export default function ActivityPage() {
         d.toLocaleTimeString(undefined, { timeZone: APP_TZ }),
         log.category,
         log.action,
+        log.actorName ?? "",
       ].map(csvCell);
     });
     const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
@@ -145,6 +152,7 @@ export default function ActivityPage() {
                 <th className="px-4 py-2 font-medium">When</th>
                 <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium">Change</th>
+                <th className="px-4 py-2 font-medium">By</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
@@ -165,6 +173,9 @@ export default function ActivityPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-zinc-200">{log.action}</td>
+                  <td className="whitespace-nowrap px-4 py-2 text-zinc-400">
+                    {log.actorName ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

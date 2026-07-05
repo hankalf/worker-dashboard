@@ -120,6 +120,8 @@ model ActivityLog {
   category  String
   action    String
   subjectId String?
+  actorId   String?
+  actorName String?
   archived  Boolean  @default(false)
   createdAt DateTime @default(now())
 
