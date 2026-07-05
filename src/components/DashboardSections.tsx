@@ -172,15 +172,21 @@ function MemberBody({
           <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             {member.position?.title ?? "No position"}
           </div>
-          {/* Roles (capabilities) */}
+          {/* Roles (capabilities) — plain text list */}
           {member.capabilities.length > 0 && (
+            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {member.capabilities.map((c) => c.name).join(" · ")}
+            </div>
+          )}
+          {/* Equipment — bold tags */}
+          {member.roles.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {member.capabilities.map((c) => (
+              {member.roles.map((r) => (
                 <span
-                  key={c.id}
-                  className="whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                  key={r.id}
+                  className="whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
                 >
-                  {c.name}
+                  {r.name}
                 </span>
               ))}
             </div>

@@ -615,15 +615,21 @@ export default function EmployeesPage() {
                 {employee.position?.title ?? "No position"}
                 {employee.username ? ` · ${employee.username}` : ""}
               </div>
-              {/* Roles (capabilities) */}
+              {/* Roles (capabilities) — plain text list */}
               {employee.capabilities.length > 0 && (
+                <div className="mt-1 text-xs text-zinc-400">
+                  {employee.capabilities.map((cap) => cap.name).join(" · ")}
+                </div>
+              )}
+              {/* Equipment — bold tags */}
+              {employee.roles.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {employee.capabilities.map((cap) => (
+                  {employee.roles.map((role) => (
                     <span
-                      key={cap.id}
-                      className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+                      key={role.id}
+                      className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-bold text-zinc-200"
                     >
-                      {cap.name}
+                      {role.name}
                     </span>
                   ))}
                 </div>
