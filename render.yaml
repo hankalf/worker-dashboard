@@ -5,8 +5,10 @@ services:
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
     # Free plan has no preDeployCommand and builds can't reach the private
-    # network, so migrations + idempotent seed run at startup instead.
-    startCommand: npx prisma migrate deploy && npx prisma db seed && npm run start
+    # network, so migrations run at startup. Seed is NOT re-run on every boot
+    # (the DB is already seeded); re-seeding each cold start only added latency
+    # and an extra failure point. To (re)seed a fresh DB: npx prisma db seed.
+    startCommand: npx prisma migrate deploy && npm run start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
