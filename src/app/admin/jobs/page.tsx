@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { APP_TZ } from "@/lib/time";
+import { PRIORITY_LEVELS, priorityLabel, priorityBadgeClass } from "@/lib/priority";
 
 type Employee = { id: string; name: string };
 type Job = {
@@ -181,12 +182,17 @@ export default function JobsPage() {
           />
           <label className="text-xs text-zinc-400">
             Priority
-            <input
-              type="number"
+            <select
               value={form.priority}
               onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
               className={`mt-1 block w-full ${inputClass}`}
-            />
+            >
+              {PRIORITY_LEVELS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
@@ -234,7 +240,13 @@ export default function JobsPage() {
                     })}
                   </span>
                 )}
-                {job.priority > 0 && <span>Priority {job.priority}</span>}
+                {priorityBadgeClass(job.priority) && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-medium ${priorityBadgeClass(job.priority)}`}
+                  >
+                    {priorityLabel(job.priority)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-3 text-sm">

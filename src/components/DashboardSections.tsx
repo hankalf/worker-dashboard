@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes } from "@/lib/time";
+import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
@@ -194,6 +195,34 @@ export function DashboardSections({
   const onShiftCount = roster.length;
   const presentCount = roster.filter(present).length;
 
+  // Side tasks grouped by assigned employee (unassigned last), each group's
+  // tasks ordered by priority (highest first).
+  const jobGroups = (() => {
+    const map = new Map<
+      string,
+      { name: string; position: string | null; jobs: JobWithRelations[] }
+    >();
+    for (const job of jobs) {
+      const key = job.assignedEmployee?.id ?? "__unassigned__";
+      if (!map.has(key)) {
+        map.set(key, {
+          name: job.assignedEmployee?.name ?? "Unassigned",
+          position: job.assignedEmployee?.position?.title ?? null,
+          jobs: [],
+        });
+      }
+      map.get(key)!.jobs.push(job);
+    }
+    const groups = [...map.values()];
+    groups.forEach((g) => g.jobs.sort((a, b) => b.priority - a.priority));
+    groups.sort((a, b) => {
+      if (a.name === "Unassigned") return 1;
+      if (b.name === "Unassigned") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    return groups;
+  })();
+
   const onLunch = now
     ? employees.filter((emp) => {
         const end = lunchEndMinutes(emp);
@@ -381,39 +410,52 @@ export function DashboardSections({
             No side tasks yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="font-medium">{job.title}</h3>
-                  <span
-                    className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[job.status]}`}
-                  >
-                    {STATUS_LABELS[job.status]}
-                  </span>
+          <div className="flex flex-col gap-6">
+            {jobGroups.map((group) => (
+              <div key={group.name}>
+                <h3 className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {group.name}
+                  {showPositions && group.position ? ` · ${group.position}` : ""}
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.jobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <h3 className="font-medium">{job.title}</h3>
+                        <span className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[job.status]}`}
+                          >
+                            {STATUS_LABELS[job.status]}
+                          </span>
+                          {priorityBadgeClass(job.priority) && (
+                            <span
+                              className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${priorityBadgeClass(job.priority)}`}
+                            >
+                              {priorityLabel(job.priority)}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {job.description && (
+                        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+                          {job.description}
+                        </p>
+                      )}
+                      {job.dueDate && (
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Due:{" "}
+                          {new Date(job.dueDate).toLocaleDateString(undefined, {
+                            timeZone: "UTC",
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {job.description && (
-                  <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {job.description}
-                  </p>
-                )}
-                <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Assigned to: {job.assignedEmployee?.name ?? "Unassigned"}
-                  {showPositions && job.assignedEmployee?.position
-                    ? ` (${job.assignedEmployee.position.title})`
-                    : ""}
-                </div>
-                {job.dueDate && (
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Due:{" "}
-                    {new Date(job.dueDate).toLocaleDateString(undefined, {
-                      timeZone: "UTC",
-                    })}
-                  </div>
-                )}
               </div>
             ))}
           </div>
