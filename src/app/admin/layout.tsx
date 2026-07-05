@@ -2,18 +2,9 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminSignOutButton } from "@/components/AdminSignOutButton";
+import { AdminNav } from "@/components/AdminNav";
 
 export const dynamic = "force-dynamic";
-
-const NAV_ITEMS = [
-  { href: "/admin", label: "Admin Dashboard", adminOnly: false },
-  { href: "/admin/assign", label: "Assign", adminOnly: false },
-  { href: "/admin/jobs", label: "Side Tasks", adminOnly: false },
-  { href: "/admin/employees", label: "Employees", adminOnly: true },
-  { href: "/admin/positions", label: "Positions", adminOnly: true },
-  { href: "/admin/roles", label: "Roles", adminOnly: true },
-  { href: "/admin/activity", label: "Activity", adminOnly: false },
-];
 
 export default async function AdminLayout({
   children,
@@ -28,7 +19,6 @@ export default async function AdminLayout({
       })
     : null;
   const isAdmin = employee?.accessLevel === "ADMIN";
-  const items = NAV_ITEMS.filter((item) => isAdmin || !item.adminOnly);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
@@ -50,18 +40,7 @@ export default async function AdminLayout({
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="shrink-0 border-b border-zinc-800 bg-zinc-900 p-2 md:w-48 md:border-b-0 md:border-r md:p-4">
-          <ul className="flex flex-row gap-1 overflow-x-auto md:flex-col">
-            {items.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="block whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <AdminNav isAdmin={isAdmin} />
         </nav>
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
