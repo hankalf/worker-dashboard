@@ -98,46 +98,54 @@ const ATTENDANCE_LABEL: Record<string, string> = {
   CALLED_OUT: "Called out",
 };
 
-// Card body for one employee: name + shift chip beside it, roles and lunch
-// underneath. Absent / called-out people are dimmed with a red badge.
+// Card body for one employee: name on its own line, then all badges/chips and
+// roles beneath it. Absent / called-out people are dimmed with a red badge.
 function MemberBody({ member }: { member: EmployeeWithRelations }) {
   const out = member.attendance !== "PRESENT";
+  const hasBadges =
+    member.isLead ||
+    out ||
+    member.shift ||
+    member.breakStart ||
+    member.lunchStart;
   return (
     <div className={out ? "opacity-60" : undefined}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-sm font-medium">{member.name}</span>
-          {member.isLead && (
-            <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
-              Lead
-            </span>
-          )}
-          {out && (
-            <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
-              {ATTENDANCE_LABEL[member.attendance]}
-            </span>
-          )}
-          {member.shift && (
-            <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-              {SHIFTS[member.shift].label}
-            </span>
-          )}
-        </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          {member.breakStart && (
-            <span className="whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
-              Break {formatClock(member.breakStart)}
-            </span>
-          )}
-          {member.lunchStart && (
-            <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
-              Lunch {formatClock(member.lunchStart)}
-            </span>
-          )}
-        </span>
-      </div>
+      <div className="text-sm font-medium">{member.name}</div>
+      {hasBadges && (
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <span className="flex flex-wrap items-center gap-1.5">
+            {member.isLead && (
+              <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
+                Lead
+              </span>
+            )}
+            {out && (
+              <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+                {ATTENDANCE_LABEL[member.attendance]}
+              </span>
+            )}
+            {member.shift && (
+              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                {SHIFTS[member.shift].label}
+              </span>
+            )}
+          </span>
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            {member.breakStart && (
+              <span className="whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
+                Break {formatClock(member.breakStart)}
+              </span>
+            )}
+            {member.lunchStart && (
+              <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
+                Lunch {formatClock(member.lunchStart)}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
       {member.roles.length > 0 && (
-        <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
           {member.roles.map((role) => role.name).join(" · ")}
         </div>
       )}
@@ -368,11 +376,11 @@ export function DashboardSections({
                       No one assigned
                     </p>
                   ) : (
-                    <ul className="flex flex-col gap-2">
+                    <ul className="flex flex-col gap-3">
                       {column.members.map((member) => (
                         <li
                           key={member.id}
-                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-800/50"
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-800/50"
                         >
                           <MemberBody member={member} />
                         </li>
