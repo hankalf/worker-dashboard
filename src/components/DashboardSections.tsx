@@ -6,6 +6,7 @@ import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes } from "@/lib/time";
 import { currentShift, SHIFTS } from "@/lib/shift";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
+import { AutoScroll } from "@/components/AutoScroll";
 
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
@@ -185,6 +186,8 @@ export function DashboardSections({
   announcements = [],
   handoffNotes = {},
   horizontalTasks = false,
+  autoScroll = false,
+  hideEmptyPositions = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -195,6 +198,8 @@ export function DashboardSections({
   announcements?: string[];
   handoffNotes?: Record<string, string>;
   horizontalTasks?: boolean;
+  autoScroll?: boolean;
+  hideEmptyPositions?: boolean;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -216,6 +221,11 @@ export function DashboardSections({
     };
   });
   const roster = employees.filter(onShift);
+
+  // On the public board, hide positions that have nobody on this shift.
+  const visibleColumns = hideEmptyPositions
+    ? columns.filter((c) => c.members.length > 0)
+    : columns;
 
   // Positions with nobody present on the current shift (admin view only).
   const understaffed = columns
@@ -329,6 +339,7 @@ export function DashboardSections({
             No one is on lunch right now.
           </p>
         ) : (
+          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {onLunch.map((emp) => (
               <div
@@ -345,6 +356,7 @@ export function DashboardSections({
               </div>
             ))}
           </div>
+          </AutoScroll>
         )}
       </section>
 
@@ -353,6 +365,7 @@ export function DashboardSections({
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Lunch Schedule
           </h2>
+          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
           <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {lunchSchedule.map((emp) => (
               <li
@@ -375,6 +388,7 @@ export function DashboardSections({
               </li>
             ))}
           </ul>
+          </AutoScroll>
         </section>
       )}
       </div>
@@ -390,13 +404,16 @@ export function DashboardSections({
         </h2>
 
         {showPositions ? (
-          columns.length === 0 ? (
+          visibleColumns.length === 0 ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No positions yet.
+              {hideEmptyPositions
+                ? "No one assigned to a position on this shift."
+                : "No positions yet."}
             </p>
           ) : (
+            <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[48vh]">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {columns.map((column) => (
+              {visibleColumns.map((column) => (
                 <div
                   key={column.id}
                   className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
@@ -432,6 +449,7 @@ export function DashboardSections({
                 </div>
               ))}
             </div>
+            </AutoScroll>
           )
         ) : roster.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -460,6 +478,7 @@ export function DashboardSections({
             No side tasks yet.
           </p>
         ) : (
+          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[40vh]">
           <div
             className={
               horizontalTasks
@@ -521,6 +540,7 @@ export function DashboardSections({
               </div>
             ))}
           </div>
+          </AutoScroll>
         )}
       </section>
     </>

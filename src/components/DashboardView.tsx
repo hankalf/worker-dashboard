@@ -122,6 +122,8 @@ export function DashboardView({
           handoffNotes={handoffNotes}
           showPositions
           horizontalTasks
+          autoScroll
+          hideEmptyPositions
         />
       </main>
     </div>
