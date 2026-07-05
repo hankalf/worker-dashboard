@@ -5,17 +5,17 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const TOP_ITEMS = [
-  { href: "/admin", label: "Admin Dashboard" },
-  { href: "/admin/assign", label: "Assign" },
-  { href: "/admin/jobs", label: "Side Tasks" },
-  { href: "/admin/attendance", label: "Attendance" },
+  { href: "/admin", label: "Admin Dashboard", adminOnly: false },
+  { href: "/admin/assign", label: "Assign", adminOnly: false },
+  { href: "/admin/jobs", label: "Side Tasks", adminOnly: false },
+  { href: "/admin/attendance", label: "Attendance", adminOnly: true },
 ];
 
 const SETUP_ITEMS = [
   { href: "/admin/employees", label: "Employees", adminOnly: true },
   { href: "/admin/positions", label: "Positions", adminOnly: true },
   { href: "/admin/roles", label: "Roles", adminOnly: true },
-  { href: "/admin/activity", label: "Activity", adminOnly: false },
+  { href: "/admin/activity", label: "Activity", adminOnly: true },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -26,6 +26,7 @@ function isActive(pathname: string, href: string) {
 
 export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const topItems = TOP_ITEMS.filter((i) => isAdmin || !i.adminOnly);
   const setupItems = SETUP_ITEMS.filter((i) => isAdmin || !i.adminOnly);
   const inSetup = setupItems.some((i) => isActive(pathname, i.href));
   const [open, setOpen] = useState(inSetup);
@@ -39,7 +40,7 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <ul className="flex flex-row gap-1 overflow-x-auto md:flex-col">
-      {TOP_ITEMS.map((item) => (
+      {topItems.map((item) => (
         <li key={item.href}>
           <Link href={item.href} className={linkClass(item.href)}>
             {item.label}

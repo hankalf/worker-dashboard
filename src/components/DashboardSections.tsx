@@ -319,7 +319,8 @@ export function DashboardSections({
         </div>
       )}
 
-      <section className="mb-10">
+      <div className="mb-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <section>
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
         </h2>
@@ -328,7 +329,7 @@ export function DashboardSections({
             No one is on lunch right now.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {onLunch.map((emp) => (
               <div
                 key={emp.id}
@@ -348,7 +349,7 @@ export function DashboardSections({
       </section>
 
       {lunchSchedule.length > 0 && (
-        <section className="mb-10">
+        <section>
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Lunch Schedule
           </h2>
@@ -376,6 +377,7 @@ export function DashboardSections({
           </ul>
         </section>
       )}
+      </div>
 
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

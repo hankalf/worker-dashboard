@@ -73,8 +73,11 @@ export function AdminDashboard({
   const [expiresInput, setExpiresInput] = useState(() =>
     easternDateTimeInput(new Date())
   );
-  // Optional scheduled start (blank = show immediately), limited to 48h ahead.
-  const [startsInput, setStartsInput] = useState("");
+  // Optional scheduled start, prefilled with the current Eastern time (bump it
+  // forward to schedule, or "clear" to show immediately); limited to 48h ahead.
+  const [startsInput, setStartsInput] = useState(() =>
+    easternDateTimeInput(new Date())
+  );
   const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -139,7 +142,7 @@ export function AdminDashboard({
       }),
     });
     setMessage("");
-    setStartsInput("");
+    setStartsInput(easternDateTimeInput(new Date()));
     setExpiresInput(easternDateTimeInput(new Date()));
     setPinNew(false);
     setPosting(false);

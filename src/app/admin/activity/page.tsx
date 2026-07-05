@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { APP_TZ } from "@/lib/time";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 type ActivityLog = {
   id: string;
@@ -23,6 +24,7 @@ const RANGES: { value: string; label: string; days: number | null }[] = [
 ];
 
 export default function ActivityPage() {
+  const admin = useAdminGuard();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -30,6 +32,7 @@ export default function ActivityPage() {
   const [range, setRange] = useState("all");
 
   useEffect(() => {
+    if (!admin) return;
     (async () => {
       const res = await fetch("/api/activity-logs");
       if (res.status === 403) {
@@ -39,7 +42,7 @@ export default function ActivityPage() {
       setLogs(await res.json());
       setLoading(false);
     })();
-  }, []);
+  }, [admin]);
 
   const categories = Array.from(new Set(logs.map((l) => l.category))).sort();
 
@@ -86,6 +89,9 @@ export default function ActivityPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Block render until admin is confirmed (supervisors get redirected away).
+  if (!admin) return null;
 
   return (
     <div className="max-w-4xl">

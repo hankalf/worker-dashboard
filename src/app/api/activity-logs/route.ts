@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/rbac";
+import { requireAdmin } from "@/lib/rbac";
 
 const RETENTION_DAYS = 14;
 
 export async function GET(req: Request) {
-  const staff = await requireStaff();
-  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // Purge anything older than the retention window on read (no cron needed),
   // but keep archived entries (e.g. terminated-employee history) forever.
