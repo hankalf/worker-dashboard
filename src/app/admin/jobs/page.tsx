@@ -60,14 +60,17 @@ export default function JobsPage() {
       fetch("/api/employees"),
       fetch("/api/task-logs"),
     ]);
-    if (employeesRes.status === 403) {
-      // Session no longer maps to an admin — send them back to sign in
+    if (employeesRes.status === 403 || jobsRes.status === 403) {
+      // Session no longer has panel access — send them back to sign in
       window.location.href = "/login";
       return;
     }
-    setJobs(await jobsRes.json());
-    setEmployees(await employeesRes.json());
-    setLogs(await logsRes.json());
+    // Default to empty arrays on any non-OK response so the page never crashes.
+    const arr = async <T,>(res: Response): Promise<T[]> =>
+      res.ok ? await res.json() : [];
+    setJobs(await arr<Job>(jobsRes));
+    setEmployees(await arr<Employee>(employeesRes));
+    setLogs(await arr<TaskLog>(logsRes));
   };
 
   useEffect(() => {
