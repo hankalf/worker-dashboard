@@ -75,6 +75,7 @@ function EmployeeCard({
   onLeadToggle,
   warnRole,
   overlay = false,
+  noDrag = false,
 }: {
   employee: Employee;
   saveState?: SaveState;
@@ -86,23 +87,27 @@ function EmployeeCard({
   onLeadToggle?: (id: string, value: boolean) => void;
   warnRole?: string | null;
   overlay?: boolean;
+  noDrag?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: employee.id,
-    disabled: overlay,
+    disabled: overlay || noDrag,
   });
   const out = employee.attendance !== "PRESENT";
+  const fixed = overlay || noDrag;
 
   return (
     <div
-      ref={overlay ? undefined : setNodeRef}
-      {...(overlay ? {} : { ...listeners, ...attributes })}
+      ref={fixed ? undefined : setNodeRef}
+      {...(fixed ? {} : { ...listeners, ...attributes })}
       className={`select-none rounded-md border p-3 ${
         overlay
           ? "border-blue-500 bg-zinc-800 shadow-lg shadow-black/50"
           : isDragging
             ? "border-zinc-700 bg-zinc-800/40 opacity-40"
-            : `cursor-grab border-zinc-700 bg-zinc-800 hover:border-zinc-500 active:cursor-grabbing ${out ? "opacity-60" : ""}`
+            : noDrag
+              ? `border-zinc-700 bg-zinc-800 ${out ? "opacity-60" : ""}`
+              : `cursor-grab border-zinc-700 bg-zinc-800 hover:border-zinc-500 active:cursor-grabbing ${out ? "opacity-60" : ""}`
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -539,6 +544,10 @@ export default function AssignPage() {
     })),
   ];
 
+  // Absent / called-out people are pulled out of the position board into their
+  // own section so the board shows only who's actually working.
+  const absentEmployees = employees.filter((e) => e.attendance !== "PRESENT");
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-4">
@@ -610,10 +619,12 @@ export default function AssignPage() {
               id={column.id}
               title={column.title}
               requiredRole={column.requiredRole}
-              employees={employees.filter((e) =>
-                column.id === UNASSIGNED
-                  ? !e.positionId
-                  : e.positionId === column.id
+              employees={employees.filter(
+                (e) =>
+                  e.attendance === "PRESENT" &&
+                  (column.id === UNASSIGNED
+                    ? !e.positionId
+                    : e.positionId === column.id)
               )}
               saveStates={saveStates}
               positions={positions}
@@ -627,6 +638,26 @@ export default function AssignPage() {
             />
           ))}
         </div>
+
+        {absentEmployees.length > 0 && (
+          <div className="mt-8 border-t border-zinc-800 pt-6">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+              Absent / Called out ({absentEmployees.length})
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {absentEmployees.map((e) => (
+                <EmployeeCard
+                  key={e.id}
+                  employee={e}
+                  saveState={saveStates[e.id]}
+                  onAttendanceChange={setAttendance}
+                  noDrag
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         <DragOverlay>
           {activeEmployee && <EmployeeCard employee={activeEmployee} overlay />}
         </DragOverlay>
