@@ -14,6 +14,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 
 type Role = { id: string; name: string };
 type Position = { id: string; title: string; requiredRole: Role | null };
@@ -139,7 +140,7 @@ function EmployeeCard({
       )}
       {warnRole && (
         <div className="mt-1 text-xs font-medium text-amber-400">
-          ⚠ Missing role: {warnRole}
+          ⚠ Missing equipment: {warnRole}
         </div>
       )}
       {!overlay &&
@@ -562,6 +563,10 @@ export default function AssignPage() {
         dropdown (best on phones) — and set their lunch, break, and
         attendance. Every change saves instantly.
       </p>
+
+      <div className="mb-6">
+        <ShiftHandoffEditor />
+      </div>
 
       {undoSnapshot && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-200">

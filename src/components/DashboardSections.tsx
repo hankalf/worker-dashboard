@@ -188,6 +188,7 @@ export function DashboardSections({
   horizontalTasks = false,
   autoScroll = false,
   hideEmptyPositions = false,
+  tv = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -200,6 +201,7 @@ export function DashboardSections({
   horizontalTasks?: boolean;
   autoScroll?: boolean;
   hideEmptyPositions?: boolean;
+  tv?: boolean;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -411,7 +413,10 @@ export function DashboardSections({
                 : "No positions yet."}
             </p>
           ) : (
-            <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[48vh]">
+            <AutoScroll
+              enabled={autoScroll && (tv ? visibleColumns.length > 6 : true)}
+              maxHeightClass={tv ? "max-h-[80vh]" : "max-h-[48vh]"}
+            >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleColumns.map((column) => (
                 <div

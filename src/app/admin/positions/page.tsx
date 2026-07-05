@@ -27,7 +27,7 @@ export default function PositionsPage() {
   const load = async () => {
     const [positionsRes, rolesRes] = await Promise.all([
       fetch("/api/positions"),
-      fetch("/api/roles"),
+      fetch("/api/equipment"),
     ]);
     setPositions(await positionsRes.json());
     setRoles(await rolesRes.json());
@@ -107,13 +107,13 @@ export default function PositionsPage() {
           className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
         />
         <label className="text-xs text-zinc-400">
-          Required role (optional — warns when assigning someone without it)
+          Required equipment (optional — warns when assigning someone without it)
           <select
             value={requiredRoleId}
             onChange={(e) => setRequiredRoleId(e.target.value)}
             className="mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
           >
-            <option value="">No required role</option>
+            <option value="">No required equipment</option>
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
                 {role.name}

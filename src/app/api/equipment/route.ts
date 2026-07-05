@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 
+// Note: "equipment" is the user-facing name for the Role model (kept internal).
 export async function GET() {
-  const roles = await prisma.role.findMany({ orderBy: { name: "asc" } });
-  return NextResponse.json(roles);
+  const equipment = await prisma.role.findMany({ orderBy: { name: "asc" } });
+  return NextResponse.json(equipment);
 }
 
 export async function POST(req: Request) {
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const role = await prisma.role.create({ data: { name, description } });
-  await logActivity("Role", `Added role ${role.name}`);
-  return NextResponse.json(role, { status: 201 });
+  const item = await prisma.role.create({ data: { name, description } });
+  await logActivity("Equipment", `Added equipment ${item.name}`);
+  return NextResponse.json(item, { status: 201 });
 }

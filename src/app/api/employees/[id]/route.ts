@@ -152,8 +152,8 @@ export async function PATCH(
     if (isAdmin && body.roleIds !== undefined)
       changes.push(
         employee.roles.length
-          ? `roles → ${employee.roles.map((r) => r.name).join(", ")}`
-          : "roles cleared"
+          ? `equipment → ${employee.roles.map((r) => r.name).join(", ")}`
+          : "equipment cleared"
       );
     if (
       isAdmin &&

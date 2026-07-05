@@ -14,7 +14,7 @@ const TOP_ITEMS = [
 const SETUP_ITEMS = [
   { href: "/admin/employees", label: "Employees", adminOnly: true },
   { href: "/admin/positions", label: "Positions", adminOnly: true },
-  { href: "/admin/roles", label: "Roles", adminOnly: true },
+  { href: "/admin/equipment", label: "Equipment", adminOnly: true },
   { href: "/admin/activity", label: "Activity", adminOnly: true },
 ];
 

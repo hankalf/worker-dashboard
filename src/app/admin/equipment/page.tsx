@@ -3,23 +3,23 @@
 import { useEffect, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 
-type Role = {
+type Equipment = {
   id: string;
   name: string;
   description: string | null;
 };
 
-export default function RolesPage() {
+export default function EquipmentPage() {
   const guarded = useAdminGuard();
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    const res = await fetch("/api/roles");
-    setRoles(await res.json());
+    const res = await fetch("/api/equipment");
+    setEquipment(await res.json());
   };
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function RolesPage() {
     e.preventDefault();
     setError(null);
 
-    const url = editingId ? `/api/roles/${editingId}` : "/api/roles";
+    const url = editingId ? `/api/equipment/${editingId}` : "/api/equipment";
     const method = editingId ? "PATCH" : "POST";
     const res = await fetch(url, {
       method,
@@ -54,15 +54,16 @@ export default function RolesPage() {
     load();
   };
 
-  const handleEdit = (role: Role) => {
-    setEditingId(role.id);
-    setName(role.name);
-    setDescription(role.description ?? "");
+  const handleEdit = (item: Equipment) => {
+    setEditingId(item.id);
+    setName(item.name);
+    setDescription(item.description ?? "");
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this role? It will be removed from all employees.")) return;
-    await fetch(`/api/roles/${id}`, { method: "DELETE" });
+    if (!confirm("Delete this equipment? It will be removed from all employees."))
+      return;
+    await fetch(`/api/equipment/${id}`, { method: "DELETE" });
     load();
   };
 
@@ -72,10 +73,10 @@ export default function RolesPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="mb-1 text-lg font-semibold text-white">Roles</h2>
+      <h2 className="mb-1 text-lg font-semibold text-white">Equipment</h2>
       <p className="mb-4 text-sm text-zinc-400">
-        Roles describe what an employee is able to do (e.g. Picking, Forklift,
-        Receiving). Assign them to employees on the Employees page.
+        Equipment describes what an employee is able to operate (e.g. Forklift,
+        Pallet Jack, Scanner). Assign it to employees on the Employees page.
       </p>
 
       <form
@@ -101,7 +102,7 @@ export default function RolesPage() {
             type="submit"
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
           >
-            {editingId ? "Save changes" : "Add role"}
+            {editingId ? "Save changes" : "Add equipment"}
           </button>
           {editingId && (
             <button
@@ -116,26 +117,26 @@ export default function RolesPage() {
       </form>
 
       <ul className="flex flex-col gap-2">
-        {roles.map((role) => (
+        {equipment.map((item) => (
           <li
-            key={role.id}
+            key={item.id}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
           >
             <div>
-              <div className="font-medium text-white">{role.name}</div>
-              {role.description && (
-                <div className="text-sm text-zinc-400">{role.description}</div>
+              <div className="font-medium text-white">{item.name}</div>
+              {item.description && (
+                <div className="text-sm text-zinc-400">{item.description}</div>
               )}
             </div>
             <div className="flex gap-3 text-sm">
               <button
-                onClick={() => handleEdit(role)}
+                onClick={() => handleEdit(item)}
                 className="text-zinc-400 hover:text-white"
               >
                 Edit
               </button>
               <button
-                onClick={() => handleDelete(role.id)}
+                onClick={() => handleDelete(item.id)}
                 className="text-red-400 hover:text-red-300"
               >
                 Delete

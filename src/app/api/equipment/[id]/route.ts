@@ -12,12 +12,12 @@ export async function PATCH(
 
   const { id } = await params;
   const { name, description } = await req.json();
-  const role = await prisma.role.update({
+  const item = await prisma.role.update({
     where: { id },
     data: { name, description },
   });
-  await logActivity("Role", `Renamed role to ${role.name}`);
-  return NextResponse.json(role);
+  await logActivity("Equipment", `Renamed equipment to ${item.name}`);
+  return NextResponse.json(item);
 }
 
 export async function DELETE(
@@ -28,8 +28,8 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const role = await prisma.role.findUnique({ where: { id } });
+  const item = await prisma.role.findUnique({ where: { id } });
   await prisma.role.delete({ where: { id } });
-  if (role) await logActivity("Role", `Deleted role ${role.name}`);
+  if (item) await logActivity("Equipment", `Deleted equipment ${item.name}`);
   return NextResponse.json({ ok: true });
 }

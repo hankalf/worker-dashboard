@@ -8,7 +8,6 @@ import {
   easternInputToUtcISO,
   easternDateTimeInput,
 } from "@/lib/time";
-import { currentShift, SHIFTS, type ShiftKey } from "@/lib/shift";
 import { MAX_VISIBLE_NOTICES, splitNotices } from "@/lib/announcements";
 import {
   DashboardSections,
@@ -17,6 +16,7 @@ import {
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
+import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 
 type Notice = {
   id: string;
@@ -33,8 +33,6 @@ type ShiftNote = {
   updatedByName: string | null;
   updatedAt: string;
 };
-
-const HANDOFF_SHIFTS: ShiftKey[] = ["FIRST", "SECOND", "THIRD"];
 
 // Format an expiry timestamp for display in the app's timezone.
 function fmtExpiry(iso: string | null) {
@@ -87,31 +85,9 @@ export function AdminDashboard({
     new Date(Date.now() + 48 * 3600 * 1000)
   );
 
-  const notesById = Object.fromEntries(shiftNotes.map((n) => [n.id, n]));
   const handoffNotes = Object.fromEntries(
     shiftNotes.map((n) => [n.id, n.message])
   );
-  const nowShift = now ? currentShift(now) : null;
-  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      HANDOFF_SHIFTS.map((s) => [s, notesById[s]?.message ?? ""])
-    )
-  );
-  const [savingShift, setSavingShift] = useState<string | null>(null);
-  const [savedShift, setSavedShift] = useState<string | null>(null);
-
-  const saveHandoff = async (shift: ShiftKey) => {
-    setSavingShift(shift);
-    await fetch("/api/shift-notes", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shift, message: drafts[shift] }),
-    });
-    setSavingShift(null);
-    setSavedShift(shift);
-    setTimeout(() => setSavedShift(null), 2000);
-    router.refresh();
-  };
 
   const nowMs = now ? now.getTime() : Date.now();
   const isExpired = (n: Notice) =>
@@ -254,64 +230,8 @@ export function AdminDashboard({
         )}
       </div>
 
-      <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-          Shift handoff notes
-        </label>
-        <p className="text-xs text-zinc-500">
-          Shown above the notices for whichever shift is active. Leave blank to
-          clear.
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {HANDOFF_SHIFTS.map((shift) => (
-            <div
-              key={shift}
-              className={`rounded-md border p-3 ${
-                nowShift === shift
-                  ? "border-violet-700 bg-violet-950/30"
-                  : "border-zinc-700 bg-zinc-800/40"
-              }`}
-            >
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-200">
-                  {SHIFTS[shift].label}
-                </span>
-                {nowShift === shift && (
-                  <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
-                    ACTIVE
-                  </span>
-                )}
-              </div>
-              <textarea
-                value={drafts[shift]}
-                onChange={(e) =>
-                  setDrafts((d) => ({ ...d, [shift]: e.target.value }))
-                }
-                rows={3}
-                placeholder="Notes for the incoming crew…"
-                className="w-full resize-y rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500"
-              />
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate text-[10px] text-zinc-500">
-                  {notesById[shift]?.updatedByName
-                    ? `by ${notesById[shift].updatedByName}`
-                    : ""}
-                </span>
-                <button
-                  onClick={() => saveHandoff(shift)}
-                  disabled={savingShift === shift}
-                  className="shrink-0 rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
-                >
-                  {savingShift === shift
-                    ? "Saving…"
-                    : savedShift === shift
-                      ? "Saved ✓"
-                      : "Save"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="mb-8">
+        <ShiftHandoffEditor />
       </div>
 
       <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900 p-4">

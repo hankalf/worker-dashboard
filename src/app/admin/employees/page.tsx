@@ -95,7 +95,7 @@ export default function EmployeesPage() {
     const [employeesRes, positionsRes, rolesRes] = await Promise.all([
       fetch(`/api/employees${withTerminated ? "?includeTerminated=1" : ""}`),
       fetch("/api/positions"),
-      fetch("/api/roles"),
+      fetch("/api/equipment"),
     ]);
     if (employeesRes.status === 403) {
       // Session no longer maps to an admin — send them back to sign in
@@ -257,12 +257,13 @@ export default function EmployeesPage() {
         <p className="mb-3 text-sm text-zinc-400">
           Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
           <code className="text-zinc-300">position</code>,{" "}
-          <code className="text-zinc-300">roles</code> (separate multiple with
-          semicolons), <code className="text-zinc-300">admin</code> (yes/no),{" "}
-          <code className="text-zinc-300">username</code> and{" "}
+          <code className="text-zinc-300">equipment</code> (separate multiple
+          with semicolons), <code className="text-zinc-300">admin</code>{" "}
+          (yes/no), <code className="text-zinc-300">username</code> and{" "}
           <code className="text-zinc-300">password</code> (required for admins),
           and <code className="text-zinc-300">shift</code> (1, 2, or 3).
-          Positions and roles that don&apos;t exist yet are created automatically.{" "}
+          Positions and equipment that don&apos;t exist yet are created
+          automatically.{" "}
           <a
             href="/employee-import-sample.csv"
             download
@@ -354,11 +355,11 @@ export default function EmployeesPage() {
 
         <div>
           <div className="mb-1 text-xs font-medium text-zinc-400">
-            Roles this employee can perform
+            Equipment this employee can operate
           </div>
           {roles.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              No roles yet — add them on the Roles page.
+              No equipment yet — add it on the Equipment page.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -444,7 +445,7 @@ export default function EmployeesPage() {
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input
-          placeholder="Search employees by name, position, or role…"
+          placeholder="Search employees by name, position, or equipment…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={`min-w-40 flex-1 ${inputClass}`}

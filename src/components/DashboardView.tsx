@@ -124,6 +124,7 @@ export function DashboardView({
           horizontalTasks
           autoScroll
           hideEmptyPositions
+          tv={tv}
         />
       </main>
     </div>

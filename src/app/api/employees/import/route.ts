@@ -8,7 +8,8 @@ import { logActivity } from "@/lib/activity";
 // Expected CSV columns (header row required, in any order):
 //   name        required
 //   position    optional — created automatically if it doesn't exist
-//   roles       optional — semicolon-separated, created automatically
+//   equipment   optional — semicolon-separated, created automatically
+//               (the legacy "roles" column is still accepted)
 //   admin       optional — "yes" grants admin access (requires username + password)
 //   username    required when admin is yes
 //   password    required when admin is yes
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
       }
 
       const roleIds: string[] = [];
-      const rolesCell = get("roles");
+      const rolesCell = get("equipment") || get("roles");
       for (const roleName of rolesCell.split(";").map((r) => r.trim()).filter(Boolean)) {
         const role = await prisma.role.upsert({
           where: { name: roleName },
