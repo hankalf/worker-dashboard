@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Position } from "@/generated/prisma/client";
+import { APP_TZ } from "@/lib/time";
 import {
   DashboardSections,
   useNow,
@@ -53,6 +54,7 @@ export function AdminDashboard({
                 month: "long",
                 day: "numeric",
                 year: "numeric",
+                timeZone: APP_TZ,
               })}
             </div>
             <div className="text-2xl font-semibold tabular-nums text-white">
@@ -60,6 +62,7 @@ export function AdminDashboard({
                 hour: "numeric",
                 minute: "2-digit",
                 second: "2-digit",
+                timeZone: APP_TZ,
               })}
             </div>
           </div>

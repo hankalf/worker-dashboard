@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { APP_TZ } from "@/lib/time";
 
 type ActivityLog = {
   id: string;
@@ -62,8 +63,8 @@ export default function ActivityPage() {
     const rows = filtered.map((log) => {
       const d = new Date(log.createdAt);
       return [
-        d.toLocaleDateString(),
-        d.toLocaleTimeString(),
+        d.toLocaleDateString(undefined, { timeZone: APP_TZ }),
+        d.toLocaleTimeString(undefined, { timeZone: APP_TZ }),
         log.category,
         log.action,
       ].map(csvCell);
@@ -155,6 +156,7 @@ export default function ActivityPage() {
                       day: "numeric",
                       hour: "numeric",
                       minute: "2-digit",
+                      timeZone: APP_TZ,
                     })}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2">

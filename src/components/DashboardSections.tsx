@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
+import { appMinutes } from "@/lib/time";
 
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
@@ -60,9 +61,10 @@ const SHIFTS: Record<ShiftKey, { label: string; range: string }> = {
   THIRD: { label: "3rd Shift", range: "10:00 PM – 6:00 AM" },
 };
 
-// Which shift is active right now (FIRST 6-14, SECOND 14-22, THIRD 22-6).
+// Which shift is active right now (FIRST 6-14, SECOND 14-22, THIRD 22-6),
+// evaluated in the warehouse's timezone.
 const currentShift = (now: Date): ShiftKey => {
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = appMinutes(now);
   if (cur >= 6 * 60 && cur < 14 * 60) return "FIRST";
   if (cur >= 14 * 60 && cur < 22 * 60) return "SECOND";
   return "THIRD";
@@ -184,7 +186,7 @@ export function DashboardSections({
     ? employees.filter((emp) => {
         const end = lunchEndMinutes(emp);
         if (end === null || !emp.lunchStart) return false;
-        const cur = now.getHours() * 60 + now.getMinutes();
+        const cur = appMinutes(now);
         return cur >= toMinutes(emp.lunchStart) && cur < end;
       })
     : [];

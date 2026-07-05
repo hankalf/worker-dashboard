@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Position } from "@/generated/prisma/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { APP_TZ } from "@/lib/time";
 import {
   DashboardSections,
   useNow,
@@ -45,6 +46,7 @@ export function DashboardView({
                   month: "long",
                   day: "numeric",
                   year: "numeric",
+                  timeZone: APP_TZ,
                 })}
               </div>
               <div className="text-3xl font-semibold tabular-nums">
@@ -52,6 +54,7 @@ export function DashboardView({
                   hour: "numeric",
                   minute: "2-digit",
                   second: "2-digit",
+                  timeZone: APP_TZ,
                 })}
               </div>
             </>

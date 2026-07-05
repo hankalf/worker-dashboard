@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { APP_TZ } from "@/lib/time";
 
 type Employee = { id: string; name: string };
 type Job = {
@@ -277,6 +278,7 @@ export default function JobsPage() {
                   day: "numeric",
                   hour: "numeric",
                   minute: "2-digit",
+                  timeZone: APP_TZ,
                 })}
               </span>
             </li>

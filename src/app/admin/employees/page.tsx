@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { APP_TZ } from "@/lib/time";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
@@ -597,6 +598,7 @@ export default function EmployeesPage() {
                         day: "numeric",
                         hour: "numeric",
                         minute: "2-digit",
+                        timeZone: APP_TZ,
                       })}
                     </span>
                   </li>
