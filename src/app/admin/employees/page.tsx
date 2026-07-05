@@ -53,6 +53,13 @@ const SHIFT_SHORT: Record<Shift, string> = {
   THIRD: "3rd Shift",
 };
 
+// Sort keys for the employee list: shift in chronological order (no shift
+// last), position by title (no position last).
+const SHIFT_RANK: Record<Shift, number> = { FIRST: 0, SECOND: 1, THIRD: 2 };
+const shiftRank = (shift: Shift | null) => (shift ? SHIFT_RANK[shift] : 3);
+const positionKey = (position: Position | null) =>
+  position?.title.toLowerCase() ?? "￿";
+
 const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
   { value: "PRESENT", label: "Present" },
   { value: "ABSENT", label: "Absent" },
@@ -466,7 +473,17 @@ export default function EmployeesPage() {
       <ul className="flex flex-col gap-2">
         {employees
           .slice()
-          .sort((a, b) => a.name.localeCompare(b.name))
+          // Sort by shift (1st → 2nd → 3rd, no shift last), then by position
+          // title (no position last), then by name.
+          .sort((a, b) => {
+            const sd = shiftRank(a.shift) - shiftRank(b.shift);
+            if (sd !== 0) return sd;
+            const pd = positionKey(a.position).localeCompare(
+              positionKey(b.position)
+            );
+            if (pd !== 0) return pd;
+            return a.name.localeCompare(b.name);
+          })
           .filter((employee) => {
             const q = search.trim().toLowerCase();
             if (!q) return true;
