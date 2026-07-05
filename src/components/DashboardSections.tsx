@@ -184,6 +184,7 @@ export function DashboardSections({
   showCoverage = false,
   announcements = [],
   handoffNotes = {},
+  horizontalTasks = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -193,6 +194,7 @@ export function DashboardSections({
   showCoverage?: boolean;
   announcements?: string[];
   handoffNotes?: Record<string, string>;
+  horizontalTasks?: boolean;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -456,14 +458,26 @@ export function DashboardSections({
             No side tasks yet.
           </p>
         ) : (
-          <div className="flex flex-col gap-6">
+          <div
+            className={
+              horizontalTasks
+                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "flex flex-col gap-6"
+            }
+          >
             {jobGroups.map((group) => (
               <div key={group.name}>
                 <h3 className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   {group.name}
                   {showPositions && group.position ? ` · ${group.position}` : ""}
                 </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  className={
+                    horizontalTasks
+                      ? "flex flex-col gap-4"
+                      : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                  }
+                >
                   {group.jobs.map((job) => (
                     <div
                       key={job.id}

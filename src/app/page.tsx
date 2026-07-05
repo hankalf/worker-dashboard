@@ -28,11 +28,17 @@ export default async function Home({
         include: { assignedEmployee: { include: { position: true } } },
         orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
       }),
-      // All active notices, oldest first; splitNotices picks the visible set
-      // (pinned always shown, then unpinned up to the cap). The rest stay
-      // queued until one expires (auto-refresh re-queries and promotes them).
+      // Notices that are live now — started and not expired — oldest first;
+      // splitNotices picks the visible set (pinned always shown, then unpinned
+      // up to the cap). Scheduled notices (future startsAt) stay off the board
+      // until their time (auto-refresh re-queries and shows them).
       prisma.announcement.findMany({
-        where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        where: {
+          AND: [
+            { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          ],
+        },
         orderBy: { createdAt: "asc" },
       }),
       prisma.shiftNote.findMany(),

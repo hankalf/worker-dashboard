@@ -121,6 +121,7 @@ export function DashboardView({
           announcements={announcements}
           handoffNotes={handoffNotes}
           showPositions
+          horizontalTasks
         />
       </main>
     </div>

@@ -21,6 +21,7 @@ import {
 type Notice = {
   id: string;
   message: string;
+  startsAt: string | null;
   expiresAt: string | null;
   pinned: boolean;
   createdAt: string;
@@ -72,9 +73,16 @@ export function AdminDashboard({
   const [expiresInput, setExpiresInput] = useState(() =>
     easternDateTimeInput(new Date())
   );
+  // Optional scheduled start (blank = show immediately), limited to 48h ahead.
+  const [startsInput, setStartsInput] = useState("");
   const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const scheduleMin = easternDateTimeInput(new Date());
+  const scheduleMax = easternDateTimeInput(
+    new Date(Date.now() + 48 * 3600 * 1000)
+  );
 
   const notesById = Object.fromEntries(shiftNotes.map((n) => [n.id, n]));
   const handoffNotes = Object.fromEntries(
@@ -105,9 +113,12 @@ export function AdminDashboard({
   const nowMs = now ? now.getTime() : Date.now();
   const isExpired = (n: Notice) =>
     !!n.expiresAt && new Date(n.expiresAt).getTime() <= nowMs;
+  const isScheduled = (n: Notice) =>
+    !!n.startsAt && new Date(n.startsAt).getTime() > nowMs;
 
   // Re-derive against the live clock so the split stays correct between refreshes.
-  const active = notices.filter((n) => !isExpired(n));
+  const active = notices.filter((n) => !isExpired(n) && !isScheduled(n));
+  const scheduled = notices.filter((n) => !isExpired(n) && isScheduled(n));
   const { visible: live, queued } = splitNotices(active);
   // Anything that expired since the server render, then the server's expired set.
   const expired = [...notices.filter(isExpired), ...expiredNotices];
@@ -120,13 +131,15 @@ export function AdminDashboard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        // Interpret the picked time as Eastern (the warehouse's timezone),
+        // Interpret the picked times as Eastern (the warehouse's timezone),
         // not the admin's browser timezone.
+        startsAt: startsInput ? easternInputToUtcISO(startsInput) : null,
         expiresAt: expiresInput ? easternInputToUtcISO(expiresInput) : null,
         pinned: pinNew,
       }),
     });
     setMessage("");
+    setStartsInput("");
     setExpiresInput(easternDateTimeInput(new Date()));
     setPinNew(false);
     setPosting(false);
@@ -156,14 +169,16 @@ export function AdminDashboard({
     tone,
   }: {
     n: Notice;
-    tone: "live" | "queued" | "expired";
+    tone: "live" | "queued" | "scheduled" | "expired";
   }) => {
     const border =
       tone === "live"
         ? "border-blue-900 bg-blue-950/40"
         : tone === "queued"
           ? "border-zinc-700 bg-zinc-800/60"
-          : "border-zinc-800 bg-zinc-900/60 opacity-70";
+          : tone === "scheduled"
+            ? "border-sky-900 bg-sky-950/30"
+            : "border-zinc-800 bg-zinc-900/60 opacity-70";
     return (
       <div
         className={`flex items-start justify-between gap-3 rounded-md border px-3 py-2 ${border}`}
@@ -180,7 +195,11 @@ export function AdminDashboard({
           <div className="mt-0.5 text-xs text-zinc-500">
             {tone === "expired"
               ? `expired ${fmtExpiry(n.expiresAt)}`
-              : fmtExpiry(n.expiresAt)}
+              : tone === "scheduled"
+                ? `starts ${fmtExpiry(n.startsAt)}${
+                    n.expiresAt ? ` · until ${fmtExpiry(n.expiresAt)}` : ""
+                  }`
+                : fmtExpiry(n.expiresAt)}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -314,6 +333,27 @@ export function AdminDashboard({
             {posting ? "Posting…" : "Post"}
           </button>
         </div>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          Show starting at (Eastern, optional, up to 48h ahead):
+          <input
+            type="datetime-local"
+            value={startsInput}
+            min={scheduleMin}
+            max={scheduleMax}
+            onChange={(e) => setStartsInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+          {startsInput && (
+            <button
+              type="button"
+              onClick={() => setStartsInput("")}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              clear
+            </button>
+          )}
+        </label>
         <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
           Clear automatically at (Eastern, optional):
           <input
@@ -372,6 +412,19 @@ export function AdminDashboard({
             <div className="flex flex-col gap-2">
               {queued.map((n) => (
                 <NoticeRow key={n.id} n={n} tone="queued" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {scheduled.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
+              Scheduled ({scheduled.length}) — appear at their start time
+            </div>
+            <div className="flex flex-col gap-2">
+              {scheduled.map((n) => (
+                <NoticeRow key={n.id} n={n} tone="scheduled" />
               ))}
             </div>
           </div>

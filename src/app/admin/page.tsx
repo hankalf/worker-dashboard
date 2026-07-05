@@ -68,12 +68,14 @@ export default async function AdminDashboardPage() {
   const toDto = (n: {
     id: string;
     message: string;
+    startsAt: Date | null;
     expiresAt: Date | null;
     pinned: boolean;
     createdAt: Date;
   }) => ({
     id: n.id,
     message: n.message,
+    startsAt: n.startsAt?.toISOString() ?? null,
     expiresAt: n.expiresAt?.toISOString() ?? null,
     pinned: n.pinned,
     createdAt: n.createdAt.toISOString(),
