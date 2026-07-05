@@ -99,6 +99,7 @@ export function AdminDashboard({
           jobs={jobs}
           now={now}
           showPositions
+          showCoverage
           announcement={announcement}
         />
       </div>

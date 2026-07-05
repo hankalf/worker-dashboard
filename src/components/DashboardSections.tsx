@@ -147,6 +147,7 @@ export function DashboardSections({
   jobs,
   now,
   showPositions = false,
+  showCoverage = false,
   announcement = null,
 }: {
   positions: Position[];
@@ -154,6 +155,7 @@ export function DashboardSections({
   jobs: JobWithRelations[];
   now: Date | null;
   showPositions?: boolean;
+  showCoverage?: boolean;
   announcement?: string | null;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
@@ -207,7 +209,7 @@ export function DashboardSections({
         </div>
       )}
 
-      {showPositions && understaffed.length > 0 && (
+      {showCoverage && understaffed.length > 0 && (
         <div className="mb-8 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
           <span className="font-semibold">Understaffed this shift:</span>{" "}
           {understaffed.join(", ")}
