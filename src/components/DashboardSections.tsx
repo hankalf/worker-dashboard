@@ -164,7 +164,7 @@ export function DashboardSections({
   now,
   showPositions = false,
   showCoverage = false,
-  announcement = null,
+  announcements = [],
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -172,7 +172,7 @@ export function DashboardSections({
   now: Date | null;
   showPositions?: boolean;
   showCoverage?: boolean;
-  announcement?: string | null;
+  announcements?: string[];
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -247,12 +247,19 @@ export function DashboardSections({
 
   return (
     <>
-      {announcement && (
-        <div className="mb-8 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200">
-          <span className="mr-2 font-semibold uppercase tracking-wide">
-            Notice
-          </span>
-          {announcement}
+      {announcements.length > 0 && (
+        <div className="mb-8 flex flex-col gap-2">
+          {announcements.map((message, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+            >
+              <span className="mr-2 font-semibold uppercase tracking-wide">
+                Notice
+              </span>
+              {message}
+            </div>
+          ))}
         </div>
       )}
 

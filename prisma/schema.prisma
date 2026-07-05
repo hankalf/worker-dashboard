@@ -83,11 +83,13 @@ model Position {
   requiredRoleId String?
 }
 
-// Single pinned message shown on the dashboards (id is always "current").
+// Notices shown on the dashboards. The board shows up to 5 active notices at a
+// time (oldest first); any beyond that queue until an active one expires.
 model Announcement {
-  id        String    @id
+  id        String    @id @default(cuid())
   message   String
   expiresAt DateTime?
+  createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 

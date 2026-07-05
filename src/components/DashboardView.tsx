@@ -17,14 +17,14 @@ export function DashboardView({
   employees,
   jobs,
   isAdmin,
-  announcement,
+  announcements,
   tv = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   isAdmin: boolean;
-  announcement: string | null;
+  announcements: string[];
   tv?: boolean;
 }) {
   const now = useNow();
@@ -103,7 +103,7 @@ export function DashboardView({
           employees={employees}
           jobs={jobs}
           now={now}
-          announcement={announcement}
+          announcements={announcements}
           showPositions
         />
       </main>
