@@ -13,33 +13,31 @@ export default async function AdminDashboardPage() {
     where: { expiresAt: { lt: new Date(now.getTime() - 7 * 24 * 3600 * 1000) } },
   });
 
-  const [positions, employees, jobs, active, expired, shiftNotes] =
-    await Promise.all([
-      prisma.position.findMany({
-        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-      }),
-      prisma.employee.findMany({
-        where: { terminatedAt: null },
-        include: { position: true, roles: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.job.findMany({
-        include: { assignedEmployee: { include: { position: true } } },
-        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-      }),
-      // Active notices (live + queued), oldest first.
-      prisma.announcement.findMany({
-        where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-        orderBy: { createdAt: "asc" },
-      }),
-      // The most recently expired notices, so admins can see what dropped off.
-      prisma.announcement.findMany({
-        where: { expiresAt: { lte: now } },
-        orderBy: { expiresAt: "desc" },
-        take: 10,
-      }),
-      prisma.shiftNote.findMany(),
-    ]);
+  const [positions, employees, jobs, active, expired] = await Promise.all([
+    prisma.position.findMany({
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+    }),
+    prisma.employee.findMany({
+      where: { terminatedAt: null },
+      include: { position: true, roles: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.job.findMany({
+      include: { assignedEmployee: { include: { position: true } } },
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    }),
+    // Active notices (live + queued), oldest first.
+    prisma.announcement.findMany({
+      where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      orderBy: { createdAt: "asc" },
+    }),
+    // The most recently expired notices, so admins can see what dropped off.
+    prisma.announcement.findMany({
+      where: { expiresAt: { lte: now } },
+      orderBy: { expiresAt: "desc" },
+      take: 10,
+    }),
+  ]);
 
   // Lazy attendance-history snapshot: record the current shift's headcount,
   // throttled to at most once every 2 minutes so the 15s auto-refresh doesn't
@@ -88,12 +86,6 @@ export default async function AdminDashboardPage() {
       jobs={jobs}
       notices={active.map(toDto)}
       expiredNotices={expired.map(toDto)}
-      shiftNotes={shiftNotes.map((n) => ({
-        id: n.id,
-        message: n.message,
-        updatedByName: n.updatedByName,
-        updatedAt: n.updatedAt.toISOString(),
-      }))}
     />
   );
 }

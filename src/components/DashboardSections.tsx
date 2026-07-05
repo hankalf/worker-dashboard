@@ -184,7 +184,6 @@ export function DashboardSections({
   showPositions = false,
   showCoverage = false,
   announcements = [],
-  handoffNotes = {},
   horizontalTasks = false,
   autoScroll = false,
   hideEmptyPositions = false,
@@ -197,7 +196,6 @@ export function DashboardSections({
   showPositions?: boolean;
   showCoverage?: boolean;
   announcements?: string[];
-  handoffNotes?: Record<string, string>;
   horizontalTasks?: boolean;
   autoScroll?: boolean;
   hideEmptyPositions?: boolean;
@@ -281,17 +279,6 @@ export function DashboardSections({
 
   return (
     <>
-      {shiftKey && handoffNotes[shiftKey] && (
-        <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide">
-            {SHIFTS[shiftKey].label} Handoff
-          </div>
-          <div className="whitespace-pre-wrap text-sm">
-            {handoffNotes[shiftKey]}
-          </div>
-        </div>
-      )}
-
       {announcements.length > 0 && (
         <div className="mb-8 flex flex-col gap-2">
           {announcements.map((message, i) => (

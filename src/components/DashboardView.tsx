@@ -12,6 +12,7 @@ import {
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
+import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 
 export function DashboardView({
   positions,
@@ -19,7 +20,6 @@ export function DashboardView({
   jobs,
   isAdmin,
   announcements,
-  handoffNotes,
   renderedAt,
   tv = false,
 }: {
@@ -28,7 +28,6 @@ export function DashboardView({
   jobs: JobWithRelations[];
   isAdmin: boolean;
   announcements: string[];
-  handoffNotes: Record<string, string>;
   renderedAt: string;
   tv?: boolean;
 }) {
@@ -113,13 +112,13 @@ export function DashboardView({
       </header>
 
       <main className="flex-1 px-6 py-6">
+        <ShiftHandoffBanner />
         <DashboardSections
           positions={positions}
           employees={employees}
           jobs={jobs}
           now={now}
           announcements={announcements}
-          handoffNotes={handoffNotes}
           showPositions
           horizontalTasks
           autoScroll

@@ -16,7 +16,6 @@ import {
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
-import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 
 type Notice = {
   id: string;
@@ -25,13 +24,6 @@ type Notice = {
   expiresAt: string | null;
   pinned: boolean;
   createdAt: string;
-};
-
-type ShiftNote = {
-  id: string;
-  message: string;
-  updatedByName: string | null;
-  updatedAt: string;
 };
 
 // Format an expiry timestamp for display in the app's timezone.
@@ -52,14 +44,12 @@ export function AdminDashboard({
   jobs,
   notices,
   expiredNotices,
-  shiftNotes,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   notices: Notice[];
   expiredNotices: Notice[];
-  shiftNotes: ShiftNote[];
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -83,10 +73,6 @@ export function AdminDashboard({
   const scheduleMin = easternDateTimeInput(new Date());
   const scheduleMax = easternDateTimeInput(
     new Date(Date.now() + 48 * 3600 * 1000)
-  );
-
-  const handoffNotes = Object.fromEntries(
-    shiftNotes.map((n) => [n.id, n.message])
   );
 
   const nowMs = now ? now.getTime() : Date.now();
@@ -228,10 +214,6 @@ export function AdminDashboard({
             </div>
           </div>
         )}
-      </div>
-
-      <div className="mb-8">
-        <ShiftHandoffEditor />
       </div>
 
       <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
@@ -378,7 +360,6 @@ export function AdminDashboard({
           showPositions
           showCoverage
           announcements={live.map((n) => n.message)}
-          handoffNotes={handoffNotes}
         />
       </div>
     </div>
