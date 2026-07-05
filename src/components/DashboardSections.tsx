@@ -471,7 +471,7 @@ export function DashboardSections({
                         <li
                           key={member.id}
                           className={`rounded-md border px-3 py-3 ${
-                            activeNow(member)
+                            showCoverage && activeNow(member)
                               ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
@@ -496,7 +496,7 @@ export function DashboardSections({
               <div
                 key={member.id}
                 className={`rounded-lg border p-4 shadow-sm ${
-                  activeNow(member)
+                  showCoverage && activeNow(member)
                     ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
