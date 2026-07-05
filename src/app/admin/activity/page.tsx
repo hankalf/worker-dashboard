@@ -90,6 +90,23 @@ export default function ActivityPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Download ALL log data (activity + side-task logs + position history) as one
+  // CSV. Does not delete anything.
+  const downloadAll = async () => {
+    const res = await fetch("/api/activity-logs/export");
+    if (!res.ok) {
+      alert("Download failed.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `warehouse-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Download ALL log data (activity + side-task logs) as one CSV, then clear the
   // database. The download happens first so the archive is safely in hand before
   // anything is deleted.
@@ -141,6 +158,12 @@ export default function ActivityPage() {
             className="rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
           >
             Export to Excel
+          </button>
+          <button
+            onClick={downloadAll}
+            className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+          >
+            Download all logs
           </button>
           <button
             onClick={exportAllAndClear}
