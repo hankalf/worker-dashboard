@@ -451,6 +451,73 @@ async function dbTests(now: Date, specs: Spec[]) {
 }
 
 // ===========================================================================
+// SHIFT ROTATION — how the main dashboard board changes across shifts
+// ===========================================================================
+// The public board's "Team by Position" section filters to the crew whose
+// shift is active now (plus no-shift crew and anyone staying over), and hides
+// positions with nobody on. We anchor `now` into each shift and assert the
+// resulting board — deterministically, from the seeded specs.
+function rotationTests(specs: Spec[]) {
+  const nowRef = easternAt("2026-07-06T12:00");
+  const stayOverAt = new Date(nowRef.getTime() + 2 * 3600 * 1000); // 14:00 ET
+  const roster = specs.map((s) => ({
+    shift: s.shift as string | null,
+    positionIdx: s.positionIdx,
+    attendance: s.attendance as string,
+    stayOverUntil: s.stayOver ? stayOverAt : null,
+  }));
+  const anchors: Record<string, string> = {
+    FIRST: "2026-07-06T10:00",
+    SECOND: "2026-07-06T18:00",
+    THIRD: "2026-07-06T02:00",
+  };
+
+  console.log("\n=== MAIN DASHBOARD — SHIFT ROTATION ===");
+  for (const shift of ["FIRST", "SECOND", "THIRD"] as const) {
+    group(`rotation: ${SHIFTS[shift].label}`);
+    const now = easternAt(anchors[shift]);
+    eq("currentShift matches anchor", currentShift(now), shift);
+
+    const stayingOver = (e: { stayOverUntil: Date | null }) =>
+      !!e.stayOverUntil && e.stayOverUntil.getTime() > now.getTime();
+    const onShift = (e: { shift: string | null; stayOverUntil: Date | null }) =>
+      e.shift === null || e.shift === shift || stayingOver(e);
+    const present = (e: { attendance: string }) => e.attendance === "PRESENT";
+
+    // Board shows only positioned crew who are on this shift.
+    const visible = roster.filter((e) => e.positionIdx !== null && onShift(e));
+    ok(
+      "no foreign-shift crew unless no-shift or staying over",
+      visible.every((e) => e.shift === null || e.shift === shift || stayingOver(e))
+    );
+    ok(
+      "every active card is present + on shift",
+      visible.filter((e) => present(e) && onShift(e)).every((e) => present(e) && onShift(e))
+    );
+    // Cross-check the visible count against the spec source of truth.
+    const expected = specs.filter((s) => {
+      const so = s.stayOver ? stayOverAt.getTime() > now.getTime() : false;
+      return s.positionIdx !== null && (s.shift === null || s.shift === shift || so);
+    }).length;
+    eq("visible positioned count matches specs", visible.length, expected);
+
+    const posShown = new Set(visible.map((e) => e.positionIdx)).size;
+    const presentCount = visible.filter(present).length;
+    const stayCount = visible.filter((e) => stayingOver(e) && e.shift !== shift).length;
+    console.log(
+      `  ${SHIFTS[shift].label}: positions shown ${posShown}, on-board ${visible.length}, present ${presentCount}, staying-over ${stayCount}`
+    );
+  }
+
+  // The three shifts + no-shift together account for every worker exactly once.
+  group("rotation: coverage");
+  const counts = { FIRST: 0, SECOND: 0, THIRD: 0, NONE: 0 };
+  for (const s of specs) counts[s.shift ?? "NONE"]++;
+  eq("shifts partition the workforce", counts.FIRST + counts.SECOND + counts.THIRD + counts.NONE, specs.length);
+  ok("each real shift has crew", counts.FIRST > 0 && counts.SECOND > 0 && counts.THIRD > 0);
+}
+
+// ===========================================================================
 // HTTP API TESTS (against the running dev server)
 // ===========================================================================
 const BASE = "http://localhost:3000";
@@ -588,6 +655,7 @@ async function main() {
   unitTests();
   const { specs } = await seed(now);
   const { roster } = await dbTests(now, specs);
+  rotationTests(specs);
   try {
     await httpTests(roster);
   } catch (err) {
