@@ -15,6 +15,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
+import { shiftEndDate } from "@/lib/shift";
 
 type Role = { id: string; name: string };
 type Position = { id: string; title: string; requiredRole: Role | null };
@@ -31,7 +32,17 @@ type Employee = {
   shift: Shift | null;
   attendance: Attendance;
   isLead: boolean;
+  stayOverUntil: string | null;
 };
+
+// How long past shift end an employee stays to help the next shift (30-min steps).
+const STAY_OVER_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: "No" },
+  { value: 30, label: "30 min" },
+  { value: 60, label: "1 hr" },
+  { value: 90, label: "1.5 hr" },
+  { value: 120, label: "2 hr" },
+];
 
 type SaveState = "saving" | "saved" | "error";
 
@@ -74,6 +85,7 @@ function EmployeeCard({
   onBreakChange,
   onAttendanceChange,
   onLeadToggle,
+  onStayOverChange,
   warnRole,
   overlay = false,
   noDrag = false,
@@ -86,10 +98,20 @@ function EmployeeCard({
   onBreakChange?: (id: string, value: string) => void;
   onAttendanceChange?: (id: string, value: Attendance) => void;
   onLeadToggle?: (id: string, value: boolean) => void;
+  onStayOverChange?: (id: string, minutes: number) => void;
   warnRole?: string | null;
   overlay?: boolean;
   noDrag?: boolean;
 }) {
+  // Reconstruct the currently-selected stay-over duration from stayOverUntil.
+  const stayOverValue = (() => {
+    if (!employee.stayOverUntil || !employee.shift) return 0;
+    const until = new Date(employee.stayOverUntil).getTime();
+    if (until <= Date.now()) return 0;
+    const end = shiftEndDate(employee.shift, new Date()).getTime();
+    const mins = Math.round((until - end) / 60000);
+    return STAY_OVER_OPTIONS.some((o) => o.value === mins) ? mins : 0;
+  })();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: employee.id,
     disabled: overlay || noDrag,
@@ -154,7 +176,8 @@ function EmployeeCard({
           onLunchChange ||
           onBreakChange ||
           onAttendanceChange ||
-          onLeadToggle) && (
+          onLeadToggle ||
+          onStayOverChange) && (
         <div
           onPointerDown={stopDrag}
           onKeyDown={stopDrag}
@@ -214,6 +237,25 @@ function EmployeeCard({
               </select>
             </>
           )}
+          {onStayOverChange && employee.shift && (
+            <>
+              <span>Stay over</span>
+              <select
+                value={stayOverValue}
+                onChange={(e) =>
+                  onStayOverChange(employee.id, Number(e.target.value))
+                }
+                style={{ colorScheme: "dark" }}
+                className="rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                {STAY_OVER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           {onAttendanceChange && (
             <select
               value={employee.attendance}
@@ -261,6 +303,7 @@ function PositionColumn({
   onBreakChange,
   onAttendanceChange,
   onLeadToggle,
+  onStayOverChange,
   horizontal = false,
 }: {
   id: string;
@@ -274,6 +317,7 @@ function PositionColumn({
   onBreakChange: (id: string, value: string) => void;
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
+  onStayOverChange: (id: string, minutes: number) => void;
   horizontal?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -321,6 +365,7 @@ function PositionColumn({
             onBreakChange={onBreakChange}
             onAttendanceChange={onAttendanceChange}
             onLeadToggle={onLeadToggle}
+            onStayOverChange={onStayOverChange}
             warnRole={
               requiredRole &&
               !employee.roles.some((r) => r.id === requiredRole.id)
@@ -483,6 +528,28 @@ export default function AssignPage() {
     flashSaved(employeeId, res.ok);
   };
 
+  const setStayOver = async (employeeId: string, minutes: number) => {
+    const emp = employees.find((e) => e.id === employeeId);
+    if (!emp || !emp.shift) return;
+    const stayOverUntil =
+      minutes > 0
+        ? new Date(
+            shiftEndDate(emp.shift, new Date()).getTime() + minutes * 60000
+          ).toISOString()
+        : null;
+    setEmployees((current) =>
+      current.map((e) => (e.id === employeeId ? { ...e, stayOverUntil } : e))
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stayOverUntil: stayOverUntil ?? "" }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
   const resetAll = async () => {
     if (
       !confirm(
@@ -585,6 +652,7 @@ export default function AssignPage() {
       onBreakChange={setBreak}
       onAttendanceChange={setAttendance}
       onLeadToggle={setLead}
+      onStayOverChange={setStayOver}
     />
   );
 

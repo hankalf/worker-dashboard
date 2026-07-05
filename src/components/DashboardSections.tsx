@@ -120,11 +120,18 @@ const ATTENDANCE_LABEL: Record<string, string> = {
 
 // Card body for one employee: name on its own line, then all badges/chips and
 // roles beneath it. Absent / called-out people are dimmed with a red badge.
-function MemberBody({ member }: { member: EmployeeWithRelations }) {
+function MemberBody({
+  member,
+  stayingOver = false,
+}: {
+  member: EmployeeWithRelations;
+  stayingOver?: boolean;
+}) {
   const out = member.attendance !== "PRESENT";
   const hasBadges =
     member.isLead ||
     out ||
+    stayingOver ||
     member.shift ||
     member.breakStart ||
     member.lunchStart;
@@ -153,6 +160,11 @@ function MemberBody({ member }: { member: EmployeeWithRelations }) {
             {member.shift && (
               <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 {SHIFTS[member.shift].label}
+              </span>
+            )}
+            {stayingOver && (
+              <span className="whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                Staying over
               </span>
             )}
           </span>
@@ -211,8 +223,20 @@ export function DashboardSections({
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
   const shiftKey = now ? currentShift(now) : null;
+  // Staying over: still within their marked stay-over window (past shift end).
+  const stayingOver = (e: EmployeeWithRelations) =>
+    !!e.stayOverUntil &&
+    !!now &&
+    new Date(e.stayOverUntil).getTime() > now.getTime();
+  // Show current shift's crew (by clock) + anyone marked to stay over.
   const onShift = (e: EmployeeWithRelations) =>
-    !shiftKey || e.shift === null || e.shift === shiftKey;
+    !shiftKey ||
+    e.shift === null ||
+    e.shift === shiftKey ||
+    stayingOver(e);
+  // Actively staying past their own shift (used for the badge).
+  const stayingOverNow = (e: EmployeeWithRelations) =>
+    stayingOver(e) && e.shift !== shiftKey;
   const present = (e: EmployeeWithRelations) => e.attendance === "PRESENT";
 
   const columns = positions.map((position) => {
@@ -440,7 +464,7 @@ export function DashboardSections({
                           key={member.id}
                           className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-800/50"
                         >
-                          <MemberBody member={member} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} />
                         </li>
                       ))}
                     </ul>
@@ -461,7 +485,7 @@ export function DashboardSections({
                 key={member.id}
                 className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <MemberBody member={member} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} />
               </div>
             ))}
           </div>

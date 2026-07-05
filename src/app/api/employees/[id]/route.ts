@@ -89,6 +89,8 @@ export async function PATCH(
   if (body.breakStart !== undefined) data.breakStart = body.breakStart || null;
   if (body.shift !== undefined) data.shift = body.shift || null;
   if (body.isLead !== undefined) data.isLead = !!body.isLead;
+  if (body.stayOverUntil !== undefined)
+    data.stayOverUntil = body.stayOverUntil ? new Date(body.stayOverUntil) : null;
 
   // Identity / access / roles — admins only.
   if (isAdmin) {

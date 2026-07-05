@@ -57,6 +57,9 @@ model Employee {
   lunchEnd     String?
   // Optional short (15-min) break start, "HH:MM"
   breakStart   String?
+  // If set (and in the future), the employee is staying past their shift end to
+  // help the next shift — keeps showing on the main dashboard until this time.
+  stayOverUntil DateTime?
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)
