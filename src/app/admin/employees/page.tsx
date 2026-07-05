@@ -60,6 +60,15 @@ const shiftRank = (shift: Shift | null) => (shift ? SHIFT_RANK[shift] : 3);
 const positionKey = (position: Position | null) =>
   position?.title.toLowerCase() ?? "￿";
 
+// The employee list is laid out as one column per shift (plus a "No shift"
+// column, shown only when it has anyone).
+const SHIFT_COLUMNS: { key: Shift | null; label: string }[] = [
+  { key: "FIRST", label: "1st Shift" },
+  { key: "SECOND", label: "2nd Shift" },
+  { key: "THIRD", label: "3rd Shift" },
+  { key: null, label: "No shift" },
+];
+
 const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
   { value: "PRESENT", label: "Present" },
   { value: "ABSENT", label: "Absent" },
@@ -470,14 +479,13 @@ export default function EmployeesPage() {
         </label>
       </div>
 
-      <ul className="flex flex-col gap-2">
-        {employees
+      {(() => {
+        const q = search.trim().toLowerCase();
+        // Sort by position (no position last), then by name; shift is handled
+        // by splitting into columns below.
+        const visible = employees
           .slice()
-          // Sort by shift (1st → 2nd → 3rd, no shift last), then by position
-          // title (no position last), then by name.
           .sort((a, b) => {
-            const sd = shiftRank(a.shift) - shiftRank(b.shift);
-            if (sd !== 0) return sd;
             const pd = positionKey(a.position).localeCompare(
               positionKey(b.position)
             );
@@ -485,21 +493,42 @@ export default function EmployeesPage() {
             return a.name.localeCompare(b.name);
           })
           .filter((employee) => {
-            const q = search.trim().toLowerCase();
             if (!q) return true;
             return (
               employee.name.toLowerCase().includes(q) ||
               (employee.position?.title ?? "").toLowerCase().includes(q) ||
               employee.roles.some((r) => r.name.toLowerCase().includes(q))
             );
-          })
-          .map((employee) => (
-          <li
-            key={employee.id}
-            className={`flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
-              employee.terminatedAt ? "opacity-60" : ""
-            }`}
-          >
+          });
+
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {SHIFT_COLUMNS.map((col) => {
+              const members = visible.filter((e) => e.shift === col.key);
+              // Hide the "No shift" column when empty; keep the real shifts.
+              if (col.key === null && members.length === 0) return null;
+              return (
+                <div
+                  key={col.label}
+                  className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-950/50 p-3"
+                >
+                  <h3 className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    {col.label}
+                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-zinc-400">
+                      {members.length}
+                    </span>
+                  </h3>
+                  {members.length === 0 ? (
+                    <p className="text-sm text-zinc-600">No employees</p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {members.map((employee) => (
+                        <li
+                          key={employee.id}
+                          className={`flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
+                            employee.terminatedAt ? "opacity-60" : ""
+                          }`}
+                        >
             <div>
               <div className="flex items-center gap-2 font-medium text-white">
                 {employee.name}
@@ -542,7 +571,7 @@ export default function EmployeesPage() {
                 </div>
               )}
             </div>
-            <div className="flex shrink-0 gap-3 text-sm">
+            <div className="flex flex-wrap gap-3 text-sm">
               <button
                 onClick={() => openHistory(employee)}
                 className="text-zinc-400 hover:text-white"
@@ -580,8 +609,15 @@ export default function EmployeesPage() {
               </button>
             </div>
           </li>
-        ))}
-      </ul>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {historyFor && (
         <div
