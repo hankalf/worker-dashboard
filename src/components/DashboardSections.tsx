@@ -243,6 +243,9 @@ export function DashboardSections({
   const stayingOverNow = (e: EmployeeWithRelations) =>
     stayingOver(e) && e.shift !== shiftKey;
   const present = (e: EmployeeWithRelations) => e.attendance === "PRESENT";
+  // Actively working right now: present and on the current shift (or staying
+  // over). These cards get a violet outline, matching the Assign board.
+  const activeNow = (e: EmployeeWithRelations) => present(e) && onShift(e);
 
   const columns = positions.map((position) => {
     const members = employees
@@ -467,7 +470,11 @@ export function DashboardSections({
                       {column.members.map((member) => (
                         <li
                           key={member.id}
-                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 dark:border-zinc-800 dark:bg-zinc-800/50"
+                          className={`rounded-md border px-3 py-3 ${
+                            activeNow(member)
+                              ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
+                              : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
+                          }`}
                         >
                           <MemberBody member={member} stayingOver={stayingOverNow(member)} />
                         </li>
@@ -488,7 +495,11 @@ export function DashboardSections({
             {roster.map((member) => (
               <div
                 key={member.id}
-                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                className={`rounded-lg border p-4 shadow-sm ${
+                  activeNow(member)
+                    ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
+                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+                }`}
               >
                 <MemberBody member={member} stayingOver={stayingOverNow(member)} />
               </div>
