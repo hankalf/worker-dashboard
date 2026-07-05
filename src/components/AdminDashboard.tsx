@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Position } from "@/generated/prisma/client";
-import { APP_TZ } from "@/lib/time";
-import { MAX_VISIBLE_NOTICES } from "@/lib/announcements";
+import { APP_TZ, easternInputToUtcISO } from "@/lib/time";
+import { currentShift, SHIFTS, type ShiftKey } from "@/lib/shift";
+import { MAX_VISIBLE_NOTICES, splitNotices } from "@/lib/announcements";
 import {
   DashboardSections,
   useNow,
@@ -17,8 +18,18 @@ type Notice = {
   id: string;
   message: string;
   expiresAt: string | null;
+  pinned: boolean;
   createdAt: string;
 };
+
+type ShiftNote = {
+  id: string;
+  message: string;
+  updatedByName: string | null;
+  updatedAt: string;
+};
+
+const HANDOFF_SHIFTS: ShiftKey[] = ["FIRST", "SECOND", "THIRD"];
 
 // Format an expiry timestamp for display in the app's timezone.
 function fmtExpiry(iso: string | null) {
@@ -38,12 +49,14 @@ export function AdminDashboard({
   jobs,
   notices,
   expiredNotices,
+  shiftNotes,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   notices: Notice[];
   expiredNotices: Notice[];
+  shiftNotes: ShiftNote[];
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -51,8 +64,35 @@ export function AdminDashboard({
 
   const [message, setMessage] = useState("");
   const [expiresInput, setExpiresInput] = useState("");
+  const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const notesById = Object.fromEntries(shiftNotes.map((n) => [n.id, n]));
+  const handoffNotes = Object.fromEntries(
+    shiftNotes.map((n) => [n.id, n.message])
+  );
+  const nowShift = now ? currentShift(now) : null;
+  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      HANDOFF_SHIFTS.map((s) => [s, notesById[s]?.message ?? ""])
+    )
+  );
+  const [savingShift, setSavingShift] = useState<string | null>(null);
+  const [savedShift, setSavedShift] = useState<string | null>(null);
+
+  const saveHandoff = async (shift: ShiftKey) => {
+    setSavingShift(shift);
+    await fetch("/api/shift-notes", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shift, message: drafts[shift] }),
+    });
+    setSavingShift(null);
+    setSavedShift(shift);
+    setTimeout(() => setSavedShift(null), 2000);
+    router.refresh();
+  };
 
   const nowMs = now ? now.getTime() : Date.now();
   const isExpired = (n: Notice) =>
@@ -60,8 +100,7 @@ export function AdminDashboard({
 
   // Re-derive against the live clock so the split stays correct between refreshes.
   const active = notices.filter((n) => !isExpired(n));
-  const live = active.slice(0, MAX_VISIBLE_NOTICES);
-  const queued = active.slice(MAX_VISIBLE_NOTICES);
+  const { visible: live, queued } = splitNotices(active);
   // Anything that expired since the server render, then the server's expired set.
   const expired = [...notices.filter(isExpired), ...expiredNotices];
 
@@ -73,12 +112,27 @@ export function AdminDashboard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        expiresAt: expiresInput ? new Date(expiresInput).toISOString() : null,
+        // Interpret the picked time as Eastern (the warehouse's timezone),
+        // not the admin's browser timezone.
+        expiresAt: expiresInput ? easternInputToUtcISO(expiresInput) : null,
+        pinned: pinNew,
       }),
     });
     setMessage("");
     setExpiresInput("");
+    setPinNew(false);
     setPosting(false);
+    router.refresh();
+  };
+
+  const togglePin = async (id: string, pinned: boolean) => {
+    setBusyId(id);
+    await fetch(`/api/announcement/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    });
+    setBusyId(null);
     router.refresh();
   };
 
@@ -107,20 +161,38 @@ export function AdminDashboard({
         className={`flex items-start justify-between gap-3 rounded-md border px-3 py-2 ${border}`}
       >
         <div className="min-w-0">
-          <div className="text-sm text-zinc-100 break-words">{n.message}</div>
+          <div className="text-sm text-zinc-100 break-words">
+            {n.pinned && (
+              <span className="mr-2 whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                Pinned
+              </span>
+            )}
+            {n.message}
+          </div>
           <div className="mt-0.5 text-xs text-zinc-500">
             {tone === "expired"
               ? `expired ${fmtExpiry(n.expiresAt)}`
               : fmtExpiry(n.expiresAt)}
           </div>
         </div>
-        <button
-          onClick={() => remove(n.id)}
-          disabled={busyId === n.id}
-          className="shrink-0 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-red-800 hover:bg-red-950/40 hover:text-red-300 disabled:opacity-50"
-        >
-          {busyId === n.id ? "…" : "Delete"}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {tone !== "expired" && (
+            <button
+              onClick={() => togglePin(n.id, !n.pinned)}
+              disabled={busyId === n.id}
+              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-700 hover:bg-amber-950/30 hover:text-amber-300 disabled:opacity-50"
+            >
+              {n.pinned ? "Unpin" : "Pin"}
+            </button>
+          )}
+          <button
+            onClick={() => remove(n.id)}
+            disabled={busyId === n.id}
+            className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-red-800 hover:bg-red-950/40 hover:text-red-300 disabled:opacity-50"
+          >
+            {busyId === n.id ? "…" : "Delete"}
+          </button>
+        </div>
       </div>
     );
   };
@@ -154,6 +226,66 @@ export function AdminDashboard({
 
       <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
+          Shift handoff notes
+        </label>
+        <p className="text-xs text-zinc-500">
+          Shown above the notices for whichever shift is active. Leave blank to
+          clear.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {HANDOFF_SHIFTS.map((shift) => (
+            <div
+              key={shift}
+              className={`rounded-md border p-3 ${
+                nowShift === shift
+                  ? "border-violet-700 bg-violet-950/30"
+                  : "border-zinc-700 bg-zinc-800/40"
+              }`}
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-200">
+                  {SHIFTS[shift].label}
+                </span>
+                {nowShift === shift && (
+                  <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
+                    ACTIVE
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={drafts[shift]}
+                onChange={(e) =>
+                  setDrafts((d) => ({ ...d, [shift]: e.target.value }))
+                }
+                rows={3}
+                placeholder="Notes for the incoming crew…"
+                className="w-full resize-y rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500"
+              />
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="truncate text-[10px] text-zinc-500">
+                  {notesById[shift]?.updatedByName
+                    ? `by ${notesById[shift].updatedByName}`
+                    : ""}
+                </span>
+                <button
+                  onClick={() => saveHandoff(shift)}
+                  disabled={savingShift === shift}
+                  className="shrink-0 rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+                >
+                  {savingShift === shift
+                    ? "Saving…"
+                    : savedShift === shift
+                      ? "Saved ✓"
+                      : "Save"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
           Post a notice
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -175,7 +307,7 @@ export function AdminDashboard({
           </button>
         </div>
         <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
-          Clear automatically at (optional):
+          Clear automatically at (Eastern, optional):
           <input
             type="datetime-local"
             value={expiresInput}
@@ -193,10 +325,19 @@ export function AdminDashboard({
             </button>
           )}
         </label>
+        <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+          <input
+            type="checkbox"
+            checked={pinNew}
+            onChange={(e) => setPinNew(e.target.checked)}
+          />
+          Pin this notice — always shown, ignores the {MAX_VISIBLE_NOTICES}-notice
+          cap
+        </label>
 
         <p className="mt-3 text-xs text-zinc-500">
-          The board shows up to {MAX_VISIBLE_NOTICES} notices at once. Extras
-          queue and appear as live ones expire.
+          The board shows up to {MAX_VISIBLE_NOTICES} notices at once (pinned
+          ones always show). Extras queue and appear as live ones expire.
         </p>
 
         {/* On the board now */}
@@ -253,6 +394,7 @@ export function AdminDashboard({
           showPositions
           showCoverage
           announcements={live.map((n) => n.message)}
+          handoffNotes={handoffNotes}
         />
       </div>
     </div>

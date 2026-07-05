@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes } from "@/lib/time";
+import { currentShift, SHIFTS } from "@/lib/shift";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 
 export type EmployeeWithRelations = Employee & {
@@ -54,23 +55,6 @@ export const formatClock = (hhmm: string) => {
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 
-type ShiftKey = "FIRST" | "SECOND" | "THIRD";
-
-const SHIFTS: Record<ShiftKey, { label: string; range: string }> = {
-  FIRST: { label: "1st Shift", range: "6:00 AM – 2:00 PM" },
-  SECOND: { label: "2nd Shift", range: "2:00 PM – 10:00 PM" },
-  THIRD: { label: "3rd Shift", range: "10:00 PM – 6:00 AM" },
-};
-
-// Which shift is active right now (FIRST 6-14, SECOND 14-22, THIRD 22-6),
-// evaluated in the warehouse's timezone.
-const currentShift = (now: Date): ShiftKey => {
-  const cur = appMinutes(now);
-  if (cur >= 6 * 60 && cur < 14 * 60) return "FIRST";
-  if (cur >= 14 * 60 && cur < 22 * 60) return "SECOND";
-  return "THIRD";
-};
-
 // Periodically soft-refreshes the current route's server data so displays
 // pick up admin-panel changes without a manual reload (no full-page refresh,
 // so client state like the clock is preserved).
@@ -80,6 +64,40 @@ export function useAutoRefresh(intervalMs = 15000) {
     const id = setInterval(() => router.refresh(), intervalMs);
     return () => clearInterval(id);
   }, [router, intervalMs]);
+}
+
+type WakeLockSentinelLike = { release: () => Promise<void> };
+type WakeLockNavigator = Navigator & {
+  wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> };
+};
+
+// Keep the screen awake while `enabled` (used in TV mode) so a wall-mounted
+// display doesn't dim or sleep. Re-acquires the lock when the tab becomes
+// visible again (the browser drops it when hidden). No-op where unsupported.
+export function useWakeLock(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || typeof navigator === "undefined") return;
+    const nav = navigator as WakeLockNavigator;
+    if (!nav.wakeLock) return;
+
+    let lock: WakeLockSentinelLike | null = null;
+    const request = async () => {
+      try {
+        lock = await nav.wakeLock!.request("screen");
+      } catch {
+        // ignore — e.g. denied while not visible
+      }
+    };
+    request();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") request();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      lock?.release().catch(() => {});
+    };
+  }, [enabled]);
 }
 
 // Live clock, initialised on mount to avoid a server/client time mismatch.
@@ -165,6 +183,7 @@ export function DashboardSections({
   showPositions = false,
   showCoverage = false,
   announcements = [],
+  handoffNotes = {},
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -173,6 +192,7 @@ export function DashboardSections({
   showPositions?: boolean;
   showCoverage?: boolean;
   announcements?: string[];
+  handoffNotes?: Record<string, string>;
 }) {
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
@@ -247,6 +267,17 @@ export function DashboardSections({
 
   return (
     <>
+      {shiftKey && handoffNotes[shiftKey] && (
+        <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide">
+            {SHIFTS[shiftKey].label} Handoff
+          </div>
+          <div className="whitespace-pre-wrap text-sm">
+            {handoffNotes[shiftKey]}
+          </div>
+        </div>
+      )}
+
       {announcements.length > 0 && (
         <div className="mb-8 flex flex-col gap-2">
           {announcements.map((message, i) => (

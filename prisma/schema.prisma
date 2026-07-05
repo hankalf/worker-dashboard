@@ -85,12 +85,39 @@ model Position {
 
 // Notices shown on the dashboards. The board shows up to 5 active notices at a
 // time (oldest first); any beyond that queue until an active one expires.
+// Pinned notices always show (above the cap) and never queue out.
 model Announcement {
   id        String    @id @default(cuid())
   message   String
   expiresAt DateTime?
+  pinned    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+// One handoff note per shift (id is the shift key: FIRST | SECOND | THIRD),
+// shown above the notices for the currently-active shift and carried until the
+// next crew edits it.
+model ShiftNote {
+  id            String   @id
+  message       String
+  updatedByName String?
+  updatedAt     DateTime @updatedAt
+}
+
+// Daily per-shift headcount snapshot for attendance history. One row per
+// (date, shift); date is the Eastern calendar day as "YYYY-MM-DD".
+model HeadcountSnapshot {
+  id        String   @id @default(cuid())
+  date      String
+  shift     String
+  present   Int
+  total     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, shift])
+  @@index([date])
 }
 
 model Job {

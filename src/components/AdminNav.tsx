@@ -8,6 +8,7 @@ const TOP_ITEMS = [
   { href: "/admin", label: "Admin Dashboard" },
   { href: "/admin/assign", label: "Assign" },
   { href: "/admin/jobs", label: "Side Tasks" },
+  { href: "/admin/attendance", label: "Attendance" },
 ];
 
 const SETUP_ITEMS = [

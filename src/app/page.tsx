@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardView } from "@/components/DashboardView";
-import { MAX_VISIBLE_NOTICES } from "@/lib/announcements";
+import { splitNotices } from "@/lib/announcements";
 
 export const dynamic = "force-dynamic";
 
@@ -14,25 +14,34 @@ export default async function Home({
   const tv = (await searchParams).tv === "1";
 
   const now = new Date();
-  const [positions, employees, jobs, notices] = await Promise.all([
-    prisma.position.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
-    prisma.employee.findMany({
-      where: { terminatedAt: null },
-      include: { position: true, roles: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.job.findMany({
-      include: { assignedEmployee: { include: { position: true } } },
-      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-    }),
-    // Up to 5 active notices, oldest first; the rest stay queued until one
-    // expires (auto-refresh re-queries and promotes the next in line).
-    prisma.announcement.findMany({
-      where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-      orderBy: { createdAt: "asc" },
-      take: MAX_VISIBLE_NOTICES,
-    }),
-  ]);
+  const [positions, employees, jobs, activeNotices, shiftNotes] =
+    await Promise.all([
+      prisma.position.findMany({
+        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+      }),
+      prisma.employee.findMany({
+        where: { terminatedAt: null },
+        include: { position: true, roles: true },
+        orderBy: { name: "asc" },
+      }),
+      prisma.job.findMany({
+        include: { assignedEmployee: { include: { position: true } } },
+        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+      }),
+      // All active notices, oldest first; splitNotices picks the visible set
+      // (pinned always shown, then unpinned up to the cap). The rest stay
+      // queued until one expires (auto-refresh re-queries and promotes them).
+      prisma.announcement.findMany({
+        where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.shiftNote.findMany(),
+    ]);
+
+  const { visible } = splitNotices(activeNotices);
+  const handoffNotes = Object.fromEntries(
+    shiftNotes.map((n) => [n.id, n.message])
+  );
 
   return (
     <DashboardView
@@ -40,7 +49,9 @@ export default async function Home({
       employees={employees}
       jobs={jobs}
       isAdmin={!!session?.user}
-      announcements={notices.map((n) => n.message)}
+      announcements={visible.map((n) => n.message)}
+      handoffNotes={handoffNotes}
+      renderedAt={now.toISOString()}
       tv={tv}
     />
   );

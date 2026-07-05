@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { message, expiresAt } = await req.json();
+  const { message, expiresAt, pinned } = await req.json();
   const trimmed = typeof message === "string" ? message.trim() : "";
   if (!trimmed) {
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   const expires = expiresAt ? new Date(expiresAt) : null;
   const announcement = await prisma.announcement.create({
-    data: { message: trimmed, expiresAt: expires },
+    data: { message: trimmed, expiresAt: expires, pinned: !!pinned },
   });
   await logActivity(
     "Announcement",

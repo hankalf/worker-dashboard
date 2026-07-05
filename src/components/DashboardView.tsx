@@ -8,6 +8,7 @@ import {
   DashboardSections,
   useNow,
   useAutoRefresh,
+  useWakeLock,
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
@@ -18,6 +19,8 @@ export function DashboardView({
   jobs,
   isAdmin,
   announcements,
+  handoffNotes,
+  renderedAt,
   tv = false,
 }: {
   positions: Position[];
@@ -25,10 +28,13 @@ export function DashboardView({
   jobs: JobWithRelations[];
   isAdmin: boolean;
   announcements: string[];
+  handoffNotes: Record<string, string>;
+  renderedAt: string;
   tv?: boolean;
 }) {
   const now = useNow();
   useAutoRefresh();
+  useWakeLock(tv);
 
   return (
     <div
@@ -52,6 +58,15 @@ export function DashboardView({
               <div className="text-3xl font-semibold tabular-nums">
                 {now.toLocaleTimeString(undefined, {
                   hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  timeZone: APP_TZ,
+                })}
+              </div>
+              <div className="text-xs text-zinc-400 dark:text-zinc-500">
+                Updated{" "}
+                {new Date(renderedAt).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
                   minute: "2-digit",
                   second: "2-digit",
                   timeZone: APP_TZ,
@@ -104,6 +119,7 @@ export function DashboardView({
           jobs={jobs}
           now={now}
           announcements={announcements}
+          handoffNotes={handoffNotes}
           showPositions
         />
       </main>
