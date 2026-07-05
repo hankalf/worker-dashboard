@@ -196,6 +196,8 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const db = new PrismaClient({ adapter });
 
 const EQUIPMENT = ["Forklift", "Pallet Jack", "Scanner", "Hard Hat", "Box Cutter"];
+// "Roles" = job functions (Capability model), distinct from Equipment.
+const ROLES = ["Receive", "Ship", "Pick", "Putaway", "DAX"];
 const POSITIONS = [
   "Receiving",
   "Put-Away",
@@ -219,6 +221,7 @@ type Spec = {
   breakStart: string | null;
   stayOver: boolean;
   equipmentIdx: number[];
+  capabilityIdx: number[];
 };
 
 function buildEmployeeSpecs(): Spec[] {
@@ -238,6 +241,8 @@ function buildEmployeeSpecs(): Spec[] {
       breakStart: i % 3 === 0 ? "10:15" : null,
       stayOver: i === 5 || i === 12,
       equipmentIdx: i % 7 === 0 ? [i % 5, (i + 1) % 5] : [i % 5],
+      // Every worker can perform 1-2 roles (distinct indices).
+      capabilityIdx: [...new Set([i % 5, (i + 2) % 5])],
     });
   }
   return specs;
@@ -249,10 +254,14 @@ async function seed(now: Date) {
   await db.employee.deleteMany();
   await db.position.deleteMany();
   await db.role.deleteMany();
+  await db.capability.deleteMany();
   await db.announcement.deleteMany();
 
   const roles: { id: string }[] = [];
   for (const name of EQUIPMENT) roles.push(await db.role.create({ data: { name } }));
+
+  const caps: { id: string }[] = [];
+  for (const name of ROLES) caps.push(await db.capability.create({ data: { name } }));
 
   const positions: { id: string }[] = [];
   for (let i = 0; i < POSITIONS.length; i++) {
@@ -282,6 +291,9 @@ async function seed(now: Date) {
         breakStart: s.breakStart,
         stayOverUntil: s.stayOver ? new Date(now.getTime() + 2 * 3600 * 1000) : null,
         roles: { connect: s.equipmentIdx.map((idx) => ({ id: roles[idx].id })) },
+        capabilities: {
+          connect: s.capabilityIdx.map((idx) => ({ id: caps[idx].id })),
+        },
       },
     });
   }
@@ -333,6 +345,11 @@ async function dbTests(now: Date, specs: Spec[]) {
     [...EQUIPMENT].sort()
   );
 
+  group("db: roles (capabilities)");
+  const caps = await db.capability.findMany({ orderBy: { name: "asc" } });
+  eq("count", caps.length, 5);
+  eq("sorted ascending", caps.map((c) => c.name), [...ROLES].sort());
+
   group("db: positions");
   const positions = await db.position.findMany({
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -348,12 +365,14 @@ async function dbTests(now: Date, specs: Spec[]) {
   group("db: employees roster");
   const roster = await db.employee.findMany({
     where: { terminatedAt: null },
-    include: { position: true, roles: true },
+    include: { position: true, roles: true, capabilities: true },
     orderBy: { name: "asc" },
   });
   eq("roster count (30 workers + admin + supervisor)", roster.length, 32);
   ok("at least 30 employees", roster.length >= 30);
   ok("every employee has ≥1 equipment or is admin/sup", roster.every((e) => e.roles.length >= 1 || e.username));
+  ok("every worker has ≥1 role (capability)", roster.filter((e) => !e.username).every((e) => e.capabilities.length >= 1));
+  ok("some workers have multiple roles", roster.some((e) => e.capabilities.length >= 2));
   ok("seeded admin has a hashed password", !!(roster.find((e) => e.username === "admin") as Record<string, unknown> | undefined)?.passwordHash);
 
   // shared grouping helpers (mirror DashboardSections)
@@ -578,6 +597,11 @@ async function httpTests(roster: { length: number }) {
     eq("/api/equipment 200", r.status, 200);
     eq("returns 5 equipment", r.body?.length, 5);
   }
+  {
+    const r = await j("/api/roles");
+    eq("/api/roles 200", r.status, 200);
+    eq("returns 5 roles", r.body?.length, 5);
+  }
 
   group("http: public dashboard HTML");
   {
@@ -605,6 +629,11 @@ async function httpTests(roster: { length: number }) {
   eq(
     "equipment POST no auth → 403",
     (await fetch(BASE + "/api/equipment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x" }) })).status,
+    403
+  );
+  eq(
+    "roles POST no auth → 403",
+    (await fetch(BASE + "/api/roles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x" }) })).status,
     403
   );
 

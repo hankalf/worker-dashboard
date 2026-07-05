@@ -6,6 +6,7 @@ import { APP_TZ } from "@/lib/time";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
+type Capability = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
 type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
 type AccessLevel = "NONE" | "SUPERVISOR" | "ADMIN";
@@ -17,6 +18,7 @@ type Employee = {
   positionId: string | null;
   position: Position | null;
   roles: Role[];
+  capabilities: Capability[];
   shift: Shift | null;
   attendance: Attendance;
   isLead: boolean;
@@ -92,9 +94,11 @@ export default function EmployeesPage() {
   const [history, setHistory] = useState<ActivityLog[] | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [name, setName] = useState("");
   const [positionId, setPositionId] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [capabilityIds, setCapabilityIds] = useState<string[]>([]);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("NONE");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -110,11 +114,13 @@ export default function EmployeesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async (withTerminated = showTerminated) => {
-    const [employeesRes, positionsRes, rolesRes] = await Promise.all([
-      fetch(`/api/employees${withTerminated ? "?includeTerminated=1" : ""}`),
-      fetch("/api/positions"),
-      fetch("/api/equipment"),
-    ]);
+    const [employeesRes, positionsRes, rolesRes, capabilitiesRes] =
+      await Promise.all([
+        fetch(`/api/employees${withTerminated ? "?includeTerminated=1" : ""}`),
+        fetch("/api/positions"),
+        fetch("/api/equipment"),
+        fetch("/api/roles"),
+      ]);
     if (employeesRes.status === 403) {
       // Session no longer maps to an admin — send them back to sign in
       window.location.href = "/login";
@@ -123,6 +129,7 @@ export default function EmployeesPage() {
     setEmployees(await employeesRes.json());
     setPositions(await positionsRes.json());
     setRoles(await rolesRes.json());
+    setCapabilities(await capabilitiesRes.json());
   };
 
   useEffect(() => {
@@ -155,6 +162,7 @@ export default function EmployeesPage() {
     setName("");
     setPositionId("");
     setRoleIds([]);
+    setCapabilityIds([]);
     setAccessLevel("NONE");
     setUsername("");
     setPassword("");
@@ -172,6 +180,14 @@ export default function EmployeesPage() {
     );
   };
 
+  const toggleCapability = (id: string) => {
+    setCapabilityIds((current) =>
+      current.includes(id)
+        ? current.filter((capId) => capId !== id)
+        : [...current, id]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -185,6 +201,7 @@ export default function EmployeesPage() {
         name,
         positionId,
         roleIds,
+        capabilityIds,
         accessLevel,
         username,
         password,
@@ -209,6 +226,7 @@ export default function EmployeesPage() {
     setName(employee.name);
     setPositionId(employee.positionId ?? "");
     setRoleIds(employee.roles.map((role) => role.id));
+    setCapabilityIds(employee.capabilities.map((c) => c.id));
     setAccessLevel(employee.accessLevel);
     setUsername(employee.username ?? "");
     setPassword("");
@@ -403,6 +421,38 @@ export default function EmployeesPage() {
           )}
         </div>
 
+        <div>
+          <div className="mb-1 text-xs font-medium text-zinc-400">
+            Roles this employee can perform
+          </div>
+          {capabilities.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              No roles yet — add them on the Roles page.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {capabilities.map((cap) => (
+                <label
+                  key={cap.id}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-sm ${
+                    capabilityIds.includes(cap.id)
+                      ? "border-blue-500 bg-blue-600/20 text-blue-300"
+                      : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={capabilityIds.includes(cap.id)}
+                    onChange={() => toggleCapability(cap.id)}
+                    className="sr-only"
+                  />
+                  {cap.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
         <label className="text-xs text-zinc-400">
           Panel access
           <select
@@ -497,7 +547,8 @@ export default function EmployeesPage() {
             return (
               employee.name.toLowerCase().includes(q) ||
               (employee.position?.title ?? "").toLowerCase().includes(q) ||
-              employee.roles.some((r) => r.name.toLowerCase().includes(q))
+              employee.roles.some((r) => r.name.toLowerCase().includes(q)) ||
+              employee.capabilities.some((c) => c.name.toLowerCase().includes(q))
             );
           });
 
@@ -530,8 +581,14 @@ export default function EmployeesPage() {
                           }`}
                         >
             <div>
-              <div className="flex items-center gap-2 font-medium text-white">
+              {/* Name + shift badge + status, all on the left */}
+              <div className="flex flex-wrap items-center gap-2 font-medium text-white">
                 {employee.name}
+                {employee.shift && (
+                  <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
+                    {SHIFT_SHORT[employee.shift]}
+                  </span>
+                )}
                 {employee.terminatedAt && (
                   <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
                     Terminated
@@ -543,7 +600,7 @@ export default function EmployeesPage() {
                   </span>
                 )}
                 {employee.accessLevel !== "NONE" && (
-                  <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-medium text-blue-300">
+                  <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
                     {ACCESS_LABEL[employee.accessLevel]}
                   </span>
                 )}
@@ -553,19 +610,20 @@ export default function EmployeesPage() {
                   </span>
                 )}
               </div>
-              <div className="text-sm text-zinc-400">
+              {/* Position */}
+              <div className="mt-0.5 text-sm text-zinc-400">
                 {employee.position?.title ?? "No position"}
-                {employee.shift ? ` · ${SHIFT_SHORT[employee.shift]}` : ""}
                 {employee.username ? ` · ${employee.username}` : ""}
               </div>
-              {employee.roles.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {employee.roles.map((role) => (
+              {/* Roles (capabilities) */}
+              {employee.capabilities.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {employee.capabilities.map((cap) => (
                     <span
-                      key={role.id}
+                      key={cap.id}
                       className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
                     >
-                      {role.name}
+                      {cap.name}
                     </span>
                   ))}
                 </div>

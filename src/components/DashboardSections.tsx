@@ -11,6 +11,7 @@ import { AutoScroll } from "@/components/AutoScroll";
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
   roles: Role[];
+  capabilities: { id: string; name: string }[];
 };
 
 export type JobWithRelations = Job & {
@@ -128,19 +129,18 @@ function MemberBody({
   stayingOver?: boolean;
 }) {
   const out = member.attendance !== "PRESENT";
-  const hasBadges =
-    member.isLead ||
-    out ||
-    stayingOver ||
-    member.shift ||
-    member.breakStart ||
-    member.lunchStart;
   return (
     <div className={out ? "opacity-60" : undefined}>
-      <div className="text-sm font-medium">{member.name}</div>
-      {hasBadges && (
-        <div className="mt-2 flex items-start justify-between gap-2">
-          <span className="flex flex-wrap items-center gap-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {/* Name + shift badge + status, all on the left */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm font-medium">{member.name}</span>
+            {member.shift && (
+              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                {SHIFTS[member.shift].label}
+              </span>
+            )}
             {member.isLead && (
               <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
                 Lead
@@ -157,11 +157,6 @@ function MemberBody({
                 {ATTENDANCE_LABEL[member.attendance]}
               </span>
             )}
-            {member.shift && (
-              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                {SHIFTS[member.shift].label}
-              </span>
-            )}
             {stayingOver && member.stayOverUntil && (
               <span className="whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
                 Staying over til{" "}
@@ -172,7 +167,27 @@ function MemberBody({
                 })}
               </span>
             )}
-          </span>
+          </div>
+          {/* Position */}
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            {member.position?.title ?? "No position"}
+          </div>
+          {/* Roles (capabilities) */}
+          {member.capabilities.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {member.capabilities.map((c) => (
+                <span
+                  key={c.id}
+                  className="whitespace-nowrap rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {c.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Break / lunch on the right */}
+        {(member.breakStart || member.lunchStart) && (
           <span className="flex shrink-0 flex-col items-end gap-1">
             {member.breakStart && (
               <span className="whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
@@ -185,13 +200,8 @@ function MemberBody({
               </span>
             )}
           </span>
-        </div>
-      )}
-      {member.roles.length > 0 && (
-        <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-          {member.roles.map((role) => role.name).join(" · ")}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

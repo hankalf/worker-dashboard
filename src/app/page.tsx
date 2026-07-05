@@ -22,7 +22,7 @@ export default async function Home({
     }),
     prisma.employee.findMany({
       where: { terminatedAt: null },
-      include: { position: true, roles: true },
+      include: { position: true, roles: true, capabilities: true },
       orderBy: { name: "asc" },
     }),
     prisma.job.findMany({

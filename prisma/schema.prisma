@@ -51,6 +51,7 @@ model Employee {
   position     Position? @relation(fields: [positionId], references: [id])
   positionId   String?
   roles        Role[]    @relation("EmployeeRoles")
+  capabilities Capability[] @relation("EmployeeCapabilities")
   jobs         Job[]
   // Lunch window as "HH:MM" strings (24h); end defaults to start+30min if unset
   lunchStart   String?
@@ -67,13 +68,23 @@ model Employee {
   createdAt    DateTime  @default(now())
 }
 
-// A capability an employee has — the kinds of job they can perform.
+// Physical equipment / certifications an employee can operate. NOTE: the model
+// is named Role for historical reasons but the entire UI calls it "Equipment".
 model Role {
   id                   String     @id @default(cuid())
   name                 String     @unique
   description          String?
   employees            Employee[] @relation("EmployeeRoles")
   requiredForPositions Position[] @relation("PositionRequiredRole")
+}
+
+// A job function an employee can perform (e.g. Receive, Ship, Pick, Putaway,
+// DAX). Shown as "Roles" in the UI. Distinct from Equipment; an employee can
+// have several.
+model Capability {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  employees Employee[] @relation("EmployeeCapabilities")
 }
 
 model Position {

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: includeTerminated ? undefined : { terminatedAt: null },
-    include: { position: true, roles: true },
+    include: { position: true, roles: true, capabilities: true },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(employees);
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     name,
     positionId,
     roleIds,
+    capabilityIds,
     accessLevel,
     username,
     password,
@@ -66,8 +67,11 @@ export async function POST(req: Request) {
         roles: {
           connect: (roleIds ?? []).map((id: string) => ({ id })),
         },
+        capabilities: {
+          connect: (capabilityIds ?? []).map((id: string) => ({ id })),
+        },
       },
-      include: { position: true, roles: true },
+      include: { position: true, roles: true, capabilities: true },
     });
     await logActivity("Employee", `Added ${employee.name}`, employee.id);
     return NextResponse.json(employee, { status: 201 });

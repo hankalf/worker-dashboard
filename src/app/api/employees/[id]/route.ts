@@ -58,7 +58,7 @@ export async function PATCH(
           positionId: null,
           isLead: false,
         },
-        include: { position: true, roles: true },
+        include: { position: true, roles: true, capabilities: true },
       });
       await logActivity("Employee", `Terminated ${employee.name}`, id);
       // Archive their logs (incl. the termination entry) so they survive the
@@ -72,7 +72,7 @@ export async function PATCH(
       const employee = await prisma.employee.update({
         where: { id },
         data: { terminatedAt: null },
-        include: { position: true, roles: true },
+        include: { position: true, roles: true, capabilities: true },
       });
       await logActivity("Employee", `Reactivated ${employee.name}`, id);
       return NextResponse.json(employee);
@@ -101,6 +101,11 @@ export async function PATCH(
         set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })),
       };
     }
+    if (body.capabilityIds !== undefined) {
+      data.capabilities = {
+        set: (body.capabilityIds as string[]).map((capId) => ({ id: capId })),
+      };
+    }
     if (body.password) {
       data.passwordHash = await bcrypt.hash(body.password, 10);
     }
@@ -126,7 +131,7 @@ export async function PATCH(
     const employee = await prisma.employee.update({
       where: { id },
       data,
-      include: { position: true, roles: true },
+      include: { position: true, roles: true, capabilities: true },
     });
 
     // Describe what changed for the activity log (positions emphasised).
@@ -158,6 +163,12 @@ export async function PATCH(
         employee.roles.length
           ? `equipment → ${employee.roles.map((r) => r.name).join(", ")}`
           : "equipment cleared"
+      );
+    if (isAdmin && body.capabilityIds !== undefined)
+      changes.push(
+        employee.capabilities.length
+          ? `roles → ${employee.capabilities.map((c) => c.name).join(", ")}`
+          : "roles cleared"
       );
     if (
       isAdmin &&
