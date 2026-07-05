@@ -90,6 +90,42 @@ export default function ActivityPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Download ALL log data (activity + side-task logs) as one CSV, then clear the
+  // database. The download happens first so the archive is safely in hand before
+  // anything is deleted.
+  const exportAllAndClear = async () => {
+    if (
+      !confirm(
+        "⚠ Export ALL logs and permanently clear the database?\n\n" +
+          "A CSV of every activity and side-task log will download first, then " +
+          "those rows will be deleted (terminated-employee history is kept). " +
+          "This cannot be undone."
+      )
+    )
+      return;
+
+    const res = await fetch("/api/activity-logs/export");
+    if (!res.ok) {
+      alert("Export failed — nothing was deleted.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `warehouse-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const del = await fetch("/api/activity-logs", { method: "DELETE" });
+    if (del.ok) {
+      setLogs([]);
+      alert("Logs exported and cleared.");
+    } else {
+      alert("Downloaded, but clearing the database failed. Please try again.");
+    }
+  };
+
   // Block render until admin is confirmed (supervisors get redirected away).
   if (!admin) return null;
 
@@ -97,13 +133,21 @@ export default function ActivityPage() {
     <div className="max-w-4xl">
       <div className="mb-1 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-white">Activity Log</h2>
-        <button
-          onClick={exportCsv}
-          disabled={filtered.length === 0}
-          className="shrink-0 rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
-        >
-          Export to Excel
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            className="rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
+          >
+            Export to Excel
+          </button>
+          <button
+            onClick={exportAllAndClear}
+            className="rounded-md border border-red-800 bg-red-950/40 px-3 py-1.5 text-sm font-medium text-red-300 hover:bg-red-900/50"
+          >
+            Export all &amp; clear DB
+          </button>
+        </div>
       </div>
       <p className="mb-4 text-sm text-zinc-400">
         Every change (assignments, shifts, lunches, roles, positions, and side

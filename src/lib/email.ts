@@ -1,36 +1,40 @@
-type Attachment = { filename: string; content: string }; // content = base64
+import nodemailer from "nodemailer";
 
-// Sends an email via the Resend HTTP API (no SDK dependency). Requires
-// RESEND_API_KEY; the sender defaults to Resend's shared onboarding address,
-// which can deliver to your own Resend account email without a verified domain.
+type Attachment = { filename: string; content: string | Buffer };
+
+// Sends mail over SMTP — defaults to Gmail. With a Gmail address + App Password
+// (SMTP_USER / SMTP_PASS) this keeps everything in your own account, no
+// third-party email service. Any other SMTP host works too via SMTP_HOST/PORT.
 export async function sendEmail(opts: {
   to: string;
   subject: string;
   text: string;
   attachments?: Attachment[];
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
-  const from =
-    process.env.REPORT_FROM || "Warehouse Dashboard <onboarding@resend.dev>";
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) throw new Error("SMTP_USER / SMTP_PASS are not set");
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: opts.to,
-      subject: opts.subject,
-      text: opts.text,
-      attachments: opts.attachments,
-    }),
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 465);
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
+    auth: { user, pass },
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Email send failed (${res.status}): ${body}`);
-  }
+  await transporter.sendMail({
+    from: process.env.REPORT_FROM || user,
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.text,
+    attachments: opts.attachments,
+  });
+}
+
+// True when SMTP credentials are configured.
+export function emailConfigured(): boolean {
+  return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
