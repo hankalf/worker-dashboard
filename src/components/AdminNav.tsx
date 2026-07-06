@@ -3,22 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-
-const TOP_ITEMS = [
-  { href: "/admin", label: "Admin Dashboard", adminOnly: false },
-  { href: "/admin/assign", label: "Assign", adminOnly: false },
-  { href: "/admin/jobs", label: "Side Tasks", adminOnly: false },
-  { href: "/admin/attendance", label: "Attendance", adminOnly: true },
-];
-
-const SETUP_ITEMS = [
-  { href: "/admin/settings", label: "General", adminOnly: true },
-  { href: "/admin/employees", label: "Employees", adminOnly: true },
-  { href: "/admin/positions", label: "Positions", adminOnly: true },
-  { href: "/admin/roles", label: "Roles", adminOnly: true },
-  { href: "/admin/equipment", label: "Equipment", adminOnly: true },
-  { href: "/admin/activity", label: "Activity", adminOnly: true },
-];
+import type { TabItem } from "@/lib/tabs";
 
 function isActive(pathname: string, href: string) {
   return href === "/admin"
@@ -26,10 +11,20 @@ function isActive(pathname: string, href: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
+export function AdminNav({
+  isAdmin,
+  tabs,
+}: {
+  isAdmin: boolean;
+  tabs: TabItem[];
+}) {
   const pathname = usePathname();
-  const topItems = TOP_ITEMS.filter((i) => isAdmin || !i.adminOnly);
-  const setupItems = SETUP_ITEMS.filter((i) => isAdmin || !i.adminOnly);
+  const topItems = tabs.filter(
+    (t) => t.group === "top" && (isAdmin || !t.adminOnly)
+  );
+  const setupItems = tabs.filter(
+    (t) => t.group === "setup" && (isAdmin || !t.adminOnly)
+  );
   const inSetup = setupItems.some((i) => isActive(pathname, i.href));
   const [open, setOpen] = useState(inSetup);
 
@@ -43,8 +38,12 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
   return (
     <ul className="flex flex-row gap-1 overflow-x-auto md:flex-col">
       {topItems.map((item) => (
-        <li key={item.href}>
-          <Link href={item.href} className={linkClass(item.href)}>
+        <li key={item.key}>
+          <Link
+            href={item.href}
+            title={item.description || undefined}
+            className={linkClass(item.href)}
+          >
             {item.label}
           </Link>
         </li>
@@ -74,9 +73,10 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
           </li>
           {open &&
             setupItems.map((item) => (
-              <li key={item.href}>
+              <li key={item.key}>
                 <Link
                   href={item.href}
+                  title={item.description || undefined}
                   className={`${linkClass(item.href)} md:ml-3`}
                 >
                   {item.label}

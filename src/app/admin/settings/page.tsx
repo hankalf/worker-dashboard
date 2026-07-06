@@ -88,6 +88,167 @@ function DescriptionList({
   );
 }
 
+type TabRow = { key: string; label: string; description: string; group: string };
+
+// Edit the admin nav tab names + descriptions (stored as overrides).
+function TabEditor() {
+  const [tabs, setTabs] = useState<TabRow[]>([]);
+  const [drafts, setDrafts] = useState<
+    Record<string, { name: string; desc: string }>
+  >({});
+  const [savedKey, setSavedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/tabs")
+      .then((r) => r.json())
+      .then((data: TabRow[]) => {
+        setTabs(data);
+        setDrafts(
+          Object.fromEntries(
+            data.map((t) => [t.key, { name: t.label, desc: t.description || "" }])
+          )
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const save = async (key: string) => {
+    const d = drafts[key];
+    const res = await fetch("/api/tabs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, name: d.name, description: d.desc }),
+    });
+    if (res.ok) {
+      setSavedKey(key);
+      setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-white">Tab names</h3>
+      <p className="mb-3 mt-1 text-sm text-zinc-400">
+        Rename the admin tabs and give them a hover description. Clear the name
+        to revert to the default; reload to see the nav update.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {tabs.map((t) => (
+          <li key={t.key} className="flex flex-wrap items-center gap-2">
+            <input
+              value={drafts[t.key]?.name ?? ""}
+              onChange={(e) =>
+                setDrafts((d) => ({
+                  ...d,
+                  [t.key]: { ...d[t.key], name: e.target.value },
+                }))
+              }
+              className="w-36 shrink-0 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100"
+            />
+            <input
+              value={drafts[t.key]?.desc ?? ""}
+              onChange={(e) =>
+                setDrafts((d) => ({
+                  ...d,
+                  [t.key]: { ...d[t.key], desc: e.target.value },
+                }))
+              }
+              placeholder="Description (tooltip)"
+              className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500"
+            />
+            <button
+              onClick={() => save(t.key)}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
+            >
+              Save
+            </button>
+            {savedKey === t.key && (
+              <span className="text-xs text-green-400">Saved</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Danger zone: bulk-clear datasets (irreversible, type-to-confirm).
+function ClearData() {
+  const OPTIONS = [
+    { key: "employees", label: "Employees (keeps login accounts)" },
+    { key: "positions", label: "Positions" },
+    { key: "roles", label: "Roles" },
+    { key: "equipment", label: "Equipment" },
+    { key: "activity", label: "Activity & history logs" },
+  ];
+  const [sel, setSel] = useState<Record<string, boolean>>({});
+  const [result, setResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    const targets = OPTIONS.filter((o) => sel[o.key]).map((o) => o.key);
+    if (targets.length === 0) {
+      setResult("Select at least one dataset.");
+      return;
+    }
+    const typed = window.prompt(
+      `This permanently deletes: ${targets.join(", ")}.\nType DELETE to confirm.`
+    );
+    if (typed !== "DELETE") return;
+    setBusy(true);
+    setResult(null);
+    const res = await fetch("/api/admin/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targets }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setResult(body.error ?? "Failed.");
+      return;
+    }
+    setResult(
+      "Cleared — " +
+        Object.entries(body.cleared as Record<string, number>)
+          .map(([k, v]) => `${v} ${k}`)
+          .join(", ")
+    );
+    setSel({});
+  };
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-red-400">Danger zone — clear data</h3>
+      <p className="mb-2 mt-1 text-sm text-zinc-400">
+        Permanently deletes the selected data. This cannot be undone — download a
+        backup first.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {OPTIONS.map((o) => (
+          <label key={o.key} className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={!!sel[o.key]}
+              onChange={() => setSel((s) => ({ ...s, [o.key]: !s[o.key] }))}
+              className="h-4 w-4"
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+      <button
+        onClick={run}
+        disabled={busy}
+        className="mt-3 rounded-md border border-red-800 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-950/70 disabled:opacity-50"
+      >
+        {busy ? "Clearing…" : "Clear selected data"}
+      </button>
+      {result && <p className="mt-2 text-sm text-amber-300">{result}</p>}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const guarded = useAdminGuard();
   const [dashboardName, setDashboardName] = useState("");
@@ -185,30 +346,41 @@ export default function SettingsPage() {
         </a>
       </div>
 
-      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <h3 className="text-sm font-medium text-white">Descriptions</h3>
-        <p className="mb-4 mt-1 text-sm text-zinc-400">
-          Edit the descriptions for positions (shown on the dashboard), roles,
-          and equipment.
-        </p>
-        <div className="flex flex-col gap-6">
-          <DescriptionList
-            heading="Positions"
-            listUrl="/api/positions"
-            itemUrl={(id) => `/api/positions/${id}`}
-          />
-          <DescriptionList
-            heading="Roles"
-            listUrl="/api/roles"
-            itemUrl={(id) => `/api/roles/${id}`}
-          />
-          <DescriptionList
-            heading="Equipment"
-            listUrl="/api/equipment"
-            itemUrl={(id) => `/api/equipment/${id}`}
-          />
+      <details className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <summary className="cursor-pointer text-sm font-medium text-white">
+          Advanced
+        </summary>
+        <div className="mt-5 flex flex-col gap-8">
+          <TabEditor />
+
+          <div>
+            <h3 className="text-sm font-medium text-white">Descriptions</h3>
+            <p className="mb-4 mt-1 text-sm text-zinc-400">
+              Edit the descriptions for positions (shown on the dashboard),
+              roles, and equipment.
+            </p>
+            <div className="flex flex-col gap-6">
+              <DescriptionList
+                heading="Positions"
+                listUrl="/api/positions"
+                itemUrl={(id) => `/api/positions/${id}`}
+              />
+              <DescriptionList
+                heading="Roles"
+                listUrl="/api/roles"
+                itemUrl={(id) => `/api/roles/${id}`}
+              />
+              <DescriptionList
+                heading="Equipment"
+                listUrl="/api/equipment"
+                itemUrl={(id) => `/api/equipment/${id}`}
+              />
+            </div>
+          </div>
+
+          <ClearData />
         </div>
-      </div>
+      </details>
     </div>
   );
 }

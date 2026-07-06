@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 import { AdminNav } from "@/components/AdminNav";
 import { getDashboardName } from "@/lib/settings";
+import { getTabs } from "@/lib/tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AdminLayout({
     : null;
   const isAdmin = employee?.accessLevel === "ADMIN";
   const dashboardName = await getDashboardName();
+  const tabs = await getTabs();
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
@@ -43,7 +45,7 @@ export default async function AdminLayout({
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="shrink-0 border-b border-zinc-800 bg-zinc-900 p-2 md:w-48 md:border-b-0 md:border-r md:p-4">
-          <AdminNav isAdmin={isAdmin} />
+          <AdminNav isAdmin={isAdmin} tabs={tabs} />
         </nav>
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
