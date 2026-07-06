@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { CsvImport } from "@/components/CsvImport";
 
 type Role = { id: string; name: string };
 type Capability = { id: string; name: string };
@@ -212,6 +213,22 @@ export default function PositionsPage() {
   return (
     <div className="max-w-2xl">
       <h2 className="mb-4 text-lg font-semibold text-white">Positions</h2>
+
+      <CsvImport
+        endpoint="/api/positions/import"
+        sampleHref="/position-import-sample.csv"
+        onDone={load}
+        instructions={
+          <>
+            Columns: <code className="text-zinc-300">title</code>,{" "}
+            <code className="text-zinc-300">description</code>,{" "}
+            <code className="text-zinc-300">equipment</code> (required
+            equipment), and <code className="text-zinc-300">role</code>{" "}
+            (required role). Missing equipment/roles are created automatically;
+            existing positions are updated by title.
+          </>
+        }
+      />
 
       <form
         onSubmit={handleSubmit}

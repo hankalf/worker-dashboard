@@ -15,6 +15,8 @@ import { logActivity } from "@/lib/activity";
 //   username    required when admin is yes
 //   password    required when admin is yes
 //   shift       optional — 1/2/3 (or 1st/2nd/3rd) for the work shift
+//   hire_date   optional — "YYYY-MM-DD" (drives the anniversary badge)
+//   birth_date  optional — "YYYY-MM-DD" (drives the birthday badge)
 const SHIFT_MAP: Record<string, "FIRST" | "SECOND" | "THIRD"> = {
   "1": "FIRST",
   "1st": "FIRST",
@@ -128,6 +130,8 @@ export async function POST(req: Request) {
           username: username || null,
           passwordHash: password ? await bcrypt.hash(password, 10) : null,
           shift: SHIFT_MAP[get("shift").toLowerCase()] ?? null,
+          hireDate: get("hire_date") || null,
+          birthDate: get("birth_date") || null,
           roles: { connect: roleIds.map((id) => ({ id })) },
           capabilities: { connect: capabilityIds.map((id) => ({ id })) },
         },

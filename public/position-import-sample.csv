@@ -1,0 +1,4 @@
+title,description,equipment,role
+Receiving,Unload inbound trucks,Scanner,Receive
+Picking,Pull orders for outbound,,Pick
+Loading,Load outbound trailers,Forklift,Ship

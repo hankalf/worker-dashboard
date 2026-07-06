@@ -1,0 +1,6 @@
+name,description
+Receive,Unload inbound trucks
+Ship,Load outbound trucks
+Pick,Pull orders
+Putaway,Stock to racks
+DAX,ERP transactions

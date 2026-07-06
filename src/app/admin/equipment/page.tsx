@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { CsvImport } from "@/components/CsvImport";
 
 type Equipment = {
   id: string;
@@ -78,6 +79,19 @@ export default function EquipmentPage() {
         Equipment describes what an employee is able to operate (e.g. Forklift,
         Pallet Jack, Scanner). Assign it to employees on the Employees page.
       </p>
+
+      <CsvImport
+        endpoint="/api/equipment/import"
+        sampleHref="/equipment-import-sample.csv"
+        onDone={load}
+        instructions={
+          <>
+            Columns: <code className="text-zinc-300">name</code> and{" "}
+            <code className="text-zinc-300">description</code> (optional).
+            Existing equipment is updated by name.
+          </>
+        }
+      />
 
       <form
         onSubmit={handleSubmit}

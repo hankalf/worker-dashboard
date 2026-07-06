@@ -320,7 +320,9 @@ export default function EmployeesPage() {
           semicolons), <code className="text-zinc-300">admin</code>{" "}
           (yes/no), <code className="text-zinc-300">username</code> and{" "}
           <code className="text-zinc-300">password</code> (required for admins),
-          and <code className="text-zinc-300">shift</code> (1, 2, or 3).
+          <code className="text-zinc-300">shift</code> (1, 2, or 3), and{" "}
+          <code className="text-zinc-300">hire_date</code> /{" "}
+          <code className="text-zinc-300">birth_date</code> (YYYY-MM-DD).
           Positions, equipment, and roles that don&apos;t exist yet are created
           automatically.{" "}
           <a

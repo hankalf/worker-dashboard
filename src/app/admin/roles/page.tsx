@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { CsvImport } from "@/components/CsvImport";
 
 type Role = {
   id: string;
@@ -186,6 +187,19 @@ export default function RolesPage() {
         Pick, Putaway, DAX). An employee can have several. Assign them on the
         Employees page.
       </p>
+
+      <CsvImport
+        endpoint="/api/roles/import"
+        sampleHref="/role-import-sample.csv"
+        onDone={load}
+        instructions={
+          <>
+            Columns: <code className="text-zinc-300">name</code> and{" "}
+            <code className="text-zinc-300">description</code> (optional).
+            Existing roles are updated by name.
+          </>
+        }
+      />
 
       <form
         onSubmit={handleSubmit}
