@@ -636,6 +636,11 @@ async function httpTests(roster: { length: number }) {
     (await fetch(BASE + "/api/roles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x" }) })).status,
     403
   );
+  eq(
+    "roles reorder no auth → 403",
+    (await fetch(BASE + "/api/roles/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status,
+    403
+  );
 
   group("http: admin session");
   const admin = await login("admin", "admin123");

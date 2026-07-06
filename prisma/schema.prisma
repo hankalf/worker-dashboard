@@ -82,9 +82,12 @@ model Role {
 // DAX). Shown as "Roles" in the UI. Distinct from Equipment; an employee can
 // have several.
 model Capability {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  employees Employee[] @relation("EmployeeCapabilities")
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  // Display order on employee cards (and the Roles setup list).
+  sortOrder   Int        @default(0)
+  employees   Employee[] @relation("EmployeeCapabilities")
 }
 
 model Position {

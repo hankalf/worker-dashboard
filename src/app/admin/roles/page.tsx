@@ -1,19 +1,109 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 
 type Role = {
   id: string;
   name: string;
+  description: string | null;
+  sortOrder: number;
 };
+
+function SortableRole({
+  role,
+  onEdit,
+  onDelete,
+}: {
+  role: Role;
+  onEdit: (r: Role) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: role.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
+        isDragging ? "relative z-10 opacity-70 shadow-lg shadow-black/40" : ""
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder"
+          className="shrink-0 cursor-grab touch-none text-zinc-500 hover:text-zinc-300 active:cursor-grabbing"
+        >
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
+            <circle cx="3" cy="3" r="1.4" />
+            <circle cx="9" cy="3" r="1.4" />
+            <circle cx="3" cy="9" r="1.4" />
+            <circle cx="9" cy="9" r="1.4" />
+            <circle cx="3" cy="15" r="1.4" />
+            <circle cx="9" cy="15" r="1.4" />
+          </svg>
+        </button>
+        <div className="min-w-0">
+          <div className="truncate font-medium text-white">{role.name}</div>
+          {role.description && (
+            <div className="text-sm text-zinc-400">{role.description}</div>
+          )}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-3 text-sm">
+        <button
+          onClick={() => onEdit(role)}
+          className="text-zinc-400 hover:text-white"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => onDelete(role.id)}
+          className="text-red-400 hover:text-red-300"
+        >
+          Delete
+        </button>
+      </div>
+    </li>
+  );
+}
 
 export default function RolesPage() {
   const guarded = useAdminGuard();
   const [roles, setRoles] = useState<Role[]>([]);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const load = async () => {
     const res = await fetch("/api/roles");
@@ -26,6 +116,7 @@ export default function RolesPage() {
 
   const resetForm = () => {
     setName("");
+    setDescription("");
     setEditingId(null);
   };
 
@@ -38,7 +129,12 @@ export default function RolesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        description,
+        // New roles go to the end; editing leaves the order untouched.
+        ...(editingId ? {} : { sortOrder: roles.length }),
+      }),
     });
 
     if (!res.ok) {
@@ -54,6 +150,7 @@ export default function RolesPage() {
   const handleEdit = (role: Role) => {
     setEditingId(role.id);
     setName(role.name);
+    setDescription(role.description ?? "");
   };
 
   const handleDelete = async (id: string) => {
@@ -61,6 +158,20 @@ export default function RolesPage() {
       return;
     await fetch(`/api/roles/${id}`, { method: "DELETE" });
     load();
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = roles.findIndex((r) => r.id === active.id);
+    const newIndex = roles.findIndex((r) => r.id === over.id);
+    const reordered = arrayMove(roles, oldIndex, newIndex);
+    setRoles(reordered); // optimistic
+    await fetch("/api/roles/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((r) => r.id) }),
+    });
   };
 
   if (!guarded) {
@@ -87,6 +198,12 @@ export default function RolesPage() {
           required
           className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
         />
+        <input
+          placeholder="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+        />
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button
@@ -110,30 +227,33 @@ export default function RolesPage() {
       {roles.length === 0 ? (
         <p className="text-sm text-zinc-500">No roles yet — add one above.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {roles.map((role) => (
-            <li
-              key={role.id}
-              className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+        <>
+          <p className="mb-2 text-xs text-zinc-500">
+            Drag the handle to reorder — this is the order roles appear on
+            employee cards.
+          </p>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={roles.map((r) => r.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className="font-medium text-white">{role.name}</div>
-              <div className="flex gap-3 text-sm">
-                <button
-                  onClick={() => handleEdit(role)}
-                  className="text-zinc-400 hover:text-white"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(role.id)}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+              <ul className="flex flex-col gap-2">
+                {roles.map((role) => (
+                  <SortableRole
+                    key={role.id}
+                    role={role}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        </>
       )}
     </div>
   );

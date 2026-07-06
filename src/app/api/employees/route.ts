@@ -16,7 +16,11 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: includeTerminated ? undefined : { terminatedAt: null },
-    include: { position: true, roles: true, capabilities: true },
+    include: {
+      position: true,
+      roles: true,
+      capabilities: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+    },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(employees);

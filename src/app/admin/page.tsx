@@ -20,7 +20,11 @@ export default async function AdminDashboardPage() {
     }),
     prisma.employee.findMany({
       where: { terminatedAt: null },
-      include: { position: true, roles: true, capabilities: true },
+      include: {
+        position: true,
+        roles: true,
+        capabilities: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.job.findMany({
