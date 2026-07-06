@@ -9,7 +9,8 @@ import { logActivity } from "@/lib/activity";
 //   name        required
 //   position    optional — created automatically if it doesn't exist
 //   equipment   optional — semicolon-separated, created automatically
-//               (the legacy "roles" column is still accepted)
+//   roles       optional — semicolon-separated job functions (Receive; Pick;
+//               …), created automatically
 //   admin       optional — "yes" grants admin access (requires username + password)
 //   username    required when admin is yes
 //   password    required when admin is yes
@@ -100,14 +101,23 @@ export async function POST(req: Request) {
       }
 
       const roleIds: string[] = [];
-      const rolesCell = get("equipment") || get("roles");
-      for (const roleName of rolesCell.split(";").map((r) => r.trim()).filter(Boolean)) {
+      for (const roleName of get("equipment").split(";").map((r) => r.trim()).filter(Boolean)) {
         const role = await prisma.role.upsert({
           where: { name: roleName },
           update: {},
           create: { name: roleName },
         });
         roleIds.push(role.id);
+      }
+
+      const capabilityIds: string[] = [];
+      for (const capName of get("roles").split(";").map((r) => r.trim()).filter(Boolean)) {
+        const cap = await prisma.capability.upsert({
+          where: { name: capName },
+          update: {},
+          create: { name: capName },
+        });
+        capabilityIds.push(cap.id);
       }
 
       await prisma.employee.create({
@@ -119,6 +129,7 @@ export async function POST(req: Request) {
           passwordHash: password ? await bcrypt.hash(password, 10) : null,
           shift: SHIFT_MAP[get("shift").toLowerCase()] ?? null,
           roles: { connect: roleIds.map((id) => ({ id })) },
+          capabilities: { connect: capabilityIds.map((id) => ({ id })) },
         },
       });
       created++;

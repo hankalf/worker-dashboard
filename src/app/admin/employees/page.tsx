@@ -302,12 +302,13 @@ export default function EmployeesPage() {
         <p className="mb-3 text-sm text-zinc-400">
           Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
           <code className="text-zinc-300">position</code>,{" "}
-          <code className="text-zinc-300">equipment</code> (separate multiple
-          with semicolons), <code className="text-zinc-300">admin</code>{" "}
+          <code className="text-zinc-300">equipment</code> and{" "}
+          <code className="text-zinc-300">roles</code> (separate multiple with
+          semicolons), <code className="text-zinc-300">admin</code>{" "}
           (yes/no), <code className="text-zinc-300">username</code> and{" "}
           <code className="text-zinc-300">password</code> (required for admins),
           and <code className="text-zinc-300">shift</code> (1, 2, or 3).
-          Positions and equipment that don&apos;t exist yet are created
+          Positions, equipment, and roles that don&apos;t exist yet are created
           automatically.{" "}
           <a
             href="/employee-import-sample.csv"
