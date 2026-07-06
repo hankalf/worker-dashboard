@@ -18,7 +18,12 @@ import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 import { shiftEndDate, currentShift } from "@/lib/shift";
 
 type Role = { id: string; name: string };
-type Position = { id: string; title: string; requiredRole: Role | null };
+type Position = {
+  id: string;
+  title: string;
+  requiredRole: Role | null;
+  requiredCapability: Role | null;
+};
 type Shift = "FIRST" | "SECOND" | "THIRD";
 type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
 type Employee = {
@@ -26,6 +31,7 @@ type Employee = {
   name: string;
   positionId: string | null;
   roles: Role[];
+  capabilities: Role[];
   lunchStart: string | null;
   lunchEnd: string | null;
   breakStart: string | null;
@@ -87,6 +93,7 @@ function EmployeeCard({
   onLeadToggle,
   onStayOverChange,
   warnRole,
+  warnCapability,
   overlay = false,
   noDrag = false,
   active = false,
@@ -101,6 +108,7 @@ function EmployeeCard({
   onLeadToggle?: (id: string, value: boolean) => void;
   onStayOverChange?: (id: string, minutes: number) => void;
   warnRole?: string | null;
+  warnCapability?: string | null;
   overlay?: boolean;
   noDrag?: boolean;
   active?: boolean;
@@ -176,6 +184,11 @@ function EmployeeCard({
       {warnRole && (
         <div className="mt-1 text-xs font-medium text-amber-400">
           ⚠ Missing equipment: {warnRole}
+        </div>
+      )}
+      {warnCapability && (
+        <div className="mt-1 text-xs font-medium text-amber-400">
+          ⚠ Missing role: {warnCapability}
         </div>
       )}
       {!overlay &&
@@ -300,6 +313,7 @@ function PositionColumn({
   id,
   title,
   requiredRole,
+  requiredCapability,
   employees,
   saveStates,
   positions,
@@ -315,6 +329,7 @@ function PositionColumn({
   id: string;
   title: string;
   requiredRole: Role | null;
+  requiredCapability: Role | null;
   employees: Employee[];
   saveStates: Record<string, SaveState>;
   positions: Position[];
@@ -349,6 +364,11 @@ function PositionColumn({
               needs {requiredRole.name}
             </div>
           )}
+          {requiredCapability && (
+            <div className="text-xs text-zinc-500">
+              role: {requiredCapability.name}
+            </div>
+          )}
         </div>
         <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
           {employees.length}
@@ -378,6 +398,12 @@ function PositionColumn({
               requiredRole &&
               !employee.roles.some((r) => r.id === requiredRole.id)
                 ? requiredRole.name
+                : null
+            }
+            warnCapability={
+              requiredCapability &&
+              !employee.capabilities.some((c) => c.id === requiredCapability.id)
+                ? requiredCapability.name
                 : null
             }
           />
@@ -638,11 +664,17 @@ export default function AssignPage() {
     : null;
 
   const columns = [
-    { id: UNASSIGNED, title: "Unassigned", requiredRole: null as Role | null },
+    {
+      id: UNASSIGNED,
+      title: "Unassigned",
+      requiredRole: null as Role | null,
+      requiredCapability: null as Role | null,
+    },
     ...positions.map((p) => ({
       id: p.id,
       title: p.title,
       requiredRole: p.requiredRole,
+      requiredCapability: p.requiredCapability,
     })),
   ];
 
@@ -659,6 +691,7 @@ export default function AssignPage() {
       id={column.id}
       title={column.title}
       requiredRole={column.requiredRole}
+      requiredCapability={column.requiredCapability}
       horizontal={horizontal}
       employees={employees.filter(
         (e) =>

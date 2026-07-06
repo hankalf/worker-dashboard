@@ -88,6 +88,7 @@ model Capability {
   // Display order on employee cards (and the Roles setup list).
   sortOrder   Int        @default(0)
   employees   Employee[] @relation("EmployeeCapabilities")
+  requiredForPositions Position[] @relation("PositionRequiredCapability")
 }
 
 model Position {
@@ -96,9 +97,12 @@ model Position {
   description    String?
   sortOrder      Int        @default(0)
   employees      Employee[]
-  // Optional role a person should hold to work this position (assign warning).
+  // Optional equipment a person should hold to work this position (assign warning).
   requiredRole   Role?      @relation("PositionRequiredRole", fields: [requiredRoleId], references: [id])
   requiredRoleId String?
+  // Optional role (job function) a person should be able to perform here.
+  requiredCapability   Capability? @relation("PositionRequiredCapability", fields: [requiredCapabilityId], references: [id])
+  requiredCapabilityId String?
 }
 
 // Notices shown on the dashboards. The board shows up to 5 active notices at a

@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 
 type Role = { id: string; name: string };
+type Capability = { id: string; name: string };
 type Position = {
   id: string;
   title: string;
@@ -28,6 +29,8 @@ type Position = {
   sortOrder: number;
   requiredRoleId: string | null;
   requiredRole: Role | null;
+  requiredCapabilityId: string | null;
+  requiredCapability: Capability | null;
 };
 
 function SortablePosition({
@@ -77,7 +80,12 @@ function SortablePosition({
           )}
           {position.requiredRole && (
             <div className="text-xs text-zinc-500">
-              Requires: {position.requiredRole.name}
+              Requires equipment: {position.requiredRole.name}
+            </div>
+          )}
+          {position.requiredCapability && (
+            <div className="text-xs text-zinc-500">
+              Requires role: {position.requiredCapability.name}
             </div>
           )}
         </div>
@@ -104,9 +112,11 @@ export default function PositionsPage() {
   const guarded = useAdminGuard();
   const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [requiredRoleId, setRequiredRoleId] = useState("");
+  const [requiredCapabilityId, setRequiredCapabilityId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,12 +126,14 @@ export default function PositionsPage() {
   );
 
   const load = async () => {
-    const [positionsRes, rolesRes] = await Promise.all([
+    const [positionsRes, rolesRes, capabilitiesRes] = await Promise.all([
       fetch("/api/positions"),
       fetch("/api/equipment"),
+      fetch("/api/roles"),
     ]);
     setPositions(await positionsRes.json());
     setRoles(await rolesRes.json());
+    setCapabilities(await capabilitiesRes.json());
   };
 
   useEffect(() => {
@@ -132,6 +144,7 @@ export default function PositionsPage() {
     setTitle("");
     setDescription("");
     setRequiredRoleId("");
+    setRequiredCapabilityId("");
     setEditingId(null);
   };
 
@@ -148,6 +161,7 @@ export default function PositionsPage() {
         title,
         description,
         requiredRoleId,
+        requiredCapabilityId,
         // New positions go to the end; editing leaves the order untouched.
         ...(editingId ? {} : { sortOrder: positions.length }),
       }),
@@ -168,6 +182,7 @@ export default function PositionsPage() {
     setTitle(position.title);
     setDescription(position.description ?? "");
     setRequiredRoleId(position.requiredRoleId ?? "");
+    setRequiredCapabilityId(position.requiredCapabilityId ?? "");
   };
 
   const handleDelete = async (id: string) => {
@@ -226,6 +241,22 @@ export default function PositionsPage() {
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
                 {role.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-zinc-400">
+          Required role (optional — warns when assigning someone who can&apos;t
+          perform it)
+          <select
+            value={requiredCapabilityId}
+            onChange={(e) => setRequiredCapabilityId(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+          >
+            <option value="">No required role</option>
+            {capabilities.map((cap) => (
+              <option key={cap.id} value={cap.id}>
+                {cap.name}
               </option>
             ))}
           </select>

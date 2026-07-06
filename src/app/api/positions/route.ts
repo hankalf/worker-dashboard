@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const positions = await prisma.position.findMany({
-    include: { requiredRole: true },
+    include: { requiredRole: true, requiredCapability: true },
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
   });
   return NextResponse.json(positions);
@@ -15,7 +15,8 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { title, description, requiredRoleId, sortOrder } = await req.json();
+  const { title, description, requiredRoleId, requiredCapabilityId, sortOrder } =
+    await req.json();
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
       title,
       description,
       requiredRoleId: requiredRoleId || null,
+      requiredCapabilityId: requiredCapabilityId || null,
       sortOrder: Number(sortOrder) || 0,
     },
   });

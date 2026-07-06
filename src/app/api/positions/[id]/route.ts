@@ -11,13 +11,15 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { title, description, requiredRoleId, sortOrder } = await req.json();
+  const { title, description, requiredRoleId, requiredCapabilityId, sortOrder } =
+    await req.json();
   const position = await prisma.position.update({
     where: { id },
     data: {
       title,
       description,
       requiredRoleId: requiredRoleId || null,
+      requiredCapabilityId: requiredCapabilityId || null,
       // Leave the display order untouched unless explicitly provided.
       ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) || 0 } : {}),
     },
