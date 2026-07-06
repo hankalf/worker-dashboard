@@ -260,6 +260,7 @@ export function DashboardSections({
     return {
       id: position.id,
       title: position.title,
+      description: position.description,
       members,
       presentCount: members.filter(present).length,
     };
@@ -486,10 +487,17 @@ export function DashboardSections({
                   key={column.id}
                   className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                 >
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-semibold">{column.title}</h3>
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold">{column.title}</h3>
+                      {column.description && (
+                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          {column.description}
+                        </p>
+                      )}
+                    </div>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                         column.presentCount === 0
                           ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"

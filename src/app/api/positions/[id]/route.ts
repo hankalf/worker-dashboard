@@ -15,12 +15,17 @@ export async function PATCH(
     await req.json();
   const position = await prisma.position.update({
     where: { id },
+    // Partial-safe: only touch fields that were actually sent, so a
+    // description-only edit doesn't clear the required role/equipment.
     data: {
-      title,
-      description,
-      requiredRoleId: requiredRoleId || null,
-      requiredCapabilityId: requiredCapabilityId || null,
-      // Leave the display order untouched unless explicitly provided.
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(requiredRoleId !== undefined
+        ? { requiredRoleId: requiredRoleId || null }
+        : {}),
+      ...(requiredCapabilityId !== undefined
+        ? { requiredCapabilityId: requiredCapabilityId || null }
+        : {}),
       ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) || 0 } : {}),
     },
   });
