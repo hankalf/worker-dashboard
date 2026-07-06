@@ -42,12 +42,14 @@ export function AdminDashboard({
   positions,
   employees,
   jobs,
+  capabilities,
   notices,
   expiredNotices,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
+  capabilities: { id: string; name: string }[];
   notices: Notice[];
   expiredNotices: Notice[];
 }) {
@@ -359,6 +361,7 @@ export function AdminDashboard({
           now={now}
           showPositions
           showCoverage
+          capabilities={capabilities}
           announcements={live.map((n) => n.message)}
         />
       </div>

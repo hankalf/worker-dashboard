@@ -210,6 +210,7 @@ export function DashboardSections({
   now,
   showPositions = false,
   showCoverage = false,
+  capabilities = [],
   announcements = [],
   horizontalTasks = false,
   autoScroll = false,
@@ -222,6 +223,7 @@ export function DashboardSections({
   now: Date | null;
   showPositions?: boolean;
   showCoverage?: boolean;
+  capabilities?: { id: string; name: string }[];
   announcements?: string[];
   horizontalTasks?: boolean;
   autoScroll?: boolean;
@@ -357,6 +359,38 @@ export function DashboardSections({
               {onLunch.length} on lunch
             </span>
           )}
+        </div>
+      )}
+
+      {/* Role coverage: how many present crew this shift can perform each role. */}
+      {showCoverage && capabilities.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Role coverage{shiftKey ? ` — ${SHIFTS[shiftKey].label}` : ""}
+          </h2>
+          <div className="flex flex-wrap gap-2 text-sm">
+            {capabilities.map((cap) => {
+              const count = roster.filter(
+                (e) =>
+                  present(e) && e.capabilities.some((c) => c.id === cap.id)
+              ).length;
+              return (
+                <span
+                  key={cap.id}
+                  className={`rounded-lg border px-3 py-1.5 ${
+                    count === 0
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
+                      : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                  }`}
+                >
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {count}
+                  </span>{" "}
+                  {cap.name}
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
 

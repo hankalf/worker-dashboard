@@ -14,7 +14,8 @@ export default async function AdminDashboardPage() {
     where: { expiresAt: { lt: new Date(now.getTime() - 7 * 24 * 3600 * 1000) } },
   });
 
-  const [positions, employees, jobs, active, expired] = await Promise.all([
+  const [positions, employees, jobs, capabilities, active, expired] =
+    await Promise.all([
     prisma.position.findMany({
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
     }),
@@ -30,6 +31,9 @@ export default async function AdminDashboardPage() {
     prisma.job.findMany({
       include: { assignedEmployee: { include: { position: true } } },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    }),
+    prisma.capability.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     // Active notices (live + queued), oldest first.
     prisma.announcement.findMany({
@@ -100,6 +104,7 @@ export default async function AdminDashboardPage() {
       positions={positions}
       employees={employees}
       jobs={jobs}
+      capabilities={capabilities}
       notices={active.map(toDto)}
       expiredNotices={expired.map(toDto)}
     />
