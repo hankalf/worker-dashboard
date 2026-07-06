@@ -96,6 +96,8 @@ export async function PATCH(
   if (isAdmin) {
     if (body.name !== undefined) data.name = body.name;
     if (body.username !== undefined) data.username = body.username || null;
+    if (body.hireDate !== undefined) data.hireDate = body.hireDate || null;
+    if (body.birthDate !== undefined) data.birthDate = body.birthDate || null;
     if (body.roleIds !== undefined) {
       data.roles = {
         set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })),

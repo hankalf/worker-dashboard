@@ -64,6 +64,10 @@ model Employee {
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)
+  // Calendar dates as "YYYY-MM-DD" (date-only, so no timezone drift) — drive
+  // the work-anniversary and birthday badges.
+  hireDate     String?
+  birthDate    String?
   terminatedAt DateTime?
   createdAt    DateTime  @default(now())
 }

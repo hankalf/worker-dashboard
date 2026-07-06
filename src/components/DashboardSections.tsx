@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
 import { currentShift, SHIFTS } from "@/lib/shift";
+import { todayKey, anniversaryYears, isBirthday } from "@/lib/celebrations";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 import { AutoScroll } from "@/components/AutoScroll";
 
@@ -124,10 +125,14 @@ const ATTENDANCE_LABEL: Record<string, string> = {
 function MemberBody({
   member,
   stayingOver = false,
+  today = null,
 }: {
   member: EmployeeWithRelations;
   stayingOver?: boolean;
+  today?: string | null;
 }) {
+  const anniv = today ? anniversaryYears(member.hireDate, today) : null;
+  const birthday = today ? isBirthday(member.birthDate, today) : false;
   const out = member.attendance !== "PRESENT";
   return (
     <div className={out ? "opacity-60" : undefined}>
@@ -160,6 +165,16 @@ function MemberBody({
                   minute: "2-digit",
                   timeZone: APP_TZ,
                 })}
+              </span>
+            )}
+            {anniv && (
+              <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                🎉 {anniv} yr anniversary
+              </span>
+            )}
+            {birthday && (
+              <span className="whitespace-nowrap rounded-full bg-pink-100 px-2 py-0.5 text-xs font-semibold text-pink-700 dark:bg-pink-500/20 dark:text-pink-300">
+                🎂 Birthday
               </span>
             )}
           </div>
@@ -233,6 +248,31 @@ export function DashboardSections({
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
   const shiftKey = now ? currentShift(now) : null;
+  const today = now ? todayKey(now) : null;
+  const thisMonth = today ? today.slice(5, 7) : null;
+
+  // This month's work anniversaries and birthdays (across all shown crew), for
+  // the celebrations banner. Sorted by day of month.
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthAbbr = thisMonth ? MONTHS[Number(thisMonth) - 1] : "";
+  const dayOf = (d: string) => Number(d.slice(8, 10));
+  const anniversariesThisMonth = thisMonth
+    ? employees
+        .filter((e) => e.hireDate && e.hireDate.slice(5, 7) === thisMonth)
+        .map((e) => ({
+          name: e.name,
+          day: dayOf(e.hireDate!),
+          years: Number(today!.slice(0, 4)) - Number(e.hireDate!.slice(0, 4)),
+        }))
+        .filter((a) => a.years >= 1)
+        .sort((a, b) => a.day - b.day)
+    : [];
+  const birthdaysThisMonth = thisMonth
+    ? employees
+        .filter((e) => e.birthDate && e.birthDate.slice(5, 7) === thisMonth)
+        .map((e) => ({ name: e.name, day: dayOf(e.birthDate!) }))
+        .sort((a, b) => a.day - b.day)
+    : [];
   // Staying over: still within their marked stay-over window (past shift end).
   const stayingOver = (e: EmployeeWithRelations) =>
     !!e.stayOverUntil &&
@@ -459,6 +499,30 @@ export function DashboardSections({
       )}
       </div>
 
+      {/* This month's work anniversaries + birthdays (only when there are any). */}
+      {(anniversariesThisMonth.length > 0 || birthdaysThisMonth.length > 0) && (
+        <div className="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+          {anniversariesThisMonth.length > 0 && (
+            <div className="text-amber-900 dark:text-amber-200">
+              <span className="mr-2 font-semibold">
+                🎉 Work anniversaries this month:
+              </span>
+              {anniversariesThisMonth
+                .map((a) => `${a.name} (${a.years} yr — ${monthAbbr} ${a.day})`)
+                .join(", ")}
+            </div>
+          )}
+          {birthdaysThisMonth.length > 0 && (
+            <div className="mt-1 text-pink-800 dark:text-pink-300">
+              <span className="mr-2 font-semibold">🎂 Birthdays this month:</span>
+              {birthdaysThisMonth
+                .map((b) => `${b.name} (${monthAbbr} ${b.day})`)
+                .join(", ")}
+            </div>
+          )}
+        </div>
+      )}
+
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           {showPositions ? "Team by Position" : "Position"}
@@ -521,7 +585,7 @@ export function DashboardSections({
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} today={today} />
                         </li>
                       ))}
                     </ul>
@@ -546,7 +610,7 @@ export function DashboardSections({
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} today={today} />
               </div>
             ))}
           </div>

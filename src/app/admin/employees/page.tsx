@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { APP_TZ } from "@/lib/time";
+import { todayKey, anniversaryYears, isBirthday } from "@/lib/celebrations";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
@@ -24,6 +25,8 @@ type Employee = {
   isLead: boolean;
   breakStart: string | null;
   lunchStart: string | null;
+  hireDate: string | null;
+  birthDate: string | null;
   terminatedAt: string | null;
 };
 
@@ -114,6 +117,8 @@ export default function EmployeesPage() {
   const [shift, setShift] = useState<Shift | "">("");
   const [attendance, setAttendance] = useState<Attendance>("PRESENT");
   const [isLead, setIsLead] = useState(false);
+  const [hireDate, setHireDate] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [search, setSearch] = useState("");
   const [showTerminated, setShowTerminated] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -178,6 +183,8 @@ export default function EmployeesPage() {
     setShift("");
     setAttendance("PRESENT");
     setIsLead(false);
+    setHireDate("");
+    setBirthDate("");
     setEditingId(null);
   };
 
@@ -217,6 +224,8 @@ export default function EmployeesPage() {
         shift,
         attendance,
         isLead,
+        hireDate,
+        birthDate,
       }),
     });
 
@@ -242,6 +251,8 @@ export default function EmployeesPage() {
     setShift(employee.shift ?? "");
     setAttendance(employee.attendance ?? "PRESENT");
     setIsLead(employee.isLead ?? false);
+    setHireDate(employee.hireDate ?? "");
+    setBirthDate(employee.birthDate ?? "");
   };
 
   const openHistory = async (employee: Employee) => {
@@ -292,6 +303,8 @@ export default function EmployeesPage() {
   if (!guarded) {
     return <p className="text-sm text-zinc-500">Checking access…</p>;
   }
+
+  const today = todayKey(new Date());
 
   return (
     <div className="max-w-3xl">
@@ -388,6 +401,26 @@ export default function EmployeesPage() {
               </option>
             ))}
           </select>
+          <label className="text-xs text-zinc-400">
+            Hire date (optional)
+            <input
+              type="date"
+              value={hireDate}
+              onChange={(e) => setHireDate(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className={`mt-1 block w-full ${inputClass}`}
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Birthday (optional)
+            <input
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className={`mt-1 block w-full ${inputClass}`}
+            />
+          </label>
           <label className="col-span-2 flex items-center gap-2 text-sm text-zinc-300">
             <input
               type="checkbox"
@@ -613,6 +646,16 @@ export default function EmployeesPage() {
                   {employee.attendance !== "PRESENT" && (
                     <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
                       {ATTENDANCE_LABEL[employee.attendance]}
+                    </span>
+                  )}
+                  {anniversaryYears(employee.hireDate, today) && (
+                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                      🎉 {anniversaryYears(employee.hireDate, today)} yr
+                    </span>
+                  )}
+                  {isBirthday(employee.birthDate, today) && (
+                    <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-xs font-semibold text-pink-300">
+                      🎂 Birthday
                     </span>
                   )}
                 </div>

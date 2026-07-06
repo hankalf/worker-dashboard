@@ -43,6 +43,8 @@ export async function POST(req: Request) {
     isLead,
     lunchStart,
     breakStart,
+    hireDate,
+    birthDate,
   } = await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -68,6 +70,8 @@ export async function POST(req: Request) {
         isLead: !!isLead,
         lunchStart: lunchStart || null,
         breakStart: breakStart || null,
+        hireDate: hireDate || null,
+        birthDate: birthDate || null,
         roles: {
           connect: (roleIds ?? []).map((id: string) => ({ id })),
         },
