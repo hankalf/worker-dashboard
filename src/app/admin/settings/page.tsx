@@ -84,6 +84,21 @@ export default function SettingsPage() {
           {saved && <span className="text-sm text-green-400">Saved</span>}
         </div>
       </form>
+
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <h3 className="text-sm font-medium text-white">Backup</h3>
+        <p className="mt-1 text-sm text-zinc-400">
+          Download a full JSON snapshot of employees, positions, roles,
+          equipment, side tasks, notices, and settings. Passwords are not
+          included.
+        </p>
+        <a
+          href="/api/backup"
+          className="mt-3 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+        >
+          Download full backup
+        </a>
+      </div>
     </div>
   );
 }
