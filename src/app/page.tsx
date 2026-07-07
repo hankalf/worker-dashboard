@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardView } from "@/components/DashboardView";
 import { splitNotices } from "@/lib/announcements";
-import { getDashboardName } from "@/lib/settings";
+import { getDashboardName, getRotationConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,8 @@ export default async function Home({
     getDashboardName(),
   ]);
 
+  const rotation = await getRotationConfig();
+
   const { visible } = splitNotices(activeNotices);
 
   return (
@@ -60,6 +62,9 @@ export default async function Home({
       announcements={visible.map((n) => n.message)}
       renderedAt={now.toISOString()}
       title={dashboardName}
+      rotatingUrl={rotation.url}
+      rotationSeconds={rotation.seconds}
+      rotatingEnabled={rotation.enabled}
       tv={tv}
     />
   );

@@ -29,6 +29,7 @@ function DescriptionList({
     fetch(listUrl)
       .then((r) => r.json())
       .then((data: DescItem[]) => {
+        if (!Array.isArray(data)) return;
         setItems(data);
         setDrafts(
           Object.fromEntries(data.map((i) => [i.id, i.description ?? ""]))
@@ -102,6 +103,7 @@ function TabEditor() {
     fetch("/api/tabs")
       .then((r) => r.json())
       .then((data: TabRow[]) => {
+        if (!Array.isArray(data)) return;
         setTabs(data);
         setDrafts(
           Object.fromEntries(
@@ -249,6 +251,110 @@ function ClearData() {
   );
 }
 
+// Rotating-dashboard config: external URL, interval, enable + a live preview.
+function RotatingDashboard() {
+  const [url, setUrl] = useState("");
+  const [seconds, setSeconds] = useState(30);
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [preview, setPreview] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        setUrl(d.rotatingUrl ?? "");
+        setSeconds(d.rotationSeconds ?? 30);
+        setEnabled(!!d.rotatingEnabled);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rotatingUrl: url,
+        rotationSeconds: seconds,
+        rotatingEnabled: enabled,
+      }),
+    });
+    if (res.ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-white">Rotating dashboard</h3>
+      <p className="mb-3 mt-1 text-sm text-zinc-400">
+        Alternate the main dashboard between its normal view and an external page
+        (the header with the date/time stays put). Some sites block being
+        embedded — use Preview to check.
+      </p>
+      <div className="flex flex-col gap-3">
+        <label className="text-sm text-zinc-300">
+          URL
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com/schedule"
+            disabled={loading}
+            className="mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+          />
+        </label>
+        <label className="text-sm text-zinc-300">
+          Seconds between rotations
+          <input
+            type="number"
+            min={5}
+            max={3600}
+            value={seconds}
+            onChange={(e) => setSeconds(Number(e.target.value))}
+            className="mt-1 block w-32 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Enable rotating display on the dashboard
+        </label>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => setPreview((p) => !p)}
+            disabled={!url}
+            className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {preview ? "Hide preview" : "Preview"}
+          </button>
+          {saved && <span className="text-sm text-green-400">Saved</span>}
+        </div>
+        {preview && url && (
+          <iframe
+            src={url}
+            title="Rotating display preview"
+            className="mt-1 h-72 w-full rounded-md border border-zinc-700 bg-white"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const guarded = useAdminGuard();
   const [dashboardName, setDashboardName] = useState("");
@@ -351,6 +457,8 @@ export default function SettingsPage() {
           Advanced
         </summary>
         <div className="mt-5 flex flex-col gap-8">
+          <RotatingDashboard />
+
           <TabEditor />
 
           <div>

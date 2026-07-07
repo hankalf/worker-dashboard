@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { Position } from "@/generated/prisma/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_TZ } from "@/lib/time";
@@ -22,6 +23,9 @@ export function DashboardView({
   announcements,
   renderedAt,
   title,
+  rotatingUrl = "",
+  rotationSeconds = 30,
+  rotatingEnabled = false,
   tv = false,
 }: {
   positions: Position[];
@@ -31,11 +35,30 @@ export function DashboardView({
   announcements: string[];
   renderedAt: string;
   title: string;
+  rotatingUrl?: string;
+  rotationSeconds?: number;
+  rotatingEnabled?: boolean;
   tv?: boolean;
 }) {
   const now = useNow();
   useAutoRefresh();
   useWakeLock(tv);
+
+  // Rotating display: alternate the body between the board and an external URL
+  // (the header with the clock/date stays put). Off unless enabled + a URL set.
+  const rotating = rotatingEnabled && !!rotatingUrl;
+  const [showingUrl, setShowingUrl] = useState(false);
+  useEffect(() => {
+    if (!rotating) {
+      setShowingUrl(false);
+      return;
+    }
+    const id = setInterval(
+      () => setShowingUrl((s) => !s),
+      Math.max(5, rotationSeconds) * 1000
+    );
+    return () => clearInterval(id);
+  }, [rotating, rotationSeconds]);
 
   return (
     <div
@@ -113,20 +136,30 @@ export function DashboardView({
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-6">
-        <ShiftHandoffBanner />
-        <DashboardSections
-          positions={positions}
-          employees={employees}
-          jobs={jobs}
-          now={now}
-          announcements={announcements}
-          showPositions
-          horizontalTasks
-          autoScroll
-          hideEmptyPositions
-          tv={tv}
-        />
+      <main className="flex flex-1 flex-col px-6 py-6">
+        {rotating && showingUrl ? (
+          <iframe
+            src={rotatingUrl}
+            title="Rotating display"
+            className="min-h-0 w-full flex-1 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800"
+          />
+        ) : (
+          <>
+            <ShiftHandoffBanner />
+            <DashboardSections
+              positions={positions}
+              employees={employees}
+              jobs={jobs}
+              now={now}
+              announcements={announcements}
+              showPositions
+              horizontalTasks
+              autoScroll
+              hideEmptyPositions
+              tv={tv}
+            />
+          </>
+        )}
       </main>
     </div>
   );
