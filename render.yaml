@@ -3,6 +3,7 @@ services:
     name: warehouse-dashboard
     runtime: node
     plan: free
+    region: virginia
     buildCommand: npm install && npx prisma generate && npm run build
     # Free plan has no preDeployCommand and builds can't reach the private
     # network, so migrations run at startup. Seed is NOT re-run on every boot
@@ -24,5 +25,6 @@ services:
 databases:
   - name: warehouse-db
     plan: free
+    region: virginia
     databaseName: warehouse
     user: warehouse
