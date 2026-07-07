@@ -6,10 +6,12 @@ services:
     region: virginia
     buildCommand: npm install && npx prisma generate && npm run build
     # Free plan has no preDeployCommand and builds can't reach the private
-    # network, so migrations run at startup. Seed is NOT re-run on every boot
-    # (the DB is already seeded); re-seeding each cold start only added latency
-    # and an extra failure point. To (re)seed a fresh DB: npx prisma db seed.
-    startCommand: npx prisma migrate deploy && npm run start
+    # network, so migrations run at startup.
+    # TEMPORARY: `prisma db seed` is included to bootstrap the admin login on a
+    # fresh prod DB (new Render account). The seed only upserts the admin
+    # (idempotent — set SEED_ADMIN_PASSWORD to control its password). Remove the
+    # `npx prisma db seed &&` once the new prod has been logged into.
+    startCommand: npx prisma migrate deploy && npx prisma db seed && npm run start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
