@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 
-// Admin/supervisor pins or unpins a notice. Pinned notices always stay on the
-// board (above the 5-at-a-time cap) and never queue out.
+// Admin/supervisor edits a notice's message and/or pins/unpins it. Partial:
+// only the provided fields change. Pinned notices always stay on the board
+// (above the 5-at-a-time cap) and never queue out.
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,14 +14,22 @@ export async function PATCH(
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { pinned } = await req.json();
+  const { pinned, message } = await req.json();
+  if (message !== undefined && !String(message).trim()) {
+    return NextResponse.json({ error: "Message is required" }, { status: 400 });
+  }
   const updated = await prisma.announcement.update({
     where: { id },
-    data: { pinned: !!pinned },
+    data: {
+      ...(pinned !== undefined ? { pinned: !!pinned } : {}),
+      ...(message !== undefined ? { message: String(message).trim() } : {}),
+    },
   });
   await logActivity(
     "Announcement",
-    `${pinned ? "Pinned" : "Unpinned"} notice: ${updated.message}`,
+    message !== undefined
+      ? `Edited notice: ${updated.message}`
+      : `${pinned ? "Pinned" : "Unpinned"} notice: ${updated.message}`,
     id
   );
   return NextResponse.json(updated);

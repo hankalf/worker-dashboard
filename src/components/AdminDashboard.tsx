@@ -71,6 +71,8 @@ export function AdminDashboard({
   const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   const scheduleMin = easternDateTimeInput(new Date());
   const scheduleMax = easternDateTimeInput(
@@ -131,6 +133,20 @@ export function AdminDashboard({
     router.refresh();
   };
 
+  const saveEdit = async (id: string) => {
+    if (!editText.trim()) return;
+    setBusyId(id);
+    await fetch(`/api/announcement/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: editText.trim() }),
+    });
+    setBusyId(null);
+    setEditingId(null);
+    setEditText("");
+    router.refresh();
+  };
+
   const NoticeRow = ({
     n,
     tone,
@@ -146,6 +162,37 @@ export function AdminDashboard({
           : tone === "scheduled"
             ? "border-sky-900 bg-sky-950/30"
             : "border-zinc-800 bg-zinc-900/60 opacity-70";
+    if (editingId === n.id) {
+      return (
+        <div className={`rounded-md border px-3 py-2 ${border}`}>
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            rows={2}
+            autoFocus
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => saveEdit(n.id)}
+              disabled={busyId === n.id || !editText.trim()}
+              className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {busyId === n.id ? "…" : "Save"}
+            </button>
+            <button
+              onClick={() => {
+                setEditingId(null);
+                setEditText("");
+              }}
+              className="rounded-md border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div
         className={`flex items-start justify-between gap-3 rounded-md border px-3 py-2 ${border}`}
@@ -170,6 +217,18 @@ export function AdminDashboard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {tone !== "expired" && (
+            <button
+              onClick={() => {
+                setEditingId(n.id);
+                setEditText(n.message);
+              }}
+              disabled={busyId === n.id}
+              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-blue-700 hover:bg-blue-950/30 hover:text-blue-300 disabled:opacity-50"
+            >
+              Edit
+            </button>
+          )}
           {tone !== "expired" && (
             <button
               onClick={() => togglePin(n.id, !n.pinned)}

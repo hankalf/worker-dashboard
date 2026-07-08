@@ -120,6 +120,13 @@ const ATTENDANCE_LABEL: Record<string, string> = {
   PTO: "PTO",
 };
 
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "2021-03-15" -> "Mar 15, 2021" (or "Mar 15" without the year).
+const fmtDayMonth = (d: string, withYear: boolean) => {
+  const [y, m, day] = d.split("-");
+  return `${MONTH_ABBR[Number(m) - 1]} ${Number(day)}${withYear ? `, ${y}` : ""}`;
+};
+
 // Card body for one employee: name on its own line, then all badges/chips and
 // roles beneath it. Absent / called-out people are dimmed with a red badge.
 function MemberBody({
@@ -193,6 +200,13 @@ function MemberBody({
           {member.capabilities.length > 0 && (
             <div className="mt-1 text-xs font-bold text-zinc-700 dark:text-zinc-200">
               {member.capabilities.map((c) => c.name).join(" · ")}
+            </div>
+          )}
+          {/* Hire / birth dates as emojis (always shown when set) */}
+          {(member.hireDate || member.birthDate) && (
+            <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-zinc-500 dark:text-zinc-400">
+              {member.hireDate && <span>🎉 {fmtDayMonth(member.hireDate, true)}</span>}
+              {member.birthDate && <span>🎂 {fmtDayMonth(member.birthDate, false)}</span>}
             </div>
           )}
         </div>
