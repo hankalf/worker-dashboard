@@ -47,7 +47,7 @@ export function ShiftHandoffBanner() {
   if (!message) return null;
 
   return (
-    <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
+    <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-center text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide">
         Handoff from {SHIFTS[fromShift].label}
       </div>

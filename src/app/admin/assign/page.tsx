@@ -15,7 +15,8 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
-import { shiftEndDate, currentShift } from "@/lib/shift";
+import { shiftEndDate, shiftStartDate, currentShift } from "@/lib/shift";
+import { APP_TZ, easternDateKey, easternInputToUtcISO } from "@/lib/time";
 
 type Role = { id: string; name: string };
 type Position = {
@@ -40,6 +41,29 @@ type Employee = {
   isLead: boolean;
   stayOverUntil: string | null;
   coverUntil: string | null;
+  comingInAt: string | null;
+};
+
+// "Coming in" options in hour increments across the day.
+const COMING_IN_TIMES = Array.from({ length: 24 }, (_, h) => {
+  const h12 = ((h + 11) % 12) + 1;
+  return {
+    value: `${String(h).padStart(2, "0")}:00`,
+    label: `${h12}:00 ${h < 12 ? "AM" : "PM"}`,
+  };
+});
+
+// The employee's coming-in hour as "HH:00" in the warehouse timezone (for
+// reselecting the dropdown), or "" when not marked / expired.
+const comingInValue = (e: Employee) => {
+  if (!e.comingInAt || !e.coverUntil) return "";
+  if (new Date(e.coverUntil).getTime() <= Date.now()) return "";
+  const hh = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TZ,
+    hourCycle: "h23",
+    hour: "2-digit",
+  }).format(new Date(e.comingInAt));
+  return `${hh}:00`;
 };
 
 // How long past shift end an employee stays to help the next shift (30-min steps).
@@ -93,7 +117,7 @@ function EmployeeCard({
   onAttendanceChange,
   onLeadToggle,
   onStayOverChange,
-  onCoverChange,
+  onComingInChange,
   warnRole,
   warnCapability,
   overlay = false,
@@ -109,7 +133,7 @@ function EmployeeCard({
   onAttendanceChange?: (id: string, value: Attendance) => void;
   onLeadToggle?: (id: string, value: boolean) => void;
   onStayOverChange?: (id: string, minutes: number) => void;
-  onCoverChange?: (id: string, checked: boolean) => void;
+  onComingInChange?: (id: string, value: string) => void;
   warnRole?: string | null;
   warnCapability?: string | null;
   overlay?: boolean;
@@ -279,7 +303,28 @@ function EmployeeCard({
               </select>
             </label>
           )}
-          {(onAttendanceChange || onLeadToggle || onCoverChange) && (
+          {onComingInChange && (
+            <label
+              className="flex items-center gap-2"
+              title="Show on the current shift's board (came in early) from this time until their own shift starts"
+            >
+              <span className="w-16 shrink-0 text-zinc-500">Coming in</span>
+              <select
+                value={comingInValue(employee)}
+                onChange={(e) => onComingInChange(employee.id, e.target.value)}
+                style={{ colorScheme: "dark" }}
+                className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-zinc-100"
+              >
+                <option value="">No</option>
+                {COMING_IN_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {(onAttendanceChange || onLeadToggle) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-700/60 pt-1.5">
               {onAttendanceChange &&
                 ATTENDANCE_OPTIONS.map((a) => (
@@ -304,23 +349,6 @@ function EmployeeCard({
                   Lead
                 </label>
               )}
-              {onCoverChange && (
-                <label
-                  className="flex items-center gap-1"
-                  title="Show on the current shift's board (came in early)"
-                >
-                  <input
-                    type="checkbox"
-                    checked={
-                      !!employee.coverUntil &&
-                      new Date(employee.coverUntil).getTime() > Date.now()
-                    }
-                    onChange={(e) => onCoverChange(employee.id, e.target.checked)}
-                    className="h-3.5 w-3.5"
-                  />
-                  In early
-                </label>
-              )}
             </div>
           )}
         </div>
@@ -343,7 +371,7 @@ function PositionColumn({
   onAttendanceChange,
   onLeadToggle,
   onStayOverChange,
-  onCoverChange,
+  onComingInChange,
   isActive,
   horizontal = false,
 }: {
@@ -360,7 +388,7 @@ function PositionColumn({
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
   onStayOverChange: (id: string, minutes: number) => void;
-  onCoverChange: (id: string, checked: boolean) => void;
+  onComingInChange: (id: string, value: string) => void;
   isActive: (e: Employee) => boolean;
   horizontal?: boolean;
 }) {
@@ -415,7 +443,7 @@ function PositionColumn({
             onAttendanceChange={onAttendanceChange}
             onLeadToggle={onLeadToggle}
             onStayOverChange={onStayOverChange}
-            onCoverChange={onCoverChange}
+            onComingInChange={onComingInChange}
             active={isActive(employee)}
             warnRole={
               requiredRole &&
@@ -622,20 +650,49 @@ export default function AssignPage() {
     flashSaved(employeeId, res.ok);
   };
 
-  const setCover = async (employeeId: string, checked: boolean) => {
-    // Cover the current shift until it ends (e.g. came in early from another).
-    const coverUntil = checked
-      ? shiftEndDate(currentShift(new Date()), new Date()).toISOString()
-      : null;
+  const setComingIn = async (employeeId: string, value: string) => {
+    const emp = employees.find((e) => e.id === employeeId);
+    if (!emp) return;
+
+    let comingInAt: string | null = null;
+    let coverUntil: string | null = null;
+    if (value) {
+      const now = new Date();
+      // The chosen hour today (Eastern); if it already passed by more than an
+      // hour, they mean tomorrow (e.g. marking at 11pm for a 4am arrival).
+      let at = new Date(easternInputToUtcISO(`${easternDateKey(now)}T${value}`));
+      if (at.getTime() < now.getTime() - 3600_000) {
+        at = new Date(
+          easternInputToUtcISO(
+            `${easternDateKey(new Date(now.getTime() + 24 * 3600 * 1000))}T${value}`
+          )
+        );
+      }
+      comingInAt = at.toISOString();
+      // Show them on the board until their own shift starts (then they're
+      // regular crew); no-shift employees always show, so fall back to the
+      // current shift's end.
+      coverUntil = (
+        emp.shift
+          ? shiftStartDate(emp.shift, at)
+          : shiftEndDate(currentShift(now), now)
+      ).toISOString();
+    }
+
     setEmployees((current) =>
-      current.map((e) => (e.id === employeeId ? { ...e, coverUntil } : e))
+      current.map((e) =>
+        e.id === employeeId ? { ...e, comingInAt, coverUntil } : e
+      )
     );
     setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
 
     const res = await fetch(`/api/employees/${employeeId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coverUntil: coverUntil ?? "" }),
+      body: JSON.stringify({
+        comingInAt: comingInAt ?? "",
+        coverUntil: coverUntil ?? "",
+      }),
     });
     flashSaved(employeeId, res.ok);
   };
@@ -750,7 +807,7 @@ export default function AssignPage() {
       onAttendanceChange={setAttendance}
       onLeadToggle={setLead}
       onStayOverChange={setStayOver}
-      onCoverChange={setCover}
+      onComingInChange={setComingIn}
       isActive={isActive}
     />
   );

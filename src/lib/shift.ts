@@ -25,6 +25,26 @@ export function shiftEndDate(shift: ShiftKey, now: Date): Date {
   return new Date(easternInputToUtcISO(`${dateKey}T${hh}:${mm}`));
 }
 
+// Minute-of-day (Eastern) each shift starts: 1st 6am, 2nd 2pm, 3rd 10pm.
+const SHIFT_START_MIN: Record<ShiftKey, number> = {
+  FIRST: 6 * 60,
+  SECOND: 14 * 60,
+  THIRD: 22 * 60,
+};
+
+// The NEXT time a shift starts at/after `now` (today if it hasn't started yet,
+// otherwise tomorrow). Used as the visibility window for "coming in early".
+export function shiftStartDate(shift: ShiftKey, now: Date): Date {
+  const startMin = SHIFT_START_MIN[shift];
+  const hh = String(Math.floor(startMin / 60)).padStart(2, "0");
+  const mm = String(startMin % 60).padStart(2, "0");
+  let dateKey = easternDateKey(now);
+  if (appMinutes(now) >= startMin) {
+    dateKey = easternDateKey(new Date(now.getTime() + 24 * 3600 * 1000));
+  }
+  return new Date(easternInputToUtcISO(`${dateKey}T${hh}:${mm}`));
+}
+
 export const SHIFTS: Record<ShiftKey, { label: string; range: string }> = {
   FIRST: { label: "1st Shift", range: "6:00 AM – 2:00 PM" },
   SECOND: { label: "2nd Shift", range: "2:00 PM – 10:00 PM" },

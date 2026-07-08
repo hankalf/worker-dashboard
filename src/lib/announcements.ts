@@ -1,6 +1,7 @@
-// How many notices the main dashboard shows at once. Active notices beyond this
-// count queue up (oldest first) and appear as visible ones expire.
-export const MAX_VISIBLE_NOTICES = 5;
+// How many unpinned notices the main dashboard shows at once (pinned notices
+// always show, above this cap). Active notices beyond the cap queue up (oldest
+// first) and appear as visible ones expire.
+export const MAX_VISIBLE_NOTICES = 3;
 
 // Split active notices into what's shown on the board vs. queued. Pinned notices
 // always show (even beyond the cap) and are listed first; unpinned notices fill

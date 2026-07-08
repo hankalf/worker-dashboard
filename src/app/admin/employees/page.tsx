@@ -249,7 +249,10 @@ export default function EmployeesPage() {
   const [attendance, setAttendance] = useState<Attendance>("PRESENT");
   const [isLead, setIsLead] = useState(false);
   const [hireDate, setHireDate] = useState("");
-  const [birthDate, setBirthDate] = useState("");
+  // Birthday is month + day only (stored as "0000-MM-DD" — the year is ignored
+  // everywhere birthdays are shown).
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
   const [search, setSearch] = useState("");
   const [showTerminated, setShowTerminated] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -315,7 +318,8 @@ export default function EmployeesPage() {
     setAttendance("PRESENT");
     setIsLead(false);
     setHireDate("");
-    setBirthDate("");
+    setBirthMonth("");
+    setBirthDay("");
     setEditingId(null);
   };
 
@@ -356,7 +360,8 @@ export default function EmployeesPage() {
         attendance,
         isLead,
         hireDate,
-        birthDate,
+        birthDate:
+          birthMonth && birthDay ? `0000-${birthMonth}-${birthDay}` : "",
       }),
     });
 
@@ -383,7 +388,8 @@ export default function EmployeesPage() {
     setAttendance(employee.attendance ?? "PRESENT");
     setIsLead(employee.isLead ?? false);
     setHireDate(employee.hireDate ?? "");
-    setBirthDate(employee.birthDate ?? "");
+    setBirthMonth(employee.birthDate ? employee.birthDate.slice(5, 7) : "");
+    setBirthDay(employee.birthDate ? employee.birthDate.slice(8, 10) : "");
   };
 
   const openHistory = async (employee: Employee) => {
@@ -545,14 +551,33 @@ export default function EmployeesPage() {
             />
           </label>
           <label className="text-xs text-zinc-400">
-            Birthday (optional)
-            <input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              style={{ colorScheme: "dark" }}
-              className={`mt-1 block w-full ${inputClass}`}
-            />
+            Birthday (optional — month &amp; day)
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <select
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Month</option>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={String(i + 1).padStart(2, "0")}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={birthDay}
+                onChange={(e) => setBirthDay(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Day</option>
+                {Array.from({ length: 31 }, (_, i) => (
+                  <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+            </div>
           </label>
           <label className="col-span-2 flex items-center gap-2 text-sm text-zinc-300">
             <input

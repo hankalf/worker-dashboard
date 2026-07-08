@@ -178,7 +178,13 @@ function MemberBody({
             )}
             {covering && (
               <span className="whitespace-nowrap rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300">
-                Covering{member.shift ? ` (${SHIFTS[member.shift].label})` : ""}
+                {member.comingInAt
+                  ? `In at ${new Date(member.comingInAt).toLocaleTimeString(
+                      undefined,
+                      { hour: "numeric", minute: "2-digit", timeZone: APP_TZ }
+                    )}`
+                  : "Covering"}
+                {member.shift ? ` (${SHIFTS[member.shift].label})` : ""}
               </span>
             )}
             {anniv && (
@@ -460,7 +466,11 @@ export function DashboardSections({
                 No lunches scheduled.
               </p>
             ) : (
-              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[32vh]">
+              <AutoScroll
+                enabled={autoScroll && lunchSchedule.length > 6}
+                speed={scrollPxPerFrame}
+                maxHeightClass="max-h-[32vh]"
+              >
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (
                     <li

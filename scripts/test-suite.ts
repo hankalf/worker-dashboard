@@ -135,23 +135,23 @@ function unitTests() {
   group("announcements.splitNotices");
   const mk = (n: number, pinned = false) =>
     Array.from({ length: n }, (_, i) => ({ id: `${pinned ? "p" : "u"}${i}`, pinned }));
-  eq("cap constant", MAX_VISIBLE_NOTICES, 5);
+  eq("cap constant", MAX_VISIBLE_NOTICES, 3);
   {
     const r = splitNotices(mk(8));
-    eq("8 unpinned → 5 visible", r.visible.length, 5);
-    eq("8 unpinned → 3 queued", r.queued.length, 3);
-    eq("visible are oldest-first", r.visible.map((x) => x.id), ["u0", "u1", "u2", "u3", "u4"]);
+    eq("8 unpinned → 3 visible", r.visible.length, 3);
+    eq("8 unpinned → 5 queued", r.queued.length, 5);
+    eq("visible are oldest-first", r.visible.map((x) => x.id), ["u0", "u1", "u2"]);
   }
   {
     const r = splitNotices([...mk(2, true), ...mk(6)]);
-    eq("2 pinned + 6 → 5 visible", r.visible.length, 5);
-    eq("2 pinned + 6 → 3 queued", r.queued.length, 3);
+    eq("2 pinned + 6 → 3 visible", r.visible.length, 3);
+    eq("2 pinned + 6 → 5 queued", r.queued.length, 5);
     ok("pinned listed first", r.visible[0].pinned && r.visible[1].pinned);
   }
   {
     const r = splitNotices([...mk(3, true), ...mk(6)]);
-    eq("3 pinned + 6 → 5 visible", r.visible.length, 5);
-    eq("3 pinned + 6 → 4 queued", r.queued.length, 4);
+    eq("3 pinned + 6 → 3 visible", r.visible.length, 3);
+    eq("3 pinned + 6 → 6 queued", r.queued.length, 6);
   }
   {
     const r = splitNotices([...mk(7, true), ...mk(2)]);
@@ -159,9 +159,9 @@ function unitTests() {
     eq("7 pinned → all unpinned queued", r.queued.length, 2);
   }
   {
-    const r = splitNotices(mk(3));
-    eq("3 (< cap) → all visible", r.visible.length, 3);
-    eq("3 (< cap) → none queued", r.queued.length, 0);
+    const r = splitNotices(mk(2));
+    eq("2 (< cap) → all visible", r.visible.length, 2);
+    eq("2 (< cap) → none queued", r.queued.length, 0);
   }
   {
     const r = splitNotices([]);
@@ -450,14 +450,14 @@ async function dbTests(now: Date, specs: Spec[]) {
   ok("scheduled notice not active", active.every((a) => a.message !== "SCHEDULED-FUTURE"));
   ok("expired notice not active", active.every((a) => a.message !== "EXPIRED-ZED"));
   const { visible, queued } = splitNotices(active);
-  eq("visible respects cap", visible.length, 5);
-  eq("queued overflow", queued.length, 3);
+  eq("visible respects cap", visible.length, 3);
+  eq("queued overflow", queued.length, 5);
   eq("both pinned are visible", visible.filter((v) => v.pinned).length, 2);
   ok("pinned shown first", visible[0].pinned && visible[1].pinned);
   eq(
     "visible set",
     visible.map((v) => v.message),
-    ["PINNED-ALPHA", "PINNED-BETA", "NOTICE-1", "NOTICE-2", "NOTICE-3"]
+    ["PINNED-ALPHA", "PINNED-BETA", "NOTICE-1"]
   );
 
   group("db: settings round-trip");
