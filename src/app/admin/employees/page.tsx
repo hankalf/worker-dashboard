@@ -99,6 +99,137 @@ const formatClock = (hhmm: string) => {
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "2021-03-15" -> "Mar 15, 2021" (or "Mar 15" without the year).
+const fmtDate = (d: string, withYear: boolean) => {
+  const [y, m, day] = d.split("-");
+  return `${MONTHS[Number(m) - 1]} ${Number(day)}${withYear ? `, ${y}` : ""}`;
+};
+
+// One employee card, used in both the shift columns and the admins section.
+function EmployeeCardRow({
+  employee,
+  today,
+  onHistory,
+  onEdit,
+  onTerminate,
+  onDelete,
+}: {
+  employee: Employee;
+  today: string;
+  onHistory: (e: Employee) => void;
+  onEdit: (e: Employee) => void;
+  onTerminate: (e: Employee, terminated: boolean) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <li
+      className={`flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
+        employee.terminatedAt ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {/* Name + status */}
+          <div className="flex flex-wrap items-center gap-2 font-medium text-white">
+            {employee.name}
+            {employee.terminatedAt && (
+              <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                Terminated
+              </span>
+            )}
+            {employee.isLead && (
+              <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
+                Lead
+              </span>
+            )}
+            {employee.accessLevel !== "NONE" && (
+              <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+                {ACCESS_LABEL[employee.accessLevel]}
+              </span>
+            )}
+            {employee.attendance !== "PRESENT" && (
+              <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
+                {ATTENDANCE_LABEL[employee.attendance]}
+              </span>
+            )}
+            {anniversaryYears(employee.hireDate, today) && (
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                🎉 {anniversaryYears(employee.hireDate, today)} yr
+              </span>
+            )}
+            {isBirthday(employee.birthDate, today) && (
+              <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-xs font-semibold text-pink-300">
+                🎂 Birthday
+              </span>
+            )}
+          </div>
+          {/* Position */}
+          <div className="mt-0.5 text-sm text-zinc-400">
+            {employee.position?.title ?? "No position"}
+            {employee.username ? ` · ${employee.username}` : ""}
+          </div>
+          {/* Roles (capabilities) — bold list */}
+          {employee.capabilities.length > 0 && (
+            <div className="mt-1 text-xs font-bold text-zinc-200">
+              {employee.capabilities.map((cap) => cap.name).join(" · ")}
+            </div>
+          )}
+          {/* Hire / birth dates (always shown) */}
+          {(employee.hireDate || employee.birthDate) && (
+            <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-zinc-500">
+              {employee.hireDate && <span>🎉 {fmtDate(employee.hireDate, true)}</span>}
+              {employee.birthDate && <span>🎂 {fmtDate(employee.birthDate, false)}</span>}
+            </div>
+          )}
+        </div>
+        {/* Right corner: shift, then break, then lunch */}
+        {(employee.shift || employee.breakStart || employee.lunchStart) && (
+          <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
+            {employee.shift && (
+              <span className="whitespace-nowrap rounded-full bg-blue-600/20 px-2 py-0.5 font-medium text-blue-300">
+                {SHIFT_SHORT[employee.shift]}
+              </span>
+            )}
+            {employee.breakStart && (
+              <span className="whitespace-nowrap rounded-full bg-orange-500/20 px-2 py-0.5 font-medium text-orange-300">
+                Break {formatClock(employee.breakStart)}
+              </span>
+            )}
+            {employee.lunchStart && (
+              <span className="whitespace-nowrap rounded-full bg-green-800 px-2 py-0.5 font-medium text-green-100">
+                Lunch {formatClock(employee.lunchStart)}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-3 text-sm">
+        <button onClick={() => onHistory(employee)} className="text-zinc-400 hover:text-white">
+          History
+        </button>
+        {employee.terminatedAt ? (
+          <button onClick={() => onTerminate(employee, false)} className="text-green-400 hover:text-green-300">
+            Reactivate
+          </button>
+        ) : (
+          <>
+            <button onClick={() => onEdit(employee)} className="text-zinc-400 hover:text-white">
+              Edit
+            </button>
+            <button onClick={() => onTerminate(employee, true)} className="text-amber-400 hover:text-amber-300">
+              Terminate
+            </button>
+          </>
+        )}
+        <button onClick={() => onDelete(employee.id)} className="text-red-400 hover:text-red-300">
+          Delete
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function EmployeesPage() {
   const guarded = useAdminGuard();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -597,10 +728,15 @@ export default function EmployeesPage() {
             );
           });
 
+        // Workers go into the shift columns; login accounts get their own section.
+        const workers = visible.filter((e) => e.accessLevel === "NONE");
+        const staff = visible.filter((e) => e.accessLevel !== "NONE");
+
         return (
+          <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {SHIFT_COLUMNS.map((col) => {
-              const members = visible.filter((e) => e.shift === col.key);
+              const members = workers.filter((e) => e.shift === col.key);
               // Hide the "No shift" column when empty; keep the real shifts.
               if (col.key === null && members.length === 0) return null;
               return (
@@ -619,119 +755,15 @@ export default function EmployeesPage() {
                   ) : (
                     <ul className="flex flex-col gap-2">
                       {members.map((employee) => (
-                        <li
+                        <EmployeeCardRow
                           key={employee.id}
-                          className={`flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3 ${
-                            employee.terminatedAt ? "opacity-60" : ""
-                          }`}
-                        >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {/* Name + status */}
-                <div className="flex flex-wrap items-center gap-2 font-medium text-white">
-                  {employee.name}
-                  {employee.terminatedAt && (
-                    <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
-                      Terminated
-                    </span>
-                  )}
-                  {employee.isLead && (
-                    <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300">
-                      Lead
-                    </span>
-                  )}
-                  {employee.accessLevel !== "NONE" && (
-                    <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
-                      {ACCESS_LABEL[employee.accessLevel]}
-                    </span>
-                  )}
-                  {employee.attendance !== "PRESENT" && (
-                    <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
-                      {ATTENDANCE_LABEL[employee.attendance]}
-                    </span>
-                  )}
-                  {anniversaryYears(employee.hireDate, today) && (
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
-                      🎉 {anniversaryYears(employee.hireDate, today)} yr
-                    </span>
-                  )}
-                  {isBirthday(employee.birthDate, today) && (
-                    <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-xs font-semibold text-pink-300">
-                      🎂 Birthday
-                    </span>
-                  )}
-                </div>
-                {/* Position */}
-                <div className="mt-0.5 text-sm text-zinc-400">
-                  {employee.position?.title ?? "No position"}
-                  {employee.username ? ` · ${employee.username}` : ""}
-                </div>
-                {/* Roles (capabilities) — bold list */}
-                {employee.capabilities.length > 0 && (
-                  <div className="mt-1 text-xs font-bold text-zinc-200">
-                    {employee.capabilities.map((cap) => cap.name).join(" · ")}
-                  </div>
-                )}
-              </div>
-              {/* Right corner: shift, then break, then lunch */}
-              {(employee.shift || employee.breakStart || employee.lunchStart) && (
-                <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
-                  {employee.shift && (
-                    <span className="whitespace-nowrap rounded-full bg-blue-600/20 px-2 py-0.5 font-medium text-blue-300">
-                      {SHIFT_SHORT[employee.shift]}
-                    </span>
-                  )}
-                  {employee.breakStart && (
-                    <span className="whitespace-nowrap rounded-full bg-orange-500/20 px-2 py-0.5 font-medium text-orange-300">
-                      Break {formatClock(employee.breakStart)}
-                    </span>
-                  )}
-                  {employee.lunchStart && (
-                    <span className="whitespace-nowrap rounded-full bg-green-800 px-2 py-0.5 font-medium text-green-100">
-                      Lunch {formatClock(employee.lunchStart)}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3 text-sm">
-              <button
-                onClick={() => openHistory(employee)}
-                className="text-zinc-400 hover:text-white"
-              >
-                History
-              </button>
-              {employee.terminatedAt ? (
-                <button
-                  onClick={() => terminate(employee, false)}
-                  className="text-green-400 hover:text-green-300"
-                >
-                  Reactivate
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => handleEdit(employee)}
-                    className="text-zinc-400 hover:text-white"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => terminate(employee, true)}
-                    className="text-amber-400 hover:text-amber-300"
-                  >
-                    Terminate
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => handleDelete(employee.id)}
-                className="text-red-400 hover:text-red-300"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
+                          employee={employee}
+                          today={today}
+                          onHistory={openHistory}
+                          onEdit={handleEdit}
+                          onTerminate={terminate}
+                          onDelete={handleDelete}
+                        />
                       ))}
                     </ul>
                   )}
@@ -739,6 +771,28 @@ export default function EmployeesPage() {
               );
             })}
           </div>
+
+          {staff.length > 0 && (
+            <div className="mt-6">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Admins &amp; Supervisors ({staff.length})
+              </h3>
+              <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {staff.map((employee) => (
+                  <EmployeeCardRow
+                    key={employee.id}
+                    employee={employee}
+                    today={today}
+                    onHistory={openHistory}
+                    onEdit={handleEdit}
+                    onTerminate={terminate}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+          </>
         );
       })()}
 

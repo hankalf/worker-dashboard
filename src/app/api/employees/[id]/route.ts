@@ -91,6 +91,8 @@ export async function PATCH(
   if (body.isLead !== undefined) data.isLead = !!body.isLead;
   if (body.stayOverUntil !== undefined)
     data.stayOverUntil = body.stayOverUntil ? new Date(body.stayOverUntil) : null;
+  if (body.coverUntil !== undefined)
+    data.coverUntil = body.coverUntil ? new Date(body.coverUntil) : null;
 
   // Identity / access / roles — admins only.
   if (isAdmin) {

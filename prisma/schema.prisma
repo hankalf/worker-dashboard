@@ -61,6 +61,9 @@ model Employee {
   // If set (and in the future), the employee is staying past their shift end to
   // help the next shift — keeps showing on the main dashboard until this time.
   stayOverUntil DateTime?
+  // If set (and in the future), the employee is covering the CURRENT shift
+  // (e.g. came in early from another shift) — shows on the board until this time.
+  coverUntil    DateTime?
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)

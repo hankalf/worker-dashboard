@@ -39,6 +39,7 @@ type Employee = {
   attendance: Attendance;
   isLead: boolean;
   stayOverUntil: string | null;
+  coverUntil: string | null;
 };
 
 // How long past shift end an employee stays to help the next shift (30-min steps).
@@ -92,6 +93,7 @@ function EmployeeCard({
   onAttendanceChange,
   onLeadToggle,
   onStayOverChange,
+  onCoverChange,
   warnRole,
   warnCapability,
   overlay = false,
@@ -107,6 +109,7 @@ function EmployeeCard({
   onAttendanceChange?: (id: string, value: Attendance) => void;
   onLeadToggle?: (id: string, value: boolean) => void;
   onStayOverChange?: (id: string, minutes: number) => void;
+  onCoverChange?: (id: string, checked: boolean) => void;
   warnRole?: string | null;
   warnCapability?: string | null;
   overlay?: boolean;
@@ -276,7 +279,7 @@ function EmployeeCard({
               </select>
             </label>
           )}
-          {(onAttendanceChange || onLeadToggle) && (
+          {(onAttendanceChange || onLeadToggle || onCoverChange) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-700/60 pt-1.5">
               {onAttendanceChange &&
                 ATTENDANCE_OPTIONS.map((a) => (
@@ -301,6 +304,23 @@ function EmployeeCard({
                   Lead
                 </label>
               )}
+              {onCoverChange && (
+                <label
+                  className="flex items-center gap-1"
+                  title="Show on the current shift's board (came in early)"
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      !!employee.coverUntil &&
+                      new Date(employee.coverUntil).getTime() > Date.now()
+                    }
+                    onChange={(e) => onCoverChange(employee.id, e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  In early
+                </label>
+              )}
             </div>
           )}
         </div>
@@ -323,6 +343,7 @@ function PositionColumn({
   onAttendanceChange,
   onLeadToggle,
   onStayOverChange,
+  onCoverChange,
   isActive,
   horizontal = false,
 }: {
@@ -339,6 +360,7 @@ function PositionColumn({
   onAttendanceChange: (id: string, value: Attendance) => void;
   onLeadToggle: (id: string, value: boolean) => void;
   onStayOverChange: (id: string, minutes: number) => void;
+  onCoverChange: (id: string, checked: boolean) => void;
   isActive: (e: Employee) => boolean;
   horizontal?: boolean;
 }) {
@@ -393,6 +415,7 @@ function PositionColumn({
             onAttendanceChange={onAttendanceChange}
             onLeadToggle={onLeadToggle}
             onStayOverChange={onStayOverChange}
+            onCoverChange={onCoverChange}
             active={isActive(employee)}
             warnRole={
               requiredRole &&
@@ -443,7 +466,8 @@ export default function AssignPage() {
   const isActive = (e: Employee) =>
     e.attendance === "PRESENT" &&
     (e.shift === nowShift ||
-      (!!e.stayOverUntil && new Date(e.stayOverUntil) > now));
+      (!!e.stayOverUntil && new Date(e.stayOverUntil) > now) ||
+      (!!e.coverUntil && new Date(e.coverUntil) > now));
 
   // Separate mouse/touch sensors: mouse drags after a small move, while touch
   // requires a short press-and-hold — so a quick finger swipe still scrolls the
@@ -598,6 +622,24 @@ export default function AssignPage() {
     flashSaved(employeeId, res.ok);
   };
 
+  const setCover = async (employeeId: string, checked: boolean) => {
+    // Cover the current shift until it ends (e.g. came in early from another).
+    const coverUntil = checked
+      ? shiftEndDate(currentShift(new Date()), new Date()).toISOString()
+      : null;
+    setEmployees((current) =>
+      current.map((e) => (e.id === employeeId ? { ...e, coverUntil } : e))
+    );
+    setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+
+    const res = await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverUntil: coverUntil ?? "" }),
+    });
+    flashSaved(employeeId, res.ok);
+  };
+
   const resetAll = async () => {
     if (
       !confirm(
@@ -708,6 +750,7 @@ export default function AssignPage() {
       onAttendanceChange={setAttendance}
       onLeadToggle={setLead}
       onStayOverChange={setStayOver}
+      onCoverChange={setCover}
       isActive={isActive}
     />
   );

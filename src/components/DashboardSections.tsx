@@ -125,10 +125,12 @@ const ATTENDANCE_LABEL: Record<string, string> = {
 function MemberBody({
   member,
   stayingOver = false,
+  covering = false,
   today = null,
 }: {
   member: EmployeeWithRelations;
   stayingOver?: boolean;
+  covering?: boolean;
   today?: string | null;
 }) {
   const anniv = today ? anniversaryYears(member.hireDate, today) : null;
@@ -165,6 +167,11 @@ function MemberBody({
                   minute: "2-digit",
                   timeZone: APP_TZ,
                 })}
+              </span>
+            )}
+            {covering && (
+              <span className="whitespace-nowrap rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300">
+                Covering{member.shift ? ` (${SHIFTS[member.shift].label})` : ""}
               </span>
             )}
             {anniv && (
@@ -278,15 +285,22 @@ export function DashboardSections({
     !!e.stayOverUntil &&
     !!now &&
     new Date(e.stayOverUntil).getTime() > now.getTime();
-  // Show current shift's crew (by clock) + anyone marked to stay over.
+  // Covering: marked to work the current shift (e.g. came in early).
+  const covering = (e: EmployeeWithRelations) =>
+    !!e.coverUntil && !!now && new Date(e.coverUntil).getTime() > now.getTime();
+  // Show current shift's crew (by clock) + anyone staying over or covering.
   const onShift = (e: EmployeeWithRelations) =>
     !shiftKey ||
     e.shift === null ||
     e.shift === shiftKey ||
-    stayingOver(e);
+    stayingOver(e) ||
+    covering(e);
   // Actively staying past their own shift (used for the badge).
   const stayingOverNow = (e: EmployeeWithRelations) =>
     stayingOver(e) && e.shift !== shiftKey;
+  // Covering another shift (used for the badge).
+  const coveringNow = (e: EmployeeWithRelations) =>
+    covering(e) && e.shift !== shiftKey && !stayingOver(e);
   const present = (e: EmployeeWithRelations) => e.attendance === "PRESENT";
   // Actively working right now: present and on the current shift (or staying
   // over). These cards get a violet outline, matching the Assign board.
@@ -364,21 +378,97 @@ export function DashboardSections({
 
   return (
     <>
-      {announcements.length > 0 && (
-        <div className="mb-8 flex flex-col gap-2">
-          {announcements.map((message, i) => (
-            <div
-              key={i}
-              className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
-            >
-              <span className="mr-2 font-semibold uppercase tracking-wide">
-                Notice
-              </span>
-              {message}
-            </div>
-          ))}
+      {/* Notices + lunch together in one row at the top (under the banner). */}
+      <div
+        className={`mb-10 grid gap-6 ${
+          announcements.length > 0 ? "lg:grid-cols-2" : ""
+        }`}
+      >
+        {announcements.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {announcements.map((message, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+              >
+                <span className="mr-2 font-semibold uppercase tracking-wide">
+                  Notice
+                </span>
+                {message}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Lunch section: On Lunch + Lunch Schedule side by side. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
+            </h2>
+            {onLunch.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                No one is on lunch right now.
+              </p>
+            ) : (
+              <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
+                <div className="flex flex-col gap-3">
+                  {onLunch.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40"
+                    >
+                      <div className="text-sm font-medium">{emp.name}</div>
+                      <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                        {emp.roles.length > 0
+                          ? `${emp.roles.map((r) => r.name).join(" · ")} · `
+                          : ""}
+                        back at {formatMinutes(lunchEndMinutes(emp)!)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </AutoScroll>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Lunch Schedule
+            </h2>
+            {lunchSchedule.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                No lunches scheduled.
+              </p>
+            ) : (
+              <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
+                <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+                  {lunchSchedule.map((emp) => (
+                    <li
+                      key={emp.id}
+                      className="flex items-center justify-between gap-3 px-4 py-2"
+                    >
+                      <span className="flex min-w-0 items-baseline gap-2">
+                        <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-700 dark:text-teal-300">
+                          {formatClock(emp.lunchStart!)}
+                        </span>
+                        <span className="truncate text-sm font-medium">
+                          {emp.name}
+                        </span>
+                      </span>
+                      {emp.position && (
+                        <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                          {emp.position.title}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </AutoScroll>
+            )}
+          </section>
         </div>
-      )}
+      </div>
 
       {showCoverage && understaffed.length > 0 && (
         <div className="mb-8 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
@@ -434,70 +524,6 @@ export function DashboardSections({
           </div>
         </div>
       )}
-
-      <div className="mb-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <section>
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
-        </h2>
-        {onLunch.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No one is on lunch right now.
-          </p>
-        ) : (
-          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {onLunch.map((emp) => (
-              <div
-                key={emp.id}
-                className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40"
-              >
-                <div className="text-sm font-medium">{emp.name}</div>
-                <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                  {emp.roles.length > 0
-                    ? `${emp.roles.map((r) => r.name).join(" · ")} · `
-                    : ""}
-                  back at {formatMinutes(lunchEndMinutes(emp)!)}
-                </div>
-              </div>
-            ))}
-          </div>
-          </AutoScroll>
-        )}
-      </section>
-
-      {lunchSchedule.length > 0 && (
-        <section>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Lunch Schedule
-          </h2>
-          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
-          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-            {lunchSchedule.map((emp) => (
-              <li
-                key={emp.id}
-                className="flex items-center justify-between gap-3 px-4 py-2"
-              >
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-700 dark:text-teal-300">
-                    {formatClock(emp.lunchStart!)}
-                  </span>
-                  <span className="truncate text-sm font-medium">
-                    {emp.name}
-                  </span>
-                </span>
-                {emp.position && (
-                  <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                    {emp.position.title}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-          </AutoScroll>
-        </section>
-      )}
-      </div>
 
       {/* This month's work anniversaries + birthdays (only when there are any). */}
       {(anniversariesThisMonth.length > 0 || birthdaysThisMonth.length > 0) && (
@@ -585,7 +611,7 @@ export function DashboardSections({
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} today={today} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} />
                         </li>
                       ))}
                     </ul>
@@ -610,7 +636,7 @@ export function DashboardSections({
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} today={today} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} />
               </div>
             ))}
           </div>
