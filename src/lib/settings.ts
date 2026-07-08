@@ -34,6 +34,18 @@ export async function setSetting(key: string, value: string): Promise<void> {
   });
 }
 
+// Auto-scroll speed for the main dashboard's overflowing sections, as a 1–10
+// slider value (default 4 ≈ the original 24px/s pace).
+export async function getScrollSpeed(): Promise<number> {
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: "scrollSpeed" } });
+    const n = Number(row?.value);
+    return n >= 1 && n <= 10 ? Math.round(n) : 4;
+  } catch {
+    return 4;
+  }
+}
+
 // Rotating-dashboard config: the public board can rotate between its own
 // content and an external URL (shown in an iframe) on a timer.
 export type RotationConfig = { url: string; seconds: number; enabled: boolean };

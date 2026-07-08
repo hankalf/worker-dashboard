@@ -65,8 +65,9 @@ export function ShiftHandoffEditor() {
         Shift handoff notes
       </label>
       <p className="text-xs text-zinc-500">
-        Shown above the notices for whichever shift is active. Leave blank to
-        clear.
+        Each shift&apos;s note is shown on the main dashboard to the NEXT shift
+        (3rd&apos;s shows while 1st works, 1st&apos;s while 2nd works, 2nd&apos;s
+        while 3rd works). Leave blank to clear.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         {HANDOFF_SHIFTS.map((shift) => (

@@ -26,6 +26,7 @@ export function DashboardView({
   rotatingUrl = "",
   rotationSeconds = 30,
   rotatingEnabled = false,
+  scrollSpeed = 4,
   tv = false,
 }: {
   positions: Position[];
@@ -38,6 +39,7 @@ export function DashboardView({
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
+  scrollSpeed?: number;
   tv?: boolean;
 }) {
   const now = useNow();
@@ -155,6 +157,7 @@ export function DashboardView({
               showPositions
               horizontalTasks
               autoScroll
+              scrollSpeed={scrollSpeed}
               hideEmptyPositions
               tv={tv}
             />

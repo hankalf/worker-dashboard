@@ -236,6 +236,7 @@ export function DashboardSections({
   announcements = [],
   horizontalTasks = false,
   autoScroll = false,
+  scrollSpeed = 4,
   hideEmptyPositions = false,
   tv = false,
 }: {
@@ -249,6 +250,8 @@ export function DashboardSections({
   announcements?: string[];
   horizontalTasks?: boolean;
   autoScroll?: boolean;
+  // 1–10 slider value from settings; 4 ≈ the original pace.
+  scrollSpeed?: number;
   hideEmptyPositions?: boolean;
   tv?: boolean;
 }) {
@@ -257,6 +260,8 @@ export function DashboardSections({
   const shiftKey = now ? currentShift(now) : null;
   const today = now ? todayKey(now) : null;
   const thisMonth = today ? today.slice(5, 7) : null;
+  // Slider value (1–10) → pixels per frame; 4 → 0.4px/frame (~24px/s).
+  const scrollPxPerFrame = Math.max(1, Math.min(10, scrollSpeed)) * 0.1;
 
   // This month's work anniversaries and birthdays (across all shown crew), for
   // the celebrations banner. Sorted by day of month.
@@ -411,7 +416,7 @@ export function DashboardSections({
                 No one is on lunch right now.
               </p>
             ) : (
-              <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
+              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[32vh]">
                 <div className="flex flex-col gap-3">
                   {onLunch.map((emp) => (
                     <div
@@ -441,7 +446,7 @@ export function DashboardSections({
                 No lunches scheduled.
               </p>
             ) : (
-              <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[32vh]">
+              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[32vh]">
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (
                     <li
@@ -569,6 +574,7 @@ export function DashboardSections({
           ) : (
             <AutoScroll
               enabled={autoScroll && (tv ? visibleColumns.length > 6 : true)}
+              speed={scrollPxPerFrame}
               maxHeightClass={tv ? "max-h-[80vh]" : "max-h-[48vh]"}
             >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -652,7 +658,7 @@ export function DashboardSections({
             No side tasks yet.
           </p>
         ) : (
-          <AutoScroll enabled={autoScroll} maxHeightClass="max-h-[40vh]">
+          <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[40vh]">
           <div
             className={
               horizontalTasks

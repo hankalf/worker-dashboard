@@ -9,10 +9,13 @@ import { useEffect, useRef, type ReactNode } from "react";
 export function AutoScroll({
   enabled,
   maxHeightClass = "",
+  speed = 0.4,
   children,
 }: {
   enabled: boolean;
   maxHeightClass?: string;
+  // Pixels per frame (~60fps); 0.4 ≈ 24px/s, the original pace.
+  speed?: number;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -35,7 +38,7 @@ export function AutoScroll({
         if (pause > 0) {
           pause--;
         } else {
-          pos += dir * 0.4; // ~24px/s at 60fps — deliberately slow
+          pos += dir * speed;
           if (pos >= overflow) {
             pos = overflow;
             dir = -1;
@@ -52,7 +55,7 @@ export function AutoScroll({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [enabled]);
+  }, [enabled, speed]);
 
   return (
     <div ref={ref} className={enabled ? `overflow-hidden ${maxHeightClass}` : ""}>

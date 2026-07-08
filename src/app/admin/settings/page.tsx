@@ -1,7 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+
+// Auto-scroll speed slider (1–10) for the main dashboard's scrolling sections.
+// Saves automatically shortly after the slider stops moving.
+function ScrollSpeed() {
+  const [speed, setSpeed] = useState(4);
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.scrollSpeed) setSpeed(d.scrollSpeed);
+      })
+      .catch(() => {});
+  }, []);
+
+  const onChange = (value: number) => {
+    setSpeed(value);
+    setSaved(false);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scrollSpeed: value }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      }
+    }, 400);
+  };
+
+  return (
+    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h3 className="text-sm font-medium text-white">Auto-scroll speed</h3>
+      <p className="mt-1 text-sm text-zinc-400">
+        How fast the main dashboard&apos;s overflowing sections (positions,
+        lunch, side tasks) scroll. Saves automatically.
+      </p>
+      <div className="mt-3 flex items-center gap-3">
+        <span className="text-xs text-zinc-500">Slow</span>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={speed}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="h-2 w-full max-w-xs cursor-pointer accent-blue-500"
+        />
+        <span className="text-xs text-zinc-500">Fast</span>
+        <span className="w-8 text-sm tabular-nums text-zinc-300">{speed}</span>
+        {saved && <span className="text-sm text-green-400">Saved</span>}
+      </div>
+    </div>
+  );
+}
 
 type DescItem = {
   id: string;
@@ -436,6 +495,8 @@ export default function SettingsPage() {
           {saved && <span className="text-sm text-green-400">Saved</span>}
         </div>
       </form>
+
+      <ScrollSpeed />
 
       <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <h3 className="text-sm font-medium text-white">Backup</h3>

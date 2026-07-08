@@ -2,7 +2,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardView } from "@/components/DashboardView";
 import { splitNotices } from "@/lib/announcements";
-import { getDashboardName, getRotationConfig } from "@/lib/settings";
+import {
+  getDashboardName,
+  getRotationConfig,
+  getScrollSpeed,
+} from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +54,7 @@ export default async function Home({
   ]);
 
   const rotation = await getRotationConfig();
+  const scrollSpeed = await getScrollSpeed();
 
   const { visible } = splitNotices(activeNotices);
 
@@ -65,6 +70,7 @@ export default async function Home({
       rotatingUrl={rotation.url}
       rotationSeconds={rotation.seconds}
       rotatingEnabled={rotation.enabled}
+      scrollSpeed={scrollSpeed}
       tv={tv}
     />
   );

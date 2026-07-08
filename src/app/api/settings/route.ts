@@ -6,21 +6,24 @@ import {
   setDashboardName,
   setSetting,
   getRotationConfig,
+  getScrollSpeed,
 } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 // Public: current site settings (login page + rotating-dashboard editor).
 export async function GET() {
-  const [dashboardName, rotation] = await Promise.all([
+  const [dashboardName, rotation, scrollSpeed] = await Promise.all([
     getDashboardName(),
     getRotationConfig(),
+    getScrollSpeed(),
   ]);
   return NextResponse.json({
     dashboardName,
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
+    scrollSpeed,
   });
 }
 
@@ -47,16 +50,22 @@ export async function PATCH(req: Request) {
   if (body.rotatingEnabled !== undefined) {
     await setSetting("rotatingEnabled", body.rotatingEnabled ? "true" : "false");
   }
+  if (body.scrollSpeed !== undefined) {
+    const speed = Math.max(1, Math.min(10, Math.round(Number(body.scrollSpeed) || 4)));
+    await setSetting("scrollSpeed", String(speed));
+  }
 
   await logActivity("Settings", "Updated settings");
-  const [dashboardName, rotation] = await Promise.all([
+  const [dashboardName, rotation, scrollSpeed] = await Promise.all([
     getDashboardName(),
     getRotationConfig(),
+    getScrollSpeed(),
   ]);
   return NextResponse.json({
     dashboardName,
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
+    scrollSpeed,
   });
 }
