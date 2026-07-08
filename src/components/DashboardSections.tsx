@@ -134,11 +134,15 @@ function MemberBody({
   stayingOver = false,
   covering = false,
   today = null,
+  hidePosition = false,
 }: {
   member: EmployeeWithRelations;
   stayingOver?: boolean;
   covering?: boolean;
   today?: string | null;
+  // Public board groups by position already, so the per-card position line is
+  // redundant there — hide it and show only roles.
+  hidePosition?: boolean;
 }) {
   const anniv = today ? anniversaryYears(member.hireDate, today) : null;
   const birthday = today ? isBirthday(member.birthDate, today) : false;
@@ -198,10 +202,12 @@ function MemberBody({
               </span>
             )}
           </div>
-          {/* Position */}
-          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {member.position?.title ?? "No position"}
-          </div>
+          {/* Position (hidden on the public board — grouped by position there) */}
+          {!hidePosition && (
+            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {member.position?.title ?? "No position"}
+            </div>
+          )}
           {/* Roles (capabilities) — bold list */}
           {member.capabilities.length > 0 && (
             <div className="mt-1 text-xs font-bold text-zinc-700 dark:text-zinc-200">
@@ -401,6 +407,11 @@ export function DashboardSections({
     .filter((e) => e.lunchStart && e.attendance === "PRESENT")
     .sort((a, b) => toMinutes(a.lunchStart!) - toMinutes(b.lunchStart!));
 
+  // With no notices posted, the lunch row has the whole top area to itself —
+  // let the two lunch sections grow taller (fewer entries hidden behind scroll).
+  const lunchMaxHeight =
+    announcements.length > 0 ? "max-h-[32vh]" : "max-h-[60vh]";
+
   return (
     <>
       {/* Notices + lunch together in one row at the top (under the banner). */}
@@ -436,7 +447,7 @@ export function DashboardSections({
                 No one is on lunch right now.
               </p>
             ) : (
-              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[32vh]">
+              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass={lunchMaxHeight}>
                 <div className="flex flex-col gap-3">
                   {onLunch.map((emp) => (
                     <div
@@ -469,7 +480,7 @@ export function DashboardSections({
               <AutoScroll
                 enabled={autoScroll && lunchSchedule.length > 6}
                 speed={scrollPxPerFrame}
-                maxHeightClass="max-h-[32vh]"
+                maxHeightClass={lunchMaxHeight}
               >
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (
@@ -485,7 +496,7 @@ export function DashboardSections({
                           {emp.name}
                         </span>
                       </span>
-                      {emp.position && (
+                      {showCoverage && emp.position && (
                         <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                           {emp.position.title}
                         </span>
@@ -641,7 +652,7 @@ export function DashboardSections({
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} />
                         </li>
                       ))}
                     </ul>
@@ -666,7 +677,7 @@ export function DashboardSections({
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} />
               </div>
             ))}
           </div>

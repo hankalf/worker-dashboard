@@ -42,6 +42,7 @@ type Employee = {
   stayOverUntil: string | null;
   coverUntil: string | null;
   comingInAt: string | null;
+  accessLevel: "NONE" | "SUPERVISOR" | "ADMIN";
 };
 
 // "Coming in" options in hour increments across the day.
@@ -393,8 +394,14 @@ function PositionColumn({
   horizontal?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  // Leads first, then by shift (1st → 2nd → 3rd, no-shift last), then name.
+  const shiftRank = (s: Shift | null) =>
+    s === "FIRST" ? 0 : s === "SECOND" ? 1 : s === "THIRD" ? 2 : 3;
   const ordered = [...employees].sort(
-    (a, b) => Number(b.isLead) - Number(a.isLead)
+    (a, b) =>
+      Number(b.isLead) - Number(a.isLead) ||
+      shiftRank(a.shift) - shiftRank(b.shift) ||
+      a.name.localeCompare(b.name)
   );
 
   return (
@@ -519,7 +526,9 @@ export default function AssignPage() {
         window.location.href = "/login";
         return;
       }
-      setEmployees(await employeesRes.json());
+      // Admins/supervisors are never assigned on the board — leave them off.
+      const all: Employee[] = await employeesRes.json();
+      setEmployees(all.filter((e) => e.accessLevel === "NONE"));
       setPositions(await positionsRes.json());
     })();
   }, []);
