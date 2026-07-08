@@ -7,6 +7,7 @@ import {
   getRotationConfig,
   getScrollSpeed,
 } from "@/lib/settings";
+import { applyDueSchedules } from "@/lib/scheduleServer";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export default async function Home({
   const tv = (await searchParams).tv === "1";
 
   const now = new Date();
+  // If a plan was scheduled for today, push it onto the live board (once/day).
+  await applyDueSchedules(now);
   const [positions, employees, jobs, activeNotices, dashboardName] =
     await Promise.all([
     prisma.position.findMany({

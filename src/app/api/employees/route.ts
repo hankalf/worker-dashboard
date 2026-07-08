@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { applyDueSchedules } from "@/lib/scheduleServer";
 
 const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
 
@@ -10,6 +11,10 @@ export async function GET(req: Request) {
   // Supervisors need the roster to run the Assign board.
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // Ensure today's plan (if any) has been pushed onto the live board even if the
+  // public display hasn't loaded yet today. Guarded — runs its work once/day.
+  await applyDueSchedules();
 
   const includeTerminated =
     new URL(req.url).searchParams.get("includeTerminated") === "1";

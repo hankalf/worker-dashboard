@@ -53,6 +53,7 @@ model Employee {
   roles        Role[]    @relation("EmployeeRoles")
   capabilities Capability[] @relation("EmployeeCapabilities")
   jobs         Job[]
+  scheduledAssignments ScheduledAssignment[]
   // Lunch window as "HH:MM" strings (24h); end defaults to start+30min if unset
   lunchStart   String?
   lunchEnd     String?
@@ -107,6 +108,7 @@ model Position {
   description    String?
   sortOrder      Int        @default(0)
   employees      Employee[]
+  scheduledAssignments ScheduledAssignment[]
   // Optional equipment a person should hold to work this position (assign warning).
   requiredRole   Role?      @relation("PositionRequiredRole", fields: [requiredRoleId], references: [id])
   requiredRoleId String?
@@ -177,6 +179,23 @@ model WorkHistory {
 model Setting {
   key   String @id
   value String
+}
+
+// A planned position assignment for an employee on a specific upcoming date
+// (Eastern "YYYY-MM-DD"). Admins set these on the assign board up to ~7 days
+// ahead (weekdays). When the date arrives, applyDueSchedules() copies each onto
+// the live board (Employee.positionId) once; past-date rows are then purged.
+model ScheduledAssignment {
+  id         String    @id @default(cuid())
+  date       String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  position   Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  positionId String?
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
 }
 
 model Job {

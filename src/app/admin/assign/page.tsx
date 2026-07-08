@@ -17,6 +17,7 @@ import {
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 import { shiftEndDate, shiftStartDate, currentShift } from "@/lib/shift";
 import { APP_TZ, easternDateKey, easternInputToUtcISO } from "@/lib/time";
+import { upcomingScheduleDates } from "@/lib/schedule";
 
 type Role = { id: string; name: string };
 type Position = {
@@ -375,6 +376,7 @@ function PositionColumn({
   onComingInChange,
   isActive,
   horizontal = false,
+  scheduleMode = false,
 }: {
   id: string;
   title: string;
@@ -392,6 +394,10 @@ function PositionColumn({
   onComingInChange: (id: string, value: string) => void;
   isActive: (e: Employee) => boolean;
   horizontal?: boolean;
+  // Planning a future date: only the Position control is shown; day-of controls
+  // (lunch/break/attendance/lead/stay-over/coming-in) and the active highlight
+  // are suppressed.
+  scheduleMode?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   // Leads first, then by shift (1st → 2nd → 3rd, no-shift last), then name.
@@ -445,13 +451,13 @@ function PositionColumn({
             saveState={saveStates[employee.id]}
             positions={positions}
             onPositionChange={onPositionChange}
-            onLunchChange={onLunchChange}
-            onBreakChange={onBreakChange}
-            onAttendanceChange={onAttendanceChange}
-            onLeadToggle={onLeadToggle}
-            onStayOverChange={onStayOverChange}
-            onComingInChange={onComingInChange}
-            active={isActive(employee)}
+            onLunchChange={scheduleMode ? undefined : onLunchChange}
+            onBreakChange={scheduleMode ? undefined : onBreakChange}
+            onAttendanceChange={scheduleMode ? undefined : onAttendanceChange}
+            onLeadToggle={scheduleMode ? undefined : onLeadToggle}
+            onStayOverChange={scheduleMode ? undefined : onStayOverChange}
+            onComingInChange={scheduleMode ? undefined : onComingInChange}
+            active={scheduleMode ? false : isActive(employee)}
             warnRole={
               requiredRole &&
               !employee.roles.some((r) => r.id === requiredRole.id)
@@ -489,12 +495,47 @@ export default function AssignPage() {
     { id: string; positionId: string }[] | null
   >(null);
 
+  // Advance scheduling: null = the live "Today" board; a date string = planning
+  // that upcoming day. `schedule` holds employeeId → planned positionId for the
+  // selected date (loaded from /api/schedule).
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<Record<string, string | null>>({});
+
   // Live-ish clock (30s) so the "active shift" highlight tracks the time.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+  const scheduleDates = upcomingScheduleDates(now);
+
+  // Load the selected date's plan; clear when back on the live board. If the
+  // selected date rolls out of the window (e.g. past midnight), fall back to Today.
+  useEffect(() => {
+    if (!selectedDate) {
+      setSchedule({});
+      return;
+    }
+    if (!scheduleDates.some((d) => d.date === selectedDate)) {
+      setSelectedDate(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/schedule?date=${selectedDate}`);
+      if (!res.ok || cancelled) return;
+      const rows: { employeeId: string; positionId: string | null }[] =
+        await res.json();
+      if (cancelled) return;
+      setSchedule(
+        Object.fromEntries(rows.map((r) => [r.employeeId, r.positionId]))
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
   const nowShift = currentShift(now);
   // Active = present and either on the current shift or still within a stay-over
   // window — i.e. the people showing as active on the main dashboard.
@@ -549,6 +590,23 @@ export default function AssignPage() {
   };
 
   const assign = async (employeeId: string, positionId: string | null) => {
+    // Planning a future date: save to that date's schedule, not the live board.
+    if (selectedDate) {
+      setSchedule((s) => ({ ...s, [employeeId]: positionId }));
+      setSaveStates((s) => ({ ...s, [employeeId]: "saving" }));
+      const res = await fetch("/api/schedule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate,
+          employeeId,
+          positionId: positionId ?? "",
+        }),
+      });
+      flashSaved(employeeId, res.ok);
+      return;
+    }
+
     setEmployees((current) =>
       current.map((e) => (e.id === employeeId ? { ...e, positionId } : e))
     );
@@ -560,6 +618,13 @@ export default function AssignPage() {
       body: JSON.stringify({ positionId: positionId ?? "" }),
     });
     flashSaved(employeeId, res.ok);
+  };
+
+  const clearDayPlan = async () => {
+    if (!selectedDate) return;
+    if (!confirm("Clear the whole plan for this day?")) return;
+    setSchedule({});
+    await fetch(`/api/schedule?date=${selectedDate}`, { method: "DELETE" });
   };
 
   const setLunch = async (employeeId: string, value: string) => {
@@ -762,7 +827,11 @@ export default function AssignPage() {
     const employeeId = String(active.id);
     const targetPositionId = over.id === UNASSIGNED ? null : String(over.id);
     const employee = employees.find((e) => e.id === employeeId);
-    if (!employee || employee.positionId === targetPositionId) return;
+    if (!employee) return;
+    const currentPositionId = selectedDate
+      ? schedule[employeeId] ?? null
+      : employee.positionId;
+    if (currentPositionId === targetPositionId) return;
 
     assign(employeeId, targetPositionId);
   };
@@ -786,9 +855,23 @@ export default function AssignPage() {
     })),
   ];
 
+  // When planning a future date, position each card by its planned position
+  // (from the schedule) and treat everyone as present — attendance/lunch/etc.
+  // are day-of concerns, not planned ahead. The live board is unchanged.
+  const scheduleMode = selectedDate !== null;
+  const boardEmployees: Employee[] = scheduleMode
+    ? employees.map((e) => ({
+        ...e,
+        positionId: schedule[e.id] ?? null,
+        attendance: "PRESENT" as Attendance,
+      }))
+    : employees;
+
   // Absent / called-out people are pulled out of the position board into their
-  // own section so the board shows only who's actually working.
-  const absentEmployees = employees.filter((e) => e.attendance !== "PRESENT");
+  // own section so the board shows only who's actually working (live board only).
+  const absentEmployees = boardEmployees.filter(
+    (e) => e.attendance !== "PRESENT"
+  );
 
   const renderColumn = (
     column: (typeof columns)[number],
@@ -801,7 +884,8 @@ export default function AssignPage() {
       requiredRole={column.requiredRole}
       requiredCapability={column.requiredCapability}
       horizontal={horizontal}
-      employees={employees.filter(
+      scheduleMode={scheduleMode}
+      employees={boardEmployees.filter(
         (e) =>
           e.attendance === "PRESENT" &&
           (column.id === UNASSIGNED
@@ -826,31 +910,86 @@ export default function AssignPage() {
       <div className="mb-1 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-white">Assign Positions</h2>
         <div className="flex shrink-0 gap-2">
-          <button
-            onClick={markAllPresent}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-green-500 hover:text-green-400"
-          >
-            Mark all Present
-          </button>
-          <button
-            onClick={resetAll}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
-          >
-            Reset all to Unassigned
-          </button>
+          {scheduleMode ? (
+            <button
+              onClick={clearDayPlan}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
+            >
+              Clear this day
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={markAllPresent}
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-green-500 hover:text-green-400"
+              >
+                Mark all Present
+              </button>
+              <button
+                onClick={resetAll}
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
+              >
+                Reset all to Unassigned
+              </button>
+            </>
+          )}
         </div>
       </div>
-      <p className="mb-4 text-sm text-zinc-400">
-        Drag an employee onto a position — or use each card&apos;s Position
-        dropdown (best on phones) — and set their lunch, break, and
-        attendance. Every change saves instantly.
-      </p>
 
-      <div className="mb-6">
-        <ShiftHandoffEditor />
+      {/* Day selector: Today (live board) + upcoming weekdays to plan ahead. */}
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setSelectedDate(null)}
+          className={`rounded-md border px-3 py-1.5 text-sm ${
+            !scheduleMode
+              ? "border-blue-500 bg-blue-950/50 text-blue-200"
+              : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          Today
+        </button>
+        {scheduleDates.map((d) => (
+          <button
+            key={d.date}
+            onClick={() => setSelectedDate(d.date)}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              selectedDate === d.date
+                ? "border-blue-500 bg-blue-950/50 text-blue-200"
+                : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
+            }`}
+          >
+            {d.label}
+          </button>
+        ))}
       </div>
 
-      {undoSnapshot && (
+      <p className="mb-4 text-sm text-zinc-400">
+        {scheduleMode ? (
+          <>
+            Planning positions for{" "}
+            <span className="font-medium text-zinc-200">
+              {scheduleDates.find((d) => d.date === selectedDate)?.label}
+            </span>
+            . Assign each employee to a position — it saves for that day and
+            takes over the board automatically when the day arrives. Lunch,
+            breaks, and attendance are set on the day itself.
+          </>
+        ) : (
+          <>
+            Drag an employee onto a position — or use each card&apos;s Position
+            dropdown (best on phones) — and set their lunch, break, and
+            attendance. Every change saves instantly.
+          </>
+        )}
+      </p>
+
+      {!scheduleMode && (
+        <div className="mb-6">
+          <ShiftHandoffEditor />
+        </div>
+      )}
+
+      {!scheduleMode && undoSnapshot && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-200">
           <span>
             Positions cleared for {undoSnapshot.length} employee

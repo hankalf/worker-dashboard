@@ -31,6 +31,8 @@ import {
   setDashboardName,
   DEFAULT_DASHBOARD_NAME,
 } from "@/lib/settings";
+import { upcomingScheduleDates, isScheduleDate } from "@/lib/schedule";
+import { applyDueSchedules } from "@/lib/scheduleServer";
 
 // ---- tiny test harness -----------------------------------------------------
 let currentGroup = "";
@@ -187,6 +189,27 @@ function unitTests() {
   ok("badge 1 amber", (priorityBadgeClass(1) ?? "").includes("amber"));
   ok("badge 2 red", (priorityBadgeClass(2) ?? "").includes("red"));
   eq("3 priority levels", PRIORITY_LEVELS.length, 3);
+
+  group("schedule.upcomingScheduleDates");
+  {
+    const wed = easternAt("2026-07-08T12:00"); // a Wednesday
+    const days = upcomingScheduleDates(wed);
+    eq("5 weekdays within 7 days", days.length, 5);
+    eq("dates in order", days.map((d) => d.date), [
+      "2026-07-09",
+      "2026-07-10",
+      "2026-07-13",
+      "2026-07-14",
+      "2026-07-15",
+    ]);
+    ok("all Mon–Fri", days.every((d) => ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(d.weekday)));
+    ok("excludes today", days.every((d) => d.date !== "2026-07-08"));
+    ok("skips the weekend", !days.some((d) => d.date === "2026-07-11" || d.date === "2026-07-12"));
+    ok("isScheduleDate accepts in-window weekday", isScheduleDate("2026-07-09", wed));
+    ok("isScheduleDate rejects today", !isScheduleDate("2026-07-08", wed));
+    ok("isScheduleDate rejects weekend", !isScheduleDate("2026-07-11", wed));
+    ok("isScheduleDate rejects beyond 7 days", !isScheduleDate("2026-07-20", wed));
+  }
 }
 
 // ===========================================================================
@@ -465,6 +488,49 @@ async function dbTests(now: Date, specs: Spec[]) {
   eq("reads back what was set", await getDashboardName(), "Acme Test Center");
   await setDashboardName("   "); // blank falls back to default
   eq("blank falls back to default", await getDashboardName(), DEFAULT_DASHBOARD_NAME);
+
+  group("db: schedule apply-on-arrival");
+  {
+    const emp = await db.employee.findFirst({ where: { accessLevel: "NONE" } });
+    const posA = positions[0];
+    const posB = positions[1];
+    const today = easternDateKey(new Date());
+    const yesterday = easternDateKey(new Date(Date.now() - 24 * 3600 * 1000));
+
+    await db.scheduledAssignment.deleteMany({});
+    await db.setting.deleteMany({ where: { key: "scheduleAppliedDate" } });
+    // Employee starts at posB live; plan them to posA for "today".
+    await db.employee.update({ where: { id: emp!.id }, data: { positionId: posB.id } });
+    await db.scheduledAssignment.create({
+      data: { employeeId: emp!.id, date: today, positionId: posA.id },
+    });
+
+    await applyDueSchedules(new Date());
+    const applied1 = await db.employee.findUnique({ where: { id: emp!.id } });
+    eq("today's plan lands on the live board", applied1!.positionId, posA.id);
+    const guard = await db.setting.findUnique({ where: { key: "scheduleAppliedDate" } });
+    eq("apply guard set to today", guard?.value, today);
+
+    // A same-day live change must not be re-overwritten on the next load.
+    await db.employee.update({ where: { id: emp!.id }, data: { positionId: posB.id } });
+    await applyDueSchedules(new Date());
+    const applied2 = await db.employee.findUnique({ where: { id: emp!.id } });
+    eq("second apply is a guarded no-op", applied2!.positionId, posB.id);
+
+    // Past-date plans are purged.
+    await db.scheduledAssignment.create({
+      data: { employeeId: emp!.id, date: yesterday, positionId: posA.id },
+    });
+    await applyDueSchedules(new Date());
+    eq(
+      "past-date plans purged",
+      await db.scheduledAssignment.count({ where: { date: yesterday } }),
+      0
+    );
+
+    await db.scheduledAssignment.deleteMany({});
+    await db.setting.deleteMany({ where: { key: "scheduleAppliedDate" } });
+  }
 
   return { roster, positions };
 }
