@@ -9,12 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboardPage() {
   const now = new Date();
 
-  // Tidy up notices that expired more than a week ago.
-  await prisma.announcement.deleteMany({
-    where: { expiresAt: { lt: new Date(now.getTime() - 7 * 24 * 3600 * 1000) } },
-  });
-
-  const [positions, employees, jobs, capabilities, active, expired] =
+  const [positions, employees, jobs, capabilities, active] =
     await Promise.all([
     prisma.position.findMany({
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -35,16 +30,10 @@ export default async function AdminDashboardPage() {
     prisma.capability.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
-    // Active notices (live + queued), oldest first.
+    // Active notices (live + queued), oldest first — for the board mirror.
     prisma.announcement.findMany({
       where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
       orderBy: { createdAt: "asc" },
-    }),
-    // The most recently expired notices, so admins can see what dropped off.
-    prisma.announcement.findMany({
-      where: { expiresAt: { lte: now } },
-      orderBy: { expiresAt: "desc" },
-      take: 10,
     }),
   ]);
 
@@ -106,7 +95,6 @@ export default async function AdminDashboardPage() {
       jobs={jobs}
       capabilities={capabilities}
       notices={active.map(toDto)}
-      expiredNotices={expired.map(toDto)}
     />
   );
 }

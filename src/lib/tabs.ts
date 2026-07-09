@@ -14,6 +14,7 @@ export type TabItem = TabDef & { description: string };
 
 export const TABS: TabDef[] = [
   { key: "dashboard", label: "Admin Dashboard", href: "/admin", group: "top", adminOnly: false },
+  { key: "notices", label: "Notices", href: "/admin/notices", group: "top", adminOnly: false },
   { key: "assign", label: "Assign", href: "/admin/assign", group: "top", adminOnly: false },
   { key: "jobs", label: "Side Tasks", href: "/admin/jobs", group: "top", adminOnly: false },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", group: "top", adminOnly: true },
