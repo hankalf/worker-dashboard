@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
 import { currentShift, SHIFTS } from "@/lib/shift";
-import { todayKey, anniversaryYears, isBirthday } from "@/lib/celebrations";
+import {
+  todayKey,
+  anniversaryYearsThisMonth,
+  isBirthday,
+} from "@/lib/celebrations";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 import { AutoScroll } from "@/components/AutoScroll";
 
@@ -120,13 +124,6 @@ const ATTENDANCE_LABEL: Record<string, string> = {
   PTO: "PTO",
 };
 
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-// "2021-03-15" -> "Mar 15, 2021" (or "Mar 15" without the year).
-const fmtDayMonth = (d: string, withYear: boolean) => {
-  const [y, m, day] = d.split("-");
-  return `${MONTH_ABBR[Number(m) - 1]} ${Number(day)}${withYear ? `, ${y}` : ""}`;
-};
-
 // Card body for one employee: name on its own line, then all badges/chips and
 // roles beneath it. Absent / called-out people are dimmed with a red badge.
 function MemberBody({
@@ -144,7 +141,7 @@ function MemberBody({
   // redundant there — hide it and show only roles.
   hidePosition?: boolean;
 }) {
-  const anniv = today ? anniversaryYears(member.hireDate, today) : null;
+  const anniv = today ? anniversaryYearsThisMonth(member.hireDate, today) : null;
   const birthday = today ? isBirthday(member.birthDate, today) : false;
   const out = member.attendance !== "PRESENT";
   return (
@@ -193,7 +190,7 @@ function MemberBody({
             )}
             {anniv && (
               <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
-                🎉 {anniv} yr anniversary
+                🎉 {anniv} yr anniversary this month
               </span>
             )}
             {birthday && (
@@ -212,13 +209,6 @@ function MemberBody({
           {member.capabilities.length > 0 && (
             <div className="mt-1 text-xs font-bold text-zinc-700 dark:text-zinc-200">
               {member.capabilities.map((c) => c.name).join(" · ")}
-            </div>
-          )}
-          {/* Hire / birth dates as emojis (always shown when set) */}
-          {(member.hireDate || member.birthDate) && (
-            <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-zinc-500 dark:text-zinc-400">
-              {member.hireDate && <span>🎉 {fmtDayMonth(member.hireDate, true)}</span>}
-              {member.birthDate && <span>🎂 {fmtDayMonth(member.birthDate, false)}</span>}
             </div>
           )}
         </div>
@@ -303,12 +293,6 @@ export function DashboardSections({
           years: Number(today!.slice(0, 4)) - Number(e.hireDate!.slice(0, 4)),
         }))
         .filter((a) => a.years >= 1)
-        .sort((a, b) => a.day - b.day)
-    : [];
-  const birthdaysThisMonth = thisMonth
-    ? employees
-        .filter((e) => e.birthDate && e.birthDate.slice(5, 7) === thisMonth)
-        .map((e) => ({ name: e.name, day: dayOf(e.birthDate!) }))
         .sort((a, b) => a.day - b.day)
     : [];
   // Staying over: still within their marked stay-over window (past shift end).
@@ -567,27 +551,18 @@ export function DashboardSections({
         </div>
       )}
 
-      {/* This month's work anniversaries + birthdays (only when there are any). */}
-      {(anniversariesThisMonth.length > 0 || birthdaysThisMonth.length > 0) && (
+      {/* This month's work anniversaries (only when there are any). Birthdays
+          are shown only on the day, on the employee's own card. */}
+      {anniversariesThisMonth.length > 0 && (
         <div className="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
-          {anniversariesThisMonth.length > 0 && (
-            <div className="text-amber-900 dark:text-amber-200">
-              <span className="mr-2 font-semibold">
-                🎉 Work anniversaries this month:
-              </span>
-              {anniversariesThisMonth
-                .map((a) => `${a.name} (${a.years} yr — ${monthAbbr} ${a.day})`)
-                .join(", ")}
-            </div>
-          )}
-          {birthdaysThisMonth.length > 0 && (
-            <div className="mt-1 text-pink-800 dark:text-pink-300">
-              <span className="mr-2 font-semibold">🎂 Birthdays this month:</span>
-              {birthdaysThisMonth
-                .map((b) => `${b.name} (${monthAbbr} ${b.day})`)
-                .join(", ")}
-            </div>
-          )}
+          <div className="text-amber-900 dark:text-amber-200">
+            <span className="mr-2 font-semibold">
+              🎉 Work anniversaries this month:
+            </span>
+            {anniversariesThisMonth
+              .map((a) => `${a.name} (${a.years} yr — ${monthAbbr} ${a.day})`)
+              .join(", ")}
+          </div>
         </div>
       )}
 

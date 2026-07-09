@@ -33,6 +33,11 @@ import {
 } from "@/lib/settings";
 import { upcomingScheduleDates, isScheduleDate } from "@/lib/schedule";
 import { applyDueSchedules } from "@/lib/scheduleServer";
+import {
+  anniversaryYears,
+  anniversaryYearsThisMonth,
+  isBirthday,
+} from "@/lib/celebrations";
 
 // ---- tiny test harness -----------------------------------------------------
 let currentGroup = "";
@@ -210,6 +215,16 @@ function unitTests() {
     ok("isScheduleDate rejects weekend", !isScheduleDate("2026-07-11", wed));
     ok("isScheduleDate rejects beyond 7 days", !isScheduleDate("2026-07-20", wed));
   }
+
+  group("celebrations");
+  // Birthdays: only on the exact day. Anniversaries: the whole month.
+  ok("birthday true on the day", isBirthday("1990-07-08", "2026-07-08"));
+  ok("birthday false other days", !isBirthday("1990-07-09", "2026-07-08"));
+  eq("anniversary (day) on the day", anniversaryYears("2020-07-08", "2026-07-08"), 6);
+  eq("anniversary (day) null off the day", anniversaryYears("2020-07-09", "2026-07-08"), null);
+  eq("anniversary (month) any day in month", anniversaryYearsThisMonth("2020-07-25", "2026-07-08"), 6);
+  eq("anniversary (month) null other months", anniversaryYearsThisMonth("2020-06-25", "2026-07-08"), null);
+  eq("anniversary (month) null under 1 year", anniversaryYearsThisMonth("2026-07-25", "2026-07-08"), null);
 }
 
 // ===========================================================================
