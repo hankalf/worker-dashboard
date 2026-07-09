@@ -5,7 +5,7 @@
  *   npx tsx scripts/test-suite.ts
  *
  * Covers: pure lib functions (time, shift, announcements, priority), then seeds
- * a realistic dataset (32 employees across shifts/positions/attendance, 8
+ * a realistic dataset (50 employees across shifts/positions/attendance, 8
  * positions, 5 equipment, 10 notices incl pinned/scheduled/expired) and asserts
  * the DB-query + grouping/sort logic and the public HTTP API against it.
  */
@@ -266,8 +266,8 @@ function buildEmployeeSpecs(): Spec[] {
   const cycle: ShiftVal[] = ["FIRST", "SECOND", "THIRD"];
   const att: AttVal[] = ["ABSENT", "CALLED_OUT", "PTO"];
   const specs: Spec[] = [];
-  for (let i = 0; i < 30; i++) {
-    const shift: ShiftVal = i < 27 ? cycle[i % 3] : null; // 9/9/9 + 3 no-shift
+  for (let i = 0; i < 48; i++) {
+    const shift: ShiftVal = i < 45 ? cycle[i % 3] : null; // 15/15/15 + 3 no-shift
     const attendance: AttVal = i % 10 < 3 ? att[i % 10] : "PRESENT"; // some out
     specs.push({
       name: `Worker ${String(i + 1).padStart(2, "0")}`,
@@ -406,7 +406,7 @@ async function dbTests(now: Date, specs: Spec[]) {
     include: { position: true, roles: true, capabilities: true },
     orderBy: { name: "asc" },
   });
-  eq("roster count (30 workers + admin + supervisor)", roster.length, 32);
+  eq("roster count (48 workers + admin + supervisor)", roster.length, 50);
   ok("at least 30 employees", roster.length >= 30);
   ok("every employee has ≥1 equipment or is admin/sup", roster.every((e) => e.roles.length >= 1 || e.username));
   ok("every worker has ≥1 role (capability)", roster.filter((e) => !e.username).every((e) => e.capabilities.length >= 1));

@@ -254,6 +254,7 @@ export function DashboardSections({
   autoScroll = false,
   scrollSpeed = 4,
   hideEmptyPositions = false,
+  hideTasks = false,
   tv = false,
 }: {
   positions: Position[];
@@ -269,6 +270,8 @@ export function DashboardSections({
   // 1–10 slider value from settings; 4 ≈ the original pace.
   scrollSpeed?: number;
   hideEmptyPositions?: boolean;
+  // The public dashboard renders Side Tasks itself, next to the handoff notes.
+  hideTasks?: boolean;
   tv?: boolean;
 }) {
   // Admins never appear on the boards; supervisors are working staff and do.
@@ -333,34 +336,6 @@ export function DashboardSections({
 
   const onShiftCount = roster.length;
   const presentCount = roster.filter(present).length;
-
-  // Side tasks grouped by assigned employee (unassigned last), each group's
-  // tasks ordered by priority (highest first).
-  const jobGroups = (() => {
-    const map = new Map<
-      string,
-      { name: string; position: string | null; jobs: JobWithRelations[] }
-    >();
-    for (const job of jobs) {
-      const key = job.assignedEmployee?.id ?? "__unassigned__";
-      if (!map.has(key)) {
-        map.set(key, {
-          name: job.assignedEmployee?.name ?? "Unassigned",
-          position: job.assignedEmployee?.position?.title ?? null,
-          jobs: [],
-        });
-      }
-      map.get(key)!.jobs.push(job);
-    }
-    const groups = [...map.values()];
-    groups.forEach((g) => g.jobs.sort((a, b) => b.priority - a.priority));
-    groups.sort((a, b) => {
-      if (a.name === "Unassigned") return 1;
-      if (b.name === "Unassigned") return -1;
-      return a.name.localeCompare(b.name);
-    });
-    return groups;
-  })();
 
   const onLunch = now
     ? employees.filter((emp) => {
@@ -634,21 +609,87 @@ export function DashboardSections({
         )}
       </section>
 
-      <section>
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Side Tasks
-        </h2>
-        {jobs.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No side tasks yet.
-          </p>
-        ) : (
-          <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass="max-h-[40vh]">
+      {!hideTasks && (
+        <SideTasksSection
+          jobs={jobs}
+          showPositions={showPositions}
+          horizontal={horizontalTasks}
+          autoScroll={autoScroll}
+          scrollSpeed={scrollSpeed}
+        />
+      )}
+    </>
+  );
+}
+
+// The Side Tasks section, grouped by assigned employee (unassigned last), each
+// group's tasks ordered by priority. Standalone so the public dashboard can
+// place it next to the handoff notes while the admin mirror keeps it below.
+export function SideTasksSection({
+  jobs,
+  showPositions = false,
+  horizontal = false,
+  // Tighter grid + height for the top-row slot beside the handoff notes.
+  compact = false,
+  autoScroll = false,
+  scrollSpeed = 4,
+}: {
+  jobs: JobWithRelations[];
+  showPositions?: boolean;
+  horizontal?: boolean;
+  compact?: boolean;
+  autoScroll?: boolean;
+  scrollSpeed?: number;
+}) {
+  const speed = Math.max(1, Math.min(10, scrollSpeed)) * 0.1;
+  const jobGroups = (() => {
+    const map = new Map<
+      string,
+      { name: string; position: string | null; jobs: JobWithRelations[] }
+    >();
+    for (const job of jobs) {
+      const key = job.assignedEmployee?.id ?? "__unassigned__";
+      if (!map.has(key)) {
+        map.set(key, {
+          name: job.assignedEmployee?.name ?? "Unassigned",
+          position: job.assignedEmployee?.position?.title ?? null,
+          jobs: [],
+        });
+      }
+      map.get(key)!.jobs.push(job);
+    }
+    const groups = [...map.values()];
+    groups.forEach((g) => g.jobs.sort((a, b) => b.priority - a.priority));
+    groups.sort((a, b) => {
+      if (a.name === "Unassigned") return 1;
+      if (b.name === "Unassigned") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    return groups;
+  })();
+
+  return (
+    <section>
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Side Tasks
+      </h2>
+      {jobs.length === 0 ? (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          No side tasks yet.
+        </p>
+      ) : (
+        <AutoScroll
+          enabled={autoScroll}
+          speed={speed}
+          maxHeightClass={compact ? "max-h-[32vh]" : "max-h-[40vh]"}
+        >
           <div
             className={
-              horizontalTasks
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "flex flex-col gap-6"
+              compact
+                ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
+                : horizontal
+                  ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "flex flex-col gap-6"
             }
           >
             {jobGroups.map((group) => (
@@ -659,7 +700,7 @@ export function DashboardSections({
                 </h3>
                 <div
                   className={
-                    horizontalTasks
+                    compact || horizontal
                       ? "flex flex-col gap-4"
                       : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
                   }
@@ -705,9 +746,8 @@ export function DashboardSections({
               </div>
             ))}
           </div>
-          </AutoScroll>
-        )}
-      </section>
-    </>
+        </AutoScroll>
+      )}
+    </section>
   );
 }

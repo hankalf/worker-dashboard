@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_TZ } from "@/lib/time";
 import {
   DashboardSections,
+  SideTasksSection,
   useNow,
   useAutoRefresh,
   useWakeLock,
@@ -147,7 +148,22 @@ export function DashboardView({
           />
         ) : (
           <>
-            <ShiftHandoffBanner />
+            {/* Handoff notes + Side Tasks share the top row; when there's no
+                handoff note the banner wrapper is empty and tasks take the
+                full width. */}
+            <div className="mb-6 flex flex-wrap items-start gap-6">
+              <div className="min-w-[300px] flex-1 empty:hidden">
+                <ShiftHandoffBanner />
+              </div>
+              <div className="min-w-[300px] flex-1">
+                <SideTasksSection
+                  jobs={jobs}
+                  compact
+                  autoScroll
+                  scrollSpeed={scrollSpeed}
+                />
+              </div>
+            </div>
             <DashboardSections
               positions={positions}
               employees={employees}
@@ -159,6 +175,7 @@ export function DashboardView({
               autoScroll
               scrollSpeed={scrollSpeed}
               hideEmptyPositions
+              hideTasks
               tv={tv}
             />
           </>
