@@ -277,26 +277,9 @@ export function DashboardSections({
   // are always shown). Recomputes as the clock crosses a shift boundary.
   const shiftKey = now ? currentShift(now) : null;
   const today = now ? todayKey(now) : null;
-  const thisMonth = today ? today.slice(5, 7) : null;
   // Slider value (1–10) → pixels per frame; 4 → 0.4px/frame (~24px/s).
   const scrollPxPerFrame = Math.max(1, Math.min(10, scrollSpeed)) * 0.1;
 
-  // This month's work anniversaries and birthdays (across all shown crew), for
-  // the celebrations banner. Sorted by day of month.
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthAbbr = thisMonth ? MONTHS[Number(thisMonth) - 1] : "";
-  const dayOf = (d: string) => Number(d.slice(8, 10));
-  const anniversariesThisMonth = thisMonth
-    ? employees
-        .filter((e) => e.hireDate && e.hireDate.slice(5, 7) === thisMonth)
-        .map((e) => ({
-          name: e.name,
-          day: dayOf(e.hireDate!),
-          years: Number(today!.slice(0, 4)) - Number(e.hireDate!.slice(0, 4)),
-        }))
-        .filter((a) => a.years >= 1)
-        .sort((a, b) => a.day - b.day)
-    : [];
   // Staying over: still within their marked stay-over window (past shift end).
   const stayingOver = (e: EmployeeWithRelations) =>
     !!e.stayOverUntil &&
@@ -553,20 +536,8 @@ export function DashboardSections({
         </div>
       )}
 
-      {/* This month's work anniversaries (only when there are any). Birthdays
-          are shown only on the day, on the employee's own card. */}
-      {anniversariesThisMonth.length > 0 && (
-        <div className="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
-          <div className="text-amber-900 dark:text-amber-200">
-            <span className="mr-2 font-semibold">
-              🎉 Work anniversaries this month:
-            </span>
-            {anniversariesThisMonth
-              .map((a) => `${a.name} (${a.years} yr — ${monthAbbr} ${a.day})`)
-              .join(", ")}
-          </div>
-        </div>
-      )}
+      {/* No celebrations banner — birthdays show on the employee's card on the
+          day, anniversaries on the card for the whole month. */}
 
       <section className="mb-10">
         <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
