@@ -11,6 +11,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [dashboardName, setDashboardName] = useState("Warehouse Dashboard");
 
   useEffect(() => {
@@ -68,14 +69,24 @@ function LoginForm() {
         <label className="mb-1 block text-sm font-medium text-zinc-300">
           Password
         </label>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-        />
+        <div className="relative mb-4">
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 pr-16 text-sm text-zinc-100"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-pressed={showPassword}
+            className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
 
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
