@@ -444,10 +444,12 @@ export default function EmployeesPage() {
   const today = todayKey(new Date());
 
   return (
-    <div className="max-w-3xl">
+    // Full width so the shift columns spread across the screen; the import and
+    // add/edit cards stay at a readable width.
+    <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Employees</h2>
 
-      <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="mb-6 max-w-3xl rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <h3 className="mb-1 text-sm font-medium text-white">Import from CSV</h3>
         <p className="mb-3 text-sm text-zinc-400">
           Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
@@ -492,7 +494,7 @@ export default function EmployeesPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mb-6 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+        className="mb-6 flex max-w-3xl flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
       >
         <h3 className="text-sm font-medium text-white">
           {editingId ? "Edit employee" : "Add employee"}

@@ -15,6 +15,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
+import { TasksPeek } from "@/components/TasksPeek";
 import { shiftEndDate, shiftStartDate, currentShift } from "@/lib/shift";
 import { APP_TZ, easternDateKey, easternInputToUtcISO } from "@/lib/time";
 import { upcomingScheduleDates } from "@/lib/schedule";
@@ -984,8 +985,9 @@ export default function AssignPage() {
       </p>
 
       {!scheduleMode && (
-        <div className="mb-6">
+        <div className="mb-6 grid items-start gap-4 lg:grid-cols-[2fr_1fr]">
           <ShiftHandoffEditor />
+          <TasksPeek />
         </div>
       )}
 
