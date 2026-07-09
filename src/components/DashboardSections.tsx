@@ -12,6 +12,7 @@ import {
 } from "@/lib/celebrations";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 import { AutoScroll } from "@/components/AutoScroll";
+import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
@@ -250,11 +251,10 @@ export function DashboardSections({
   showCoverage = false,
   capabilities = [],
   announcements = [],
-  horizontalTasks = false,
   autoScroll = false,
   scrollSpeed = 4,
   hideEmptyPositions = false,
-  hideTasks = false,
+  showHandoff = false,
   fill = false,
   tv = false,
 }: {
@@ -266,13 +266,13 @@ export function DashboardSections({
   showCoverage?: boolean;
   capabilities?: { id: string; name: string }[];
   announcements?: string[];
-  horizontalTasks?: boolean;
   autoScroll?: boolean;
   // 1–10 slider value from settings; 4 ≈ the original pace.
   scrollSpeed?: number;
   hideEmptyPositions?: boolean;
-  // The public dashboard renders Side Tasks itself, next to the handoff notes.
-  hideTasks?: boolean;
+  // Public board only: render the shift-handoff banner next to the notices
+  // (the admin mirror edits handoff notes on the Assign tab instead).
+  showHandoff?: boolean;
   // Public board: lock to the viewport on lg+ screens — the positions section
   // flexes to the remaining height and scrolls inside itself (no page scroll).
   fill?: boolean;
@@ -362,30 +362,41 @@ export function DashboardSections({
 
   return (
     <>
-      {/* Notices + lunch together in one row at the top (under the banner). */}
-      <div
-        className={`${fill ? "mb-4 shrink-0" : "mb-10"} grid gap-6 ${
-          announcements.length > 0 ? "lg:grid-cols-2" : ""
-        }`}
-      >
-        {announcements.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {announcements.map((message, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
-              >
-                <span className="mr-2 font-semibold uppercase tracking-wide">
-                  Notice
-                </span>
-                {message}
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Row A: shift-handoff notes (public board only) next to the notices.
+          A cell disappears when it has nothing to show; the other takes the
+          full row (the banner renders null without a note → empty:hidden). */}
+      {(showHandoff || announcements.length > 0) && (
+        <div
+          className={`${fill ? "mb-4 shrink-0" : "mb-8"} flex flex-wrap items-start gap-6`}
+        >
+          {showHandoff && (
+            <div className="min-w-[300px] flex-1 empty:hidden">
+              <ShiftHandoffBanner />
+            </div>
+          )}
+          {announcements.length > 0 && (
+            <div className="flex min-w-[300px] flex-1 flex-col gap-2">
+              {announcements.map((message, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+                >
+                  <span className="mr-2 font-semibold uppercase tracking-wide">
+                    Notice
+                  </span>
+                  {message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Lunch section: On Lunch + Lunch Schedule side by side. */}
-        <div className="grid gap-4 sm:grid-cols-2">
+      {/* Row B: lunches (On Lunch + Lunch Schedule) next to the side tasks. */}
+      <div
+        className={`${fill ? "mb-4 shrink-0" : "mb-10"} flex flex-wrap items-start gap-6`}
+      >
+        <div className="grid min-w-[300px] flex-1 gap-4 sm:grid-cols-2">
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
@@ -457,6 +468,15 @@ export function DashboardSections({
               </AutoScroll>
             )}
           </section>
+        </div>
+
+        <div className="min-w-[300px] flex-1">
+          <SideTasksSection
+            jobs={jobs}
+            compact
+            autoScroll={autoScroll}
+            scrollSpeed={scrollSpeed}
+          />
         </div>
       </div>
 
@@ -627,15 +647,6 @@ export function DashboardSections({
         )}
       </section>
 
-      {!hideTasks && (
-        <SideTasksSection
-          jobs={jobs}
-          showPositions={showPositions}
-          horizontal={horizontalTasks}
-          autoScroll={autoScroll}
-          scrollSpeed={scrollSpeed}
-        />
-      )}
     </>
   );
 }

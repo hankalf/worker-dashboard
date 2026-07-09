@@ -7,14 +7,12 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_TZ } from "@/lib/time";
 import {
   DashboardSections,
-  SideTasksSection,
   useNow,
   useAutoRefresh,
   useWakeLock,
   type EmployeeWithRelations,
   type JobWithRelations,
 } from "@/components/DashboardSections";
-import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 
 export function DashboardView({
   positions,
@@ -154,39 +152,20 @@ export function DashboardView({
             className="min-h-0 w-full flex-1 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800"
           />
         ) : (
-          <>
-            {/* Handoff notes + Side Tasks share the top row; when there's no
-                handoff note the banner wrapper is empty and tasks take the
-                full width. */}
-            <div className="mb-4 flex shrink-0 flex-wrap items-start gap-6">
-              <div className="min-w-[300px] flex-1 empty:hidden">
-                <ShiftHandoffBanner />
-              </div>
-              <div className="min-w-[300px] flex-1">
-                <SideTasksSection
-                  jobs={jobs}
-                  compact
-                  autoScroll
-                  scrollSpeed={scrollSpeed}
-                />
-              </div>
-            </div>
-            <DashboardSections
-              positions={positions}
-              employees={employees}
-              jobs={jobs}
-              now={now}
-              announcements={announcements}
-              showPositions
-              horizontalTasks
-              autoScroll
-              scrollSpeed={scrollSpeed}
-              hideEmptyPositions
-              hideTasks
-              fill
-              tv={tv}
-            />
-          </>
+          <DashboardSections
+            positions={positions}
+            employees={employees}
+            jobs={jobs}
+            now={now}
+            announcements={announcements}
+            showPositions
+            showHandoff
+            autoScroll
+            scrollSpeed={scrollSpeed}
+            hideEmptyPositions
+            fill
+            tv={tv}
+          />
         )}
       </main>
     </div>
