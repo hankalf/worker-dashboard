@@ -73,13 +73,16 @@ export default function EquipmentPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <h2 className="mb-1 text-lg font-semibold text-white">Equipment</h2>
       <p className="mb-4 text-sm text-zinc-400">
         Equipment describes what an employee is able to operate (e.g. Forklift,
         Pallet Jack, Scanner). Assign it to employees on the Employees page.
       </p>
 
+      {/* Two-pane: form stays readable on the left, list fills the window. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-4 lg:w-[26rem] lg:shrink-0">
       <CsvImport
         endpoint="/api/equipment/import"
         sampleHref="/equipment-import-sample.csv"
@@ -129,8 +132,9 @@ export default function EquipmentPage() {
           )}
         </div>
       </form>
+        </div>
 
-      <ul className="flex flex-col gap-2">
+        <ul className="flex min-w-0 flex-1 flex-col gap-2">
         {equipment.map((item) => (
           <li
             key={item.id}
@@ -158,7 +162,8 @@ export default function EquipmentPage() {
             </div>
           </li>
         ))}
-      </ul>
+        </ul>
+      </div>
     </div>
   );
 }

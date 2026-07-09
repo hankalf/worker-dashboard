@@ -130,12 +130,14 @@ export default function JobsPage() {
     "rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500";
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Side Tasks</h2>
 
+      {/* Two-pane: form stays readable on the left, list fills the window. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <form
         onSubmit={handleSubmit}
-        className="mb-6 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+        className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4 lg:w-[26rem] lg:shrink-0"
       >
         <input
           placeholder="Title"
@@ -218,6 +220,7 @@ export default function JobsPage() {
         </div>
       </form>
 
+      <div className="min-w-0 flex-1">
       <ul className="flex flex-col gap-2">
         {jobs.map((job) => (
           <li
@@ -300,6 +303,8 @@ export default function JobsPage() {
           ))}
         </ul>
       )}
+      </div>
+      </div>
     </div>
   );
 }

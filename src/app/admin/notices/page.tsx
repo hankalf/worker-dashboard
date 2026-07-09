@@ -42,7 +42,7 @@ export default async function NoticesPage() {
   });
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <h2 className="mb-4 text-lg font-semibold text-white">Notices</h2>
       <NoticesManager
         notices={active.map(toDto)}

@@ -148,7 +148,7 @@ export default function ActivityPage() {
   if (!admin) return null;
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <div className="mb-1 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-white">Activity Log</h2>
         <div className="flex shrink-0 gap-2">

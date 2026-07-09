@@ -37,7 +37,7 @@ function ScrollSpeed() {
   };
 
   return (
-    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
       <h3 className="text-sm font-medium text-white">Auto-scroll speed</h3>
       <p className="mt-1 text-sm text-zinc-400">
         How fast the main dashboard&apos;s overflowing sections (positions,
@@ -458,9 +458,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <h2 className="mb-4 text-lg font-semibold text-white">General</h2>
 
+      {/* Simple settings cards flow into as many columns as the window allows. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
@@ -498,7 +500,7 @@ export default function SettingsPage() {
 
       <ScrollSpeed />
 
-      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <h3 className="text-sm font-medium text-white">Backup</h3>
         <p className="mt-1 text-sm text-zinc-400">
           Download a full Excel workbook (one sheet each for employees,
@@ -511,6 +513,7 @@ export default function SettingsPage() {
         >
           Download full backup (.xlsx)
         </a>
+      </div>
       </div>
 
       <details className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">

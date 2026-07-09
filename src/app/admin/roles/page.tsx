@@ -180,7 +180,7 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <h2 className="mb-1 text-lg font-semibold text-white">Roles</h2>
       <p className="mb-4 text-sm text-zinc-400">
         Roles are the job functions an employee can perform (e.g. Receive, Ship,
@@ -188,6 +188,10 @@ export default function RolesPage() {
         Employees page.
       </p>
 
+      {/* Two-pane: the form/import stays a readable width on the left while the
+          list fills the rest of the window (stacks on small screens). */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-4 lg:w-[26rem] lg:shrink-0">
       <CsvImport
         endpoint="/api/roles/import"
         sampleHref="/role-import-sample.csv"
@@ -237,7 +241,9 @@ export default function RolesPage() {
           )}
         </div>
       </form>
+        </div>
 
+        <div className="min-w-0 flex-1">
       {roles.length === 0 ? (
         <p className="text-sm text-zinc-500">No roles yet — add one above.</p>
       ) : (
@@ -269,6 +275,8 @@ export default function RolesPage() {
           </DndContext>
         </>
       )}
+        </div>
+      </div>
     </div>
   );
 }

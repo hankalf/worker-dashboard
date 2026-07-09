@@ -211,9 +211,12 @@ export default function PositionsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Positions</h2>
 
+      {/* Two-pane: form stays readable on the left, list fills the window. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-4 lg:w-[26rem] lg:shrink-0">
       <CsvImport
         endpoint="/api/positions/import"
         sampleHref="/position-import-sample.csv"
@@ -297,7 +300,9 @@ export default function PositionsPage() {
           )}
         </div>
       </form>
+        </div>
 
+        <div className="min-w-0 flex-1">
       <p className="mb-2 text-xs text-zinc-500">
         Drag the handle to reorder — this is the order positions appear on the
         dashboard and assign board.
@@ -323,6 +328,8 @@ export default function PositionsPage() {
           </ul>
         </SortableContext>
       </DndContext>
+        </div>
+      </div>
     </div>
   );
 }
