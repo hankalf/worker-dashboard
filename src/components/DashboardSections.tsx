@@ -255,6 +255,7 @@ export function DashboardSections({
   scrollSpeed = 4,
   hideEmptyPositions = false,
   hideTasks = false,
+  fill = false,
   tv = false,
 }: {
   positions: Position[];
@@ -272,6 +273,9 @@ export function DashboardSections({
   hideEmptyPositions?: boolean;
   // The public dashboard renders Side Tasks itself, next to the handoff notes.
   hideTasks?: boolean;
+  // Public board: lock to the viewport on lg+ screens — the positions section
+  // flexes to the remaining height and scrolls inside itself (no page scroll).
+  fill?: boolean;
   tv?: boolean;
 }) {
   // Admins never appear on the boards; supervisors are working staff and do.
@@ -360,7 +364,7 @@ export function DashboardSections({
     <>
       {/* Notices + lunch together in one row at the top (under the banner). */}
       <div
-        className={`mb-10 grid gap-6 ${
+        className={`${fill ? "mb-4 shrink-0" : "mb-10"} grid gap-6 ${
           announcements.length > 0 ? "lg:grid-cols-2" : ""
         }`}
       >
@@ -514,8 +518,14 @@ export function DashboardSections({
       {/* No celebrations banner — birthdays show on the employee's card on the
           day, anniversaries on the card for the whole month. */}
 
-      <section className="mb-10">
-        <h2 className="mb-4 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <section
+        className={
+          fill
+            ? "mb-4 flex flex-col lg:mb-0 lg:min-h-0 lg:flex-1"
+            : "mb-10"
+        }
+      >
+        <h2 className="mb-4 flex shrink-0 flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           {showPositions ? "Team by Position" : "Position"}
           {showPositions && shiftKey && (
             <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
@@ -533,9 +543,17 @@ export function DashboardSections({
             </p>
           ) : (
             <AutoScroll
-              enabled={autoScroll && (tv ? visibleColumns.length > 6 : true)}
+              // In fill mode the section flexes to the leftover viewport height
+              // and AutoScroll no-ops when the content already fits.
+              enabled={autoScroll && (fill || (tv ? visibleColumns.length > 6 : true))}
               speed={scrollPxPerFrame}
-              maxHeightClass={tv ? "max-h-[80vh]" : "max-h-[48vh]"}
+              maxHeightClass={
+                fill
+                  ? "max-h-[48vh] lg:max-h-none lg:min-h-0 lg:flex-1"
+                  : tv
+                    ? "max-h-[80vh]"
+                    : "max-h-[48vh]"
+              }
             >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleColumns.map((column) => (
@@ -670,26 +688,56 @@ export function SideTasksSection({
 
   return (
     <section>
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <h2
+        className={`${compact ? "mb-2" : "mb-4"} text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400`}
+      >
         Side Tasks
       </h2>
       {jobs.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           No side tasks yet.
         </p>
+      ) : compact ? (
+        // Slim top-row variant: one line per task (title · chips · assignee),
+        // no descriptions — details live on the admin Side Tasks tab.
+        <AutoScroll enabled={autoScroll} speed={speed} maxHeightClass="max-h-[20vh]">
+          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            {jobGroups.flatMap((group) =>
+              group.jobs.map((job) => (
+                <li
+                  key={job.id}
+                  className="flex items-center gap-2 px-3 py-1.5"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {job.title}
+                  </span>
+                  {priorityBadgeClass(job.priority) && (
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityBadgeClass(job.priority)}`}
+                    >
+                      {priorityLabel(job.priority)}
+                    </span>
+                  )}
+                  <span
+                    className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[job.status]}`}
+                  >
+                    {STATUS_LABELS[job.status]}
+                  </span>
+                  <span className="w-24 shrink-0 truncate text-right text-xs text-zinc-500 dark:text-zinc-400">
+                    {group.name}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+        </AutoScroll>
       ) : (
-        <AutoScroll
-          enabled={autoScroll}
-          speed={speed}
-          maxHeightClass={compact ? "max-h-[32vh]" : "max-h-[40vh]"}
-        >
+        <AutoScroll enabled={autoScroll} speed={speed} maxHeightClass="max-h-[40vh]">
           <div
             className={
-              compact
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
-                : horizontal
-                  ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                  : "flex flex-col gap-6"
+              horizontal
+                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "flex flex-col gap-6"
             }
           >
             {jobGroups.map((group) => (
@@ -700,7 +748,7 @@ export function SideTasksSection({
                 </h3>
                 <div
                   className={
-                    compact || horizontal
+                    horizontal
                       ? "flex flex-col gap-4"
                       : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
                   }

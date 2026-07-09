@@ -64,11 +64,18 @@ export function DashboardView({
   }, [rotating, rotationSeconds]);
 
   return (
+    // On lg+ screens the board locks to the viewport height (no page scroll —
+    // long sections scroll inside themselves instead). TV mode zooms, so its
+    // height compensates (100vh / zoom) to still render exactly one screen.
     <div
-      className="flex flex-1 flex-col"
-      style={tv ? ({ zoom: 1.35 } as React.CSSProperties) : undefined}
+      className="flex flex-1 flex-col lg:h-screen lg:flex-none lg:overflow-hidden"
+      style={
+        tv
+          ? ({ zoom: 1.35, height: "calc(100vh / 1.35)" } as React.CSSProperties)
+          : undefined
+      }
     >
-      <header className="grid grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <header className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-lg font-semibold">{title}</h1>
         <div className="text-center">
           {now && (
@@ -139,7 +146,7 @@ export function DashboardView({
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col px-6 py-6">
+      <main className="flex min-h-0 flex-1 flex-col px-6 py-4 lg:overflow-hidden">
         {rotating && showingUrl ? (
           <iframe
             src={rotatingUrl}
@@ -151,7 +158,7 @@ export function DashboardView({
             {/* Handoff notes + Side Tasks share the top row; when there's no
                 handoff note the banner wrapper is empty and tasks take the
                 full width. */}
-            <div className="mb-6 flex flex-wrap items-start gap-6">
+            <div className="mb-4 flex shrink-0 flex-wrap items-start gap-6">
               <div className="min-w-[300px] flex-1 empty:hidden">
                 <ShiftHandoffBanner />
               </div>
@@ -176,6 +183,7 @@ export function DashboardView({
               scrollSpeed={scrollSpeed}
               hideEmptyPositions
               hideTasks
+              fill
               tv={tv}
             />
           </>
