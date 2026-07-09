@@ -243,7 +243,7 @@ function MemberBody({
 // recomputes as the clock ticks.
 export function DashboardSections({
   positions,
-  employees,
+  employees: allEmployees,
   jobs,
   now,
   showPositions = false,
@@ -271,6 +271,8 @@ export function DashboardSections({
   hideEmptyPositions?: boolean;
   tv?: boolean;
 }) {
+  // Admins never appear on the boards; supervisors are working staff and do.
+  const employees = allEmployees.filter((e) => e.accessLevel !== "ADMIN");
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
   const shiftKey = now ? currentShift(now) : null;

@@ -567,9 +567,9 @@ export default function AssignPage() {
         window.location.href = "/login";
         return;
       }
-      // Admins/supervisors are never assigned on the board — leave them off.
+      // Admins are never assigned on the board; supervisors are working staff.
       const all: Employee[] = await employeesRes.json();
-      setEmployees(all.filter((e) => e.accessLevel === "NONE"));
+      setEmployees(all.filter((e) => e.accessLevel !== "ADMIN"));
       setPositions(await positionsRes.json());
     })();
   }, []);
