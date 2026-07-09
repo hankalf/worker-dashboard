@@ -480,7 +480,9 @@ export function DashboardSections({
               <AutoScroll
                 enabled={autoScroll && lunchSchedule.length > 6}
                 speed={scrollPxPerFrame}
-                maxHeightClass={lunchMaxHeight}
+                // Cap to ~6 rows so the 7th+ overflows and scrolls (matching the
+                // positions section's speed & direction); ≤6 renders unscrolled.
+                maxHeightClass="max-h-[15rem]"
               >
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (
