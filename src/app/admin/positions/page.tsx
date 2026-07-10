@@ -32,6 +32,9 @@ type Position = {
   requiredRole: Role | null;
   requiredCapabilityId: string | null;
   requiredCapability: Capability | null;
+  minFirst: number;
+  minSecond: number;
+  minThird: number;
 };
 
 function SortablePosition({
@@ -118,6 +121,9 @@ export default function PositionsPage() {
   const [description, setDescription] = useState("");
   const [requiredRoleId, setRequiredRoleId] = useState("");
   const [requiredCapabilityId, setRequiredCapabilityId] = useState("");
+  const [minFirst, setMinFirst] = useState("0");
+  const [minSecond, setMinSecond] = useState("0");
+  const [minThird, setMinThird] = useState("0");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -146,6 +152,9 @@ export default function PositionsPage() {
     setDescription("");
     setRequiredRoleId("");
     setRequiredCapabilityId("");
+    setMinFirst("0");
+    setMinSecond("0");
+    setMinThird("0");
     setEditingId(null);
   };
 
@@ -163,6 +172,9 @@ export default function PositionsPage() {
         description,
         requiredRoleId,
         requiredCapabilityId,
+        minFirst,
+        minSecond,
+        minThird,
         // New positions go to the end; editing leaves the order untouched.
         ...(editingId ? {} : { sortOrder: positions.length }),
       }),
@@ -184,6 +196,9 @@ export default function PositionsPage() {
     setDescription(position.description ?? "");
     setRequiredRoleId(position.requiredRoleId ?? "");
     setRequiredCapabilityId(position.requiredCapabilityId ?? "");
+    setMinFirst(String(position.minFirst ?? 0));
+    setMinSecond(String(position.minSecond ?? 0));
+    setMinThird(String(position.minThird ?? 0));
   };
 
   const handleDelete = async (id: string) => {
@@ -281,6 +296,33 @@ export default function PositionsPage() {
             ))}
           </select>
         </label>
+        <div>
+          <span className="text-xs text-zinc-400">
+            Minimum present headcount per shift (0 = no target — flags the board
+            when a shift is below it)
+          </span>
+          <div className="mt-1 grid grid-cols-3 gap-2">
+            {(
+              [
+                ["1st", minFirst, setMinFirst],
+                ["2nd", minSecond, setMinSecond],
+                ["3rd", minThird, setMinThird],
+              ] as const
+            ).map(([label, value, setter]) => (
+              <label key={label} className="flex items-center gap-2 text-xs text-zinc-400">
+                {label}
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button

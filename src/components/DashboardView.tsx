@@ -31,6 +31,7 @@ export function DashboardView({
   scrollSpeed = 4,
   branding,
   laborShare = [],
+  version = "",
   tv = false,
 }: {
   positions: Position[];
@@ -42,6 +43,7 @@ export function DashboardView({
   title: string;
   branding?: Branding;
   laborShare?: LaborShareItem[];
+  version?: string;
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
@@ -216,6 +218,12 @@ export function DashboardView({
           />
         )}
       </main>
+
+      {version && (
+        <footer className="shrink-0 border-t border-zinc-200 px-6 py-1 text-right text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
+          {version}
+        </footer>
+      )}
     </div>
   );
 }

@@ -110,12 +110,18 @@ export async function GET() {
       { header: "Description", key: "description", width: 40 },
       { header: "Required equipment", key: "requiredEquipment", width: 20 },
       { header: "Required role", key: "requiredRole", width: 20 },
+      { header: "Min 1st", key: "minFirst", width: 8 },
+      { header: "Min 2nd", key: "minSecond", width: 8 },
+      { header: "Min 3rd", key: "minThird", width: 8 },
     ],
     positions.map((p) => ({
       title: p.title,
       description: p.description ?? "",
       requiredEquipment: p.requiredRole?.name ?? "",
       requiredRole: p.requiredCapability?.name ?? "",
+      minFirst: p.minFirst,
+      minSecond: p.minSecond,
+      minThird: p.minThird,
     }))
   );
 

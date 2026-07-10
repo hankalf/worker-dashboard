@@ -371,18 +371,34 @@ export function DashboardSections({
     activeLabor.filter((l) => l.positionId === positionId);
   const noPositionLabor = activeLabor.filter((l) => !l.positionId);
 
+  // The position's target minimum headcount for the active shift (0 = none).
+  const targetFor = (position: Position) =>
+    shiftKey === "FIRST"
+      ? position.minFirst
+      : shiftKey === "SECOND"
+        ? position.minSecond
+        : shiftKey === "THIRD"
+          ? position.minThird
+          : 0;
+
   const columns = positions.map((position) => {
     const members = employees
       .filter((e) => e.positionId === position.id && onShift(e))
       // Lead(s) first, everyone else keeps the incoming name order.
       .sort((a, b) => Number(b.isLead) - Number(a.isLead));
+    const labor = laborByPosition(position.id);
+    // Labor-share count toward coverage.
+    const presentCount = members.filter(present).length + labor.length;
+    const target = targetFor(position);
     return {
       id: position.id,
       title: position.title,
       description: position.description,
       members,
-      labor: laborByPosition(position.id),
-      presentCount: members.filter(present).length,
+      labor,
+      presentCount,
+      target,
+      under: target > 0 && presentCount < target,
     };
   });
   const roster = employees.filter(onShift);
@@ -393,10 +409,10 @@ export function DashboardSections({
     ? columns.filter((c) => c.members.length > 0 || c.labor.length > 0)
     : columns;
 
-  // Positions with nobody present on the current shift (admin view only).
+  // Positions below their target for the active shift (admin view only).
   const understaffed = columns
-    .filter((c) => c.presentCount === 0)
-    .map((c) => c.title);
+    .filter((c) => c.under)
+    .map((c) => `${c.title} (${c.presentCount}/${c.target})`);
 
   const onShiftCount = roster.length;
   const presentCount = roster.filter(present).length;
@@ -687,12 +703,13 @@ export function DashboardSections({
                     </div>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                        column.presentCount === 0
+                        column.under || (column.target === 0 && column.presentCount === 0)
                           ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
-                      {column.presentCount} present
+                      {column.presentCount}
+                      {column.target > 0 ? `/${column.target}` : ""} present
                     </span>
                   </div>
                   {column.members.length === 0 && column.labor.length === 0 ? (

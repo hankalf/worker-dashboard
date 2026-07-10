@@ -10,6 +10,7 @@ import {
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
+import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,7 @@ export default async function Home({
       scrollSpeed={scrollSpeed}
       branding={branding}
       laborShare={laborShare}
+      version={APP_VERSION}
       tv={tv}
     />
   );

@@ -676,6 +676,29 @@ export default function AssignPage() {
     }
   };
 
+  // Auto-stagger lunches: one atomic server call spaces each position's present
+  // crew 15 min apart from a shift-appropriate base, so a position stays covered.
+  const staggerLunches = async () => {
+    if (
+      !confirm(
+        "Auto-stagger lunches for everyone present? Each position's crew is spaced 15 min apart. This overwrites existing lunch times."
+      )
+    )
+      return;
+    const res = await fetch("/api/employees/stagger-lunches", {
+      method: "POST",
+    });
+    if (res.ok) {
+      const emps = await fetch("/api/employees");
+      if (emps.ok) {
+        const all: Employee[] = await emps.json();
+        setEmployees(all.filter((e) => e.accessLevel === "NONE"));
+      }
+    } else {
+      alert("Could not stagger lunches. Please try again.");
+    }
+  };
+
   const setAttendance = async (employeeId: string, value: Attendance) => {
     setEmployees((current) =>
       current.map((e) => (e.id === employeeId ? { ...e, attendance: value } : e))
@@ -926,6 +949,12 @@ export default function AssignPage() {
                 className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-green-500 hover:text-green-400"
               >
                 Mark all Present
+              </button>
+              <button
+                onClick={staggerLunches}
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-teal-500 hover:text-teal-400"
+              >
+                Stagger lunches
               </button>
               <button
                 onClick={resetAll}

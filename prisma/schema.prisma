@@ -107,6 +107,11 @@ model Position {
   title          String     @unique
   description    String?
   sortOrder      Int        @default(0)
+  // Target minimum present headcount per shift (0 = no target). Drives the
+  // "understaffed" flags on the board.
+  minFirst       Int        @default(0)
+  minSecond      Int        @default(0)
+  minThird       Int        @default(0)
   employees      Employee[]
   scheduledAssignments ScheduledAssignment[]
   laborShares    LaborShare[]

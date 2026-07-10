@@ -15,11 +15,20 @@ export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { title, description, requiredRoleId, requiredCapabilityId, sortOrder } =
-    await req.json();
+  const {
+    title,
+    description,
+    requiredRoleId,
+    requiredCapabilityId,
+    sortOrder,
+    minFirst,
+    minSecond,
+    minThird,
+  } = await req.json();
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
+  const clampMin = (v: unknown) => Math.max(0, Math.min(99, Number(v) || 0));
 
   const position = await prisma.position.create({
     data: {
@@ -28,6 +37,9 @@ export async function POST(req: Request) {
       requiredRoleId: requiredRoleId || null,
       requiredCapabilityId: requiredCapabilityId || null,
       sortOrder: Number(sortOrder) || 0,
+      minFirst: clampMin(minFirst),
+      minSecond: clampMin(minSecond),
+      minThird: clampMin(minThird),
     },
   });
   await logActivity("Position", `Added position ${position.title}`);

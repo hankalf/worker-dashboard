@@ -11,8 +11,17 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const { title, description, requiredRoleId, requiredCapabilityId, sortOrder } =
-    await req.json();
+  const {
+    title,
+    description,
+    requiredRoleId,
+    requiredCapabilityId,
+    sortOrder,
+    minFirst,
+    minSecond,
+    minThird,
+  } = await req.json();
+  const clampMin = (v: unknown) => Math.max(0, Math.min(99, Number(v) || 0));
   const position = await prisma.position.update({
     where: { id },
     // Partial-safe: only touch fields that were actually sent, so a
@@ -27,6 +36,9 @@ export async function PATCH(
         ? { requiredCapabilityId: requiredCapabilityId || null }
         : {}),
       ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) || 0 } : {}),
+      ...(minFirst !== undefined ? { minFirst: clampMin(minFirst) } : {}),
+      ...(minSecond !== undefined ? { minSecond: clampMin(minSecond) } : {}),
+      ...(minThird !== undefined ? { minThird: clampMin(minThird) } : {}),
     },
   });
   await logActivity("Position", `Renamed position to ${position.title}`);

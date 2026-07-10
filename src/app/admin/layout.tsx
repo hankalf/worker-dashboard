@@ -5,6 +5,7 @@ import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 import { AdminNav } from "@/components/AdminNav";
 import { getDashboardName, getBranding } from "@/lib/settings";
 import { getTabs } from "@/lib/tabs";
+import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,12 @@ export default async function AdminLayout({
         <nav className="shrink-0 border-b border-zinc-800 bg-zinc-900 p-2 md:w-48 md:border-b-0 md:border-r md:p-4">
           <AdminNav isAdmin={isAdmin} tabs={tabs} />
         </nav>
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6">
+          {children}
+          <p className="mt-8 text-right text-[10px] text-zinc-600">
+            {APP_VERSION}
+          </p>
+        </main>
       </div>
     </div>
   );
