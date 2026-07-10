@@ -500,21 +500,6 @@ export default function SettingsPage() {
       </form>
 
       <ScrollSpeed />
-
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <h3 className="text-sm font-medium text-white">Backup</h3>
-        <p className="mt-1 text-sm text-zinc-400">
-          Download a full Excel workbook (one sheet each for employees,
-          positions, roles, equipment, side tasks, notices, history, and
-          settings). Passwords are not included.
-        </p>
-        <a
-          href="/api/backup"
-          className="mt-3 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
-        >
-          Download full backup (.xlsx)
-        </a>
-      </div>
       </div>
 
       <AppearanceEditor />
@@ -524,6 +509,21 @@ export default function SettingsPage() {
           Advanced
         </summary>
         <div className="mt-5 flex flex-col gap-8">
+          <div>
+            <h3 className="text-sm font-medium text-white">Backup</h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              Download a full Excel workbook (one sheet each for employees,
+              positions, roles, equipment, side tasks, notices, history, and
+              settings). Passwords are not included.
+            </p>
+            <a
+              href="/api/backup"
+              className="mt-3 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+            >
+              Download full backup (.xlsx)
+            </a>
+          </div>
+
           <RotatingDashboard />
 
           <TabEditor />
