@@ -7,9 +7,12 @@ type LaborShare = {
   id: string;
   name: string;
   shift: string;
+  positionId: string | null;
   positionTitle: string | null;
   comingInAt: string | null;
   leavingAt: string | null;
+  comingIn: string;
+  leaving: string;
 };
 
 const SHIFTS = [
@@ -34,6 +37,7 @@ export function LaborShareEditor() {
   const [positionId, setPositionId] = useState("");
   const [comingIn, setComingIn] = useState("");
   const [leaving, setLeaving] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,14 +52,23 @@ export function LaborShareEditor() {
       .catch(() => {});
   }, []);
 
-  const add = async () => {
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setPositionId("");
+    setComingIn("");
+    setLeaving("");
+  };
+
+  const save = async () => {
     if (!name.trim()) return;
     setBusy(true);
     setError(null);
     const res = await fetch("/api/labor-share", {
-      method: "POST",
+      method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id: editingId ?? undefined,
         name,
         shift,
         positionId: positionId || null,
@@ -66,18 +79,29 @@ export function LaborShareEditor() {
     setBusy(false);
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      setError(d.error ?? "Could not add.");
+      setError(d.error ?? "Could not save.");
       return;
     }
     setList(await res.json());
-    setName("");
-    setComingIn("");
-    setLeaving("");
+    resetForm();
+  };
+
+  const startEdit = (l: LaborShare) => {
+    setEditingId(l.id);
+    setName(l.name);
+    setShift(l.shift);
+    setPositionId(l.positionId ?? "");
+    setComingIn(l.comingIn);
+    setLeaving(l.leaving);
+    setError(null);
   };
 
   const remove = async (id: string) => {
     const res = await fetch(`/api/labor-share?id=${id}`, { method: "DELETE" });
-    if (res.ok) setList(await res.json());
+    if (res.ok) {
+      setList(await res.json());
+      if (editingId === id) resetForm();
+    }
   };
 
   const inputClass =
@@ -96,7 +120,7 @@ export function LaborShareEditor() {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
+          onKeyDown={(e) => e.key === "Enter" && save()}
           placeholder="Name"
           className={inputClass}
         />
@@ -118,7 +142,7 @@ export function LaborShareEditor() {
           style={{ colorScheme: "dark" }}
           className={inputClass}
         >
-          <option value="">No dept</option>
+          <option value="">No position</option>
           {positions.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
@@ -145,13 +169,23 @@ export function LaborShareEditor() {
             className={`flex-1 ${inputClass}`}
           />
         </label>
-        <button
-          onClick={add}
-          disabled={busy || !name.trim()}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
-        >
-          {busy ? "Adding…" : "Add"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={save}
+            disabled={busy || !name.trim()}
+            className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+          >
+            {busy ? "Saving…" : editingId ? "Save" : "Add"}
+          </button>
+          {editingId && (
+            <button
+              onClick={resetForm}
+              className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
       {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
 
@@ -165,18 +199,26 @@ export function LaborShareEditor() {
               <span className="min-w-0">
                 <span className="font-medium text-zinc-100">{l.name}</span>
                 <span className="ml-2 text-xs text-zinc-500">
-                  {SHIFT_LABEL[l.shift]} · {l.positionTitle ?? "No dept"}
+                  {SHIFT_LABEL[l.shift]} · {l.positionTitle ?? "No position"}
                   {l.comingInAt || l.leavingAt
                     ? ` · ${l.comingInAt ?? "?"}${l.leavingAt ? `–${l.leavingAt}` : ""}`
                     : ""}
                 </span>
               </span>
-              <button
-                onClick={() => remove(l.id)}
-                className="shrink-0 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-red-800 hover:bg-red-950/40 hover:text-red-300"
-              >
-                Remove
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => startEdit(l)}
+                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-blue-700 hover:bg-blue-950/30 hover:text-blue-300"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => remove(l.id)}
+                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-red-800 hover:bg-red-950/40 hover:text-red-300"
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>

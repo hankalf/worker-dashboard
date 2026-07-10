@@ -28,6 +28,7 @@ export type LaborShareItem = {
   id: string;
   name: string;
   shift: string;
+  positionId: string | null;
   positionTitle: string | null;
   comingInAt: string | null;
   leavingAt: string | null;
@@ -364,6 +365,12 @@ export function DashboardSections({
   // over). These cards get a violet outline, matching the Assign board.
   const activeNow = (e: EmployeeWithRelations) => present(e) && onShift(e);
 
+  // Labor-share for the active shift, grouped by their allotted position.
+  const activeLabor = laborShare.filter((l) => !shiftKey || l.shift === shiftKey);
+  const laborByPosition = (positionId: string) =>
+    activeLabor.filter((l) => l.positionId === positionId);
+  const noPositionLabor = activeLabor.filter((l) => !l.positionId);
+
   const columns = positions.map((position) => {
     const members = employees
       .filter((e) => e.positionId === position.id && onShift(e))
@@ -374,14 +381,16 @@ export function DashboardSections({
       title: position.title,
       description: position.description,
       members,
+      labor: laborByPosition(position.id),
       presentCount: members.filter(present).length,
     };
   });
   const roster = employees.filter(onShift);
 
-  // On the public board, hide positions that have nobody on this shift.
+  // On the public board, hide positions with nobody on this shift (labor-share
+  // counts as somebody).
   const visibleColumns = hideEmptyPositions
-    ? columns.filter((c) => c.members.length > 0)
+    ? columns.filter((c) => c.members.length > 0 || c.labor.length > 0)
     : columns;
 
   // Positions with nobody present on the current shift (admin view only).
@@ -592,45 +601,37 @@ export function DashboardSections({
       {/* No celebrations banner — birthdays show on the employee's card on the
           day, anniversaries on the card for the whole month. */}
 
-      {(() => {
-        const shown = laborShare.filter(
-          (l) => !shiftKey || l.shift === shiftKey
-        );
-        if (shown.length === 0) return null;
-        return (
-          <section className={fill ? "mb-4 shrink-0" : "mb-8"}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Labor Share{shiftKey ? ` — ${SHIFTS[shiftKey].label}` : ""} (
-              {shown.length})
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {shown.map((l) => (
-                <div
-                  key={l.id}
-                  className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {l.name}
-                    </span>
-                    <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                      Labor Share
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                    {l.positionTitle ?? "No dept"}
-                    {l.comingInAt || l.leavingAt
-                      ? ` · ${l.comingInAt ?? "?"}${
-                          l.leavingAt ? `–${l.leavingAt}` : ""
-                        }`
-                      : ""}
-                  </div>
+      {/* Labor-share with a position show inside that position's column below;
+          only the ones with no position land in this standalone strip. */}
+      {noPositionLabor.length > 0 && (
+        <section className={fill ? "mb-4 shrink-0" : "mb-8"}>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Labor Share{shiftKey ? ` — ${SHIFTS[shiftKey].label}` : ""} (
+            {noPositionLabor.length})
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {noPositionLabor.map((l) => (
+              <div
+                key={l.id}
+                className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{l.name}</span>
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                    Labor Share
+                  </span>
                 </div>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
+                {(l.comingInAt || l.leavingAt) && (
+                  <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                    {l.comingInAt ?? "?"}
+                    {l.leavingAt ? `–${l.leavingAt}` : ""}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section
         className={
@@ -694,7 +695,7 @@ export function DashboardSections({
                       {column.presentCount} present
                     </span>
                   </div>
-                  {column.members.length === 0 ? (
+                  {column.members.length === 0 && column.labor.length === 0 ? (
                     <p className="text-sm text-zinc-400 dark:text-zinc-600">
                       No one assigned
                     </p>
@@ -710,6 +711,27 @@ export function DashboardSections({
                           }`}
                         >
                           <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
+                        </li>
+                      ))}
+                      {column.labor.map((l) => (
+                        <li
+                          key={l.id}
+                          className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-3 dark:border-indigo-800 dark:bg-indigo-950/40"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium">
+                              {l.name}
+                            </span>
+                            <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              Labor Share
+                            </span>
+                          </div>
+                          {(l.comingInAt || l.leavingAt) && (
+                            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              {l.comingInAt ?? "?"}
+                              {l.leavingAt ? `–${l.leavingAt}` : ""}
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>

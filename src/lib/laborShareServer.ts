@@ -57,8 +57,12 @@ export type LaborShareDto = {
   shift: ShiftKey;
   positionId: string | null;
   positionTitle: string | null;
+  // Display labels ("2:00 PM") for the board.
   comingInAt: string | null;
   leavingAt: string | null;
+  // Raw Eastern "HH:MM" for prefilling the edit form ("" when unset).
+  comingIn: string;
+  leaving: string;
 };
 
 const fmtTime = (d: Date | null) =>
@@ -69,6 +73,19 @@ const fmtTime = (d: Date | null) =>
         timeZone: APP_TZ,
       })
     : null;
+
+// "HH:MM" (24h) in Eastern for a stored instant, or "" when null.
+const fmtHHMM = (d: Date | null) => {
+  if (!d) return "";
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TZ,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(d);
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
+  return `${g("hour")}:${g("minute")}`;
+};
 
 // Active (not-yet-ended) labor-share, oldest first. Purges finished ones first.
 export async function getActiveLaborShare(
@@ -89,6 +106,8 @@ export async function getActiveLaborShare(
       positionTitle: r.position?.title ?? null,
       comingInAt: fmtTime(r.comingInAt),
       leavingAt: fmtTime(r.leavingAt),
+      comingIn: fmtHHMM(r.comingInAt),
+      leaving: fmtHHMM(r.leavingAt),
     }));
   } catch {
     return [];
