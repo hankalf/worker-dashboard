@@ -23,6 +23,16 @@ export type EmployeeWithRelations = Employee & {
 // Optional brand accent colors (hex) for the board subtree.
 export type Brand = { notice?: string; handoff?: string; badge?: string };
 
+// A temporary borrowed worker shown on the board for their shift.
+export type LaborShareItem = {
+  id: string;
+  name: string;
+  shift: string;
+  positionTitle: string | null;
+  comingInAt: string | null;
+  leavingAt: string | null;
+};
+
 // A banner tint (border + translucent background) from a brand color, or
 // undefined to keep the element's default classes.
 export const tintStyle = (color?: string): CSSProperties | undefined =>
@@ -156,6 +166,7 @@ function MemberBody({
   covering = false,
   today = null,
   hidePosition = false,
+  hideLunch = false,
   badgeColor,
 }: {
   member: EmployeeWithRelations;
@@ -166,6 +177,9 @@ function MemberBody({
   // Public board groups by position already, so the per-card position line is
   // redundant there — hide it and show only roles.
   hidePosition?: boolean;
+  // Public board shows lunch times in the Lunch Schedule list instead, so the
+  // per-card lunch badge is hidden there (kept on the admin panel).
+  hideLunch?: boolean;
 }) {
   const anniv = today ? anniversaryYearsThisMonth(member.hireDate, today) : null;
   const birthday = today ? isBirthday(member.birthDate, today) : false;
@@ -257,7 +271,7 @@ function MemberBody({
                 Break {formatClock(member.breakStart)}
               </span>
             )}
-            {member.lunchStart && (
+            {!hideLunch && member.lunchStart && (
               <span className="whitespace-nowrap rounded-full bg-green-700 px-2 py-0.5 text-xs font-medium text-white dark:bg-green-800 dark:text-green-100">
                 Lunch {formatClock(member.lunchStart)}
               </span>
@@ -287,6 +301,7 @@ export function DashboardSections({
   hideEmptyPositions = false,
   showHandoff = false,
   brand,
+  laborShare = [],
   fill = false,
   tv = false,
 }: {
@@ -307,6 +322,8 @@ export function DashboardSections({
   showHandoff?: boolean;
   // Optional brand accent colors (notices, handoff, badges).
   brand?: Brand;
+  // Temporary borrowed workers to show for the active shift.
+  laborShare?: LaborShareItem[];
   // Public board: lock to the viewport on lg+ screens — the positions section
   // flexes to the remaining height and scrolls inside itself (no page scroll).
   fill?: boolean;
@@ -474,11 +491,11 @@ export function DashboardSections({
               </p>
             ) : (
               <AutoScroll
-                enabled={autoScroll && lunchSchedule.length > 6}
+                enabled={autoScroll && lunchSchedule.length > 4}
                 speed={scrollPxPerFrame}
-                // Cap to ~6 rows so the 7th+ overflows and scrolls (matching the
-                // positions section's speed & direction); ≤6 renders unscrolled.
-                maxHeightClass="max-h-[15rem]"
+                // Cap to ~4 rows so the 5th+ overflows and scrolls (matching the
+                // positions section's speed & direction); ≤4 renders unscrolled.
+                maxHeightClass="max-h-[9.5rem]"
               >
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (
@@ -575,6 +592,46 @@ export function DashboardSections({
       {/* No celebrations banner — birthdays show on the employee's card on the
           day, anniversaries on the card for the whole month. */}
 
+      {(() => {
+        const shown = laborShare.filter(
+          (l) => !shiftKey || l.shift === shiftKey
+        );
+        if (shown.length === 0) return null;
+        return (
+          <section className={fill ? "mb-4 shrink-0" : "mb-8"}>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Labor Share{shiftKey ? ` — ${SHIFTS[shiftKey].label}` : ""} (
+              {shown.length})
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {shown.map((l) => (
+                <div
+                  key={l.id}
+                  className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {l.name}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                      Labor Share
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                    {l.positionTitle ?? "No dept"}
+                    {l.comingInAt || l.leavingAt
+                      ? ` · ${l.comingInAt ?? "?"}${
+                          l.leavingAt ? `–${l.leavingAt}` : ""
+                        }`
+                      : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       <section
         className={
           fill
@@ -652,7 +709,7 @@ export function DashboardSections({
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} badgeColor={brand?.badge} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
                         </li>
                       ))}
                     </ul>
@@ -677,7 +734,7 @@ export function DashboardSections({
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} badgeColor={brand?.badge} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
               </div>
             ))}
           </div>

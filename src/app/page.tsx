@@ -9,6 +9,7 @@ import {
   getBranding,
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
+import { getActiveLaborShare } from "@/lib/laborShareServer";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,7 @@ export default async function Home({
   const rotation = await getRotationConfig();
   const scrollSpeed = await getScrollSpeed();
   const branding = await getBranding();
+  const laborShare = await getActiveLaborShare(now);
 
   const { visible } = splitNotices(activeNotices);
 
@@ -77,6 +79,7 @@ export default async function Home({
       rotatingEnabled={rotation.enabled}
       scrollSpeed={scrollSpeed}
       branding={branding}
+      laborShare={laborShare}
       tv={tv}
     />
   );

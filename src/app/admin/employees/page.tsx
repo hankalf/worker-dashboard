@@ -734,11 +734,12 @@ export default function EmployeesPage() {
 
       {(() => {
         const q = search.trim().toLowerCase();
-        // Sort by position (no position last), then by name; shift is handled
-        // by splitting into columns below.
+        // Within each shift column: leads first, then by position (no position
+        // last), then by name. Shift is handled by splitting into columns below.
         const visible = employees
           .slice()
           .sort((a, b) => {
+            if (a.isLead !== b.isLead) return a.isLead ? -1 : 1;
             const pd = positionKey(a.position).localeCompare(
               positionKey(b.position)
             );

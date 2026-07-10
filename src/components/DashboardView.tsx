@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Position } from "@/generated/prisma/client";
 import type { Branding } from "@/lib/settings";
@@ -13,6 +14,7 @@ import {
   useWakeLock,
   type EmployeeWithRelations,
   type JobWithRelations,
+  type LaborShareItem,
 } from "@/components/DashboardSections";
 
 export function DashboardView({
@@ -28,6 +30,7 @@ export function DashboardView({
   rotatingEnabled = false,
   scrollSpeed = 4,
   branding,
+  laborShare = [],
   tv = false,
 }: {
   positions: Position[];
@@ -38,6 +41,7 @@ export function DashboardView({
   renderedAt: string;
   title: string;
   branding?: Branding;
+  laborShare?: LaborShareItem[];
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
@@ -45,8 +49,20 @@ export function DashboardView({
   tv?: boolean;
 }) {
   const now = useNow();
+  const router = useRouter();
   useAutoRefresh();
   useWakeLock(tv);
+
+  // Enter/leave TV mode. Request fullscreen so the board fills the whole TV,
+  // and navigate client-side (soft) so the fullscreen state survives.
+  const enterTv = () => {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    router.push("/?tv=1");
+  };
+  const exitTv = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    router.push("/");
+  };
 
   // Rotating display: alternate the body between the board and an external URL
   // (the header with the clock/date stays put). Off unless enabled + a URL set.
@@ -66,13 +82,18 @@ export function DashboardView({
 
   return (
     // On lg+ screens the board locks to the viewport height (no page scroll —
-    // long sections scroll inside themselves instead). TV mode zooms, so its
-    // height compensates (100vh / zoom) to still render exactly one screen.
+    // long sections scroll inside themselves instead). TV mode zooms 1.35× for
+    // readability; both width AND height compensate (/1.35) so the enlarged
+    // board still fits the screen exactly — nothing is cut off.
     <div
       className="flex flex-1 flex-col lg:h-screen lg:flex-none lg:overflow-hidden"
       style={
         tv
-          ? ({ zoom: 1.35, height: "calc(100vh / 1.35)" } as React.CSSProperties)
+          ? ({
+              zoom: 1.35,
+              width: "calc(100vw / 1.35)",
+              height: "calc(100vh / 1.35)",
+            } as React.CSSProperties)
           : undefined
       }
     >
@@ -81,19 +102,32 @@ export function DashboardView({
           backgroundColor: branding?.headerBg || undefined,
           color: branding?.headerFg || undefined,
         }}
-        className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900"
+        className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-2 dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <h1 className="flex items-center gap-3 text-lg font-semibold">
-          {branding?.logo && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={branding.logo} alt="" className="h-8 w-auto max-w-[8rem] object-contain" />
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            {branding?.logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={branding.logo} alt="" className="h-7 w-auto max-w-[7rem] object-contain" />
+            )}
+            {title}
+          </h1>
+          {now && (
+            <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              Updated{" "}
+              {new Date(renderedAt).toLocaleTimeString(undefined, {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZone: APP_TZ,
+              })}
+            </div>
           )}
-          {title}
-        </h1>
-        <div className="text-center">
+        </div>
+        <div className="text-center leading-tight">
           {now && (
             <>
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
                 {now.toLocaleDateString(undefined, {
                   weekday: "long",
                   month: "long",
@@ -102,18 +136,9 @@ export function DashboardView({
                   timeZone: APP_TZ,
                 })}
               </div>
-              <div className="text-3xl font-semibold tabular-nums">
+              <div className="text-2xl font-semibold tabular-nums">
                 {now.toLocaleTimeString(undefined, {
                   hour: "numeric",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  timeZone: APP_TZ,
-                })}
-              </div>
-              <div className="text-xs text-zinc-400 dark:text-zinc-500">
-                Updated{" "}
-                {new Date(renderedAt).toLocaleTimeString(undefined, {
-                  hour: "2-digit",
                   minute: "2-digit",
                   second: "2-digit",
                   timeZone: APP_TZ,
@@ -124,21 +149,21 @@ export function DashboardView({
         </div>
         <div className="flex items-center justify-end gap-4 text-sm">
           {tv ? (
-            <Link
-              href="/"
+            <button
+              onClick={exitTv}
               className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-white"
             >
               Exit TV
-            </Link>
+            </button>
           ) : (
             <>
               <ThemeToggle />
-              <Link
-                href="/?tv=1"
+              <button
+                onClick={enterTv}
                 className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
               >
                 TV mode
-              </Link>
+              </button>
               {isAdmin ? (
                 <Link
                   href="/admin/assign"
@@ -185,6 +210,7 @@ export function DashboardView({
                 badge: branding.badge,
               }
             }
+            laborShare={laborShare}
             fill
             tv={tv}
           />

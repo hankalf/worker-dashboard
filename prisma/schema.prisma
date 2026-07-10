@@ -109,6 +109,7 @@ model Position {
   sortOrder      Int        @default(0)
   employees      Employee[]
   scheduledAssignments ScheduledAssignment[]
+  laborShares    LaborShare[]
   // Optional equipment a person should hold to work this position (assign warning).
   requiredRole   Role?      @relation("PositionRequiredRole", fields: [requiredRoleId], references: [id])
   requiredRoleId String?
@@ -179,6 +180,25 @@ model WorkHistory {
 model Setting {
   key   String @id
   value String
+}
+
+// Temporary "labor share" workers borrowed for a single shift. They are NOT
+// real Employees and never appear in the Employees list. They show on the
+// board for their allotted shift and are auto-purged once endsAt has passed
+// (endsAt = the leaving time, or the shift's end if none was given).
+model LaborShare {
+  id         String    @id @default(cuid())
+  name       String
+  shift      Shift
+  position   Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  positionId String?
+  comingInAt DateTime?
+  leavingAt  DateTime?
+  endsAt     DateTime
+  date       String
+  createdAt  DateTime  @default(now())
+
+  @@index([endsAt])
 }
 
 // A planned position assignment for an employee on a specific upcoming date

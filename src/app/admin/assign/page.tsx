@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 import { TasksPeek } from "@/components/TasksPeek";
+import { LaborShareEditor } from "@/components/LaborShareEditor";
 import { shiftEndDate, shiftStartDate, currentShift } from "@/lib/shift";
 import { APP_TZ, easternDateKey, easternInputToUtcISO } from "@/lib/time";
 import { upcomingScheduleDates } from "@/lib/schedule";
@@ -988,6 +989,12 @@ export default function AssignPage() {
         <div className="mb-6 grid items-start gap-4 lg:grid-cols-[2fr_1fr]">
           <ShiftHandoffEditor />
           <TasksPeek />
+        </div>
+      )}
+
+      {!scheduleMode && (
+        <div className="mb-6">
+          <LaborShareEditor />
         </div>
       )}
 

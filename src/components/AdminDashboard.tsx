@@ -10,6 +10,7 @@ import {
   useAutoRefresh,
   type EmployeeWithRelations,
   type JobWithRelations,
+  type LaborShareItem,
 } from "@/components/DashboardSections";
 import type { Notice } from "@/components/NoticesManager";
 import type { Branding } from "@/lib/settings";
@@ -23,6 +24,7 @@ export function AdminDashboard({
   capabilities,
   notices,
   branding,
+  laborShare = [],
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -30,6 +32,7 @@ export function AdminDashboard({
   capabilities: { id: string; name: string }[];
   notices: Notice[];
   branding?: Branding;
+  laborShare?: LaborShareItem[];
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -104,6 +107,7 @@ export function AdminDashboard({
               badge: branding.badge,
             }
           }
+          laborShare={laborShare}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
 import { getBranding } from "@/lib/settings";
+import { getActiveLaborShare } from "@/lib/laborShareServer";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,7 @@ export default async function AdminDashboardPage() {
   });
 
   const branding = await getBranding();
+  const laborShare = await getActiveLaborShare(now);
 
   return (
     <AdminDashboard
@@ -99,6 +101,7 @@ export default async function AdminDashboardPage() {
       capabilities={capabilities}
       notices={active.map(toDto)}
       branding={branding}
+      laborShare={laborShare}
     />
   );
 }
