@@ -5,7 +5,7 @@ import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 import { AdminNav } from "@/components/AdminNav";
 import { getDashboardName, getBranding } from "@/lib/settings";
 import { getTabs } from "@/lib/tabs";
-import { APP_VERSION } from "@/lib/version";
+import { APP_VERSION, BUILD_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +46,9 @@ export default async function AdminLayout({
           )}
           {dashboardName}
           <span className="ml-2 font-normal text-zinc-400">Admin</span>
+          <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-semibold text-blue-300">
+            {BUILD_VERSION}
+          </span>
           {!isAdmin && (
             <span className="ml-2 rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-400">
               Supervisor
