@@ -46,6 +46,54 @@ export async function getScrollSpeed(): Promise<number> {
   }
 }
 
+// Branding / theme: an optional logo (stored as a data URL so it survives
+// redeploys on hosts with an ephemeral filesystem) and a handful of accent
+// colors. Empty string = "unset", so the default styling is used.
+export type Branding = {
+  logo: string;
+  headerBg: string;
+  headerFg: string;
+  notice: string;
+  handoff: string;
+  badge: string;
+};
+
+const isHexColor = (v: unknown): v is string =>
+  typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v);
+
+export async function getBranding(): Promise<Branding> {
+  const empty: Branding = {
+    logo: "",
+    headerBg: "",
+    headerFg: "",
+    notice: "",
+    handoff: "",
+    badge: "",
+  };
+  try {
+    const rows = await prisma.setting.findMany({
+      where: { key: { startsWith: "brand." } },
+    });
+    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const color = (v: unknown) => (isHexColor(v) ? v : "");
+    const logo =
+      typeof m["brand.logo"] === "string" &&
+      m["brand.logo"].startsWith("data:image/")
+        ? m["brand.logo"]
+        : "";
+    return {
+      logo,
+      headerBg: color(m["brand.headerBg"]),
+      headerFg: color(m["brand.headerFg"]),
+      notice: color(m["brand.notice"]),
+      handoff: color(m["brand.handoff"]),
+      badge: color(m["brand.badge"]),
+    };
+  } catch {
+    return empty;
+  }
+}
+
 // Rotating-dashboard config: the public board can rotate between its own
 // content and an external URL (shown in an iframe) on a timer.
 export type RotationConfig = { url: string; seconds: number; enabled: boolean };

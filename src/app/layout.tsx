@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
-import { getDashboardName } from "@/lib/settings";
+import { getDashboardName, getBranding } from "@/lib/settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const name = await getDashboardName();
-  return { title: name, description: `${name} and admin panel` };
+  const [name, branding] = await Promise.all([getDashboardName(), getBranding()]);
+  return {
+    title: name,
+    description: `${name} and admin panel`,
+    // Use the uploaded logo as the browser-tab icon when set.
+    icons: branding.logo ? { icon: branding.logo } : undefined,
+  };
 }
 
 export default async function RootLayout({

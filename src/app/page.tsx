@@ -6,6 +6,7 @@ import {
   getDashboardName,
   getRotationConfig,
   getScrollSpeed,
+  getBranding,
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 
@@ -58,6 +59,7 @@ export default async function Home({
 
   const rotation = await getRotationConfig();
   const scrollSpeed = await getScrollSpeed();
+  const branding = await getBranding();
 
   const { visible } = splitNotices(activeNotices);
 
@@ -74,6 +76,7 @@ export default async function Home({
       rotationSeconds={rotation.seconds}
       rotatingEnabled={rotation.enabled}
       scrollSpeed={scrollSpeed}
+      branding={branding}
       tv={tv}
     />
   );

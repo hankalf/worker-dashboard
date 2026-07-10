@@ -18,7 +18,11 @@ const PREV_SHIFT: Record<ShiftKey, ShiftKey> = {
 // switching 5 minutes before the next shift starts so the incoming crew sees
 // their handoff as they arrive. Polls every 60s so an edited note appears
 // without a full page reload.
-export function ShiftHandoffBanner() {
+export function ShiftHandoffBanner({
+  handoffColor,
+}: {
+  handoffColor?: string;
+}) {
   const now = useNow();
   const [notes, setNotes] = useState<Record<string, string>>({});
 
@@ -47,7 +51,19 @@ export function ShiftHandoffBanner() {
   if (!message) return null;
 
   return (
-    <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-center text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
+    <div
+      // Brand color (when set) tints the border + background; otherwise the
+      // default violet classes apply.
+      style={
+        handoffColor
+          ? {
+              borderColor: handoffColor,
+              backgroundColor: `color-mix(in srgb, ${handoffColor} 18%, transparent)`,
+            }
+          : undefined
+      }
+      className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-center text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200"
+    >
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide">
         Handoff from {SHIFTS[fromShift].label}
       </div>

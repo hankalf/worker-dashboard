@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { AppearanceEditor } from "@/components/AppearanceEditor";
 
 // Auto-scroll speed slider (1–10) for the main dashboard's scrolling sections.
 // Saves automatically shortly after the slider stops moving.
@@ -515,6 +516,8 @@ export default function SettingsPage() {
         </a>
       </div>
       </div>
+
+      <AppearanceEditor />
 
       <details className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <summary className="cursor-pointer text-sm font-medium text-white">

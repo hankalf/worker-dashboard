@@ -3,6 +3,7 @@ import { AdminDashboard } from "@/components/AdminDashboard";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
+import { getBranding } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,8 @@ export default async function AdminDashboardPage() {
     createdAt: n.createdAt.toISOString(),
   });
 
+  const branding = await getBranding();
+
   return (
     <AdminDashboard
       positions={positions}
@@ -95,6 +98,7 @@ export default async function AdminDashboardPage() {
       jobs={jobs}
       capabilities={capabilities}
       notices={active.map(toDto)}
+      branding={branding}
     />
   );
 }

@@ -12,6 +12,7 @@ import {
   type JobWithRelations,
 } from "@/components/DashboardSections";
 import type { Notice } from "@/components/NoticesManager";
+import type { Branding } from "@/lib/settings";
 
 // The admin's live mirror of the wall display (with coverage extras). Notices
 // are managed on their own tab (/admin/notices).
@@ -21,12 +22,14 @@ export function AdminDashboard({
   jobs,
   capabilities,
   notices,
+  branding,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
   jobs: JobWithRelations[];
   capabilities: { id: string; name: string }[];
   notices: Notice[];
+  branding?: Branding;
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -94,6 +97,13 @@ export function AdminDashboard({
           showCoverage
           capabilities={capabilities}
           announcements={live.map((n) => n.message)}
+          brand={
+            branding && {
+              notice: branding.notice,
+              handoff: branding.handoff,
+              badge: branding.badge,
+            }
+          }
         />
       </div>
     </div>

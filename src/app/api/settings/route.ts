@@ -7,16 +7,21 @@ import {
   setSetting,
   getRotationConfig,
   getScrollSpeed,
+  getBranding,
 } from "@/lib/settings";
+
+const isHexColor = (v: unknown): v is string =>
+  typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v);
 
 export const dynamic = "force-dynamic";
 
 // Public: current site settings (login page + rotating-dashboard editor).
 export async function GET() {
-  const [dashboardName, rotation, scrollSpeed] = await Promise.all([
+  const [dashboardName, rotation, scrollSpeed, branding] = await Promise.all([
     getDashboardName(),
     getRotationConfig(),
     getScrollSpeed(),
+    getBranding(),
   ]);
   return NextResponse.json({
     dashboardName,
@@ -24,6 +29,7 @@ export async function GET() {
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
     scrollSpeed,
+    branding,
   });
 }
 
@@ -54,12 +60,42 @@ export async function PATCH(req: Request) {
     const speed = Math.max(1, Math.min(10, Math.round(Number(body.scrollSpeed) || 4)));
     await setSetting("scrollSpeed", String(speed));
   }
+  if (body.branding !== undefined) {
+    const b = body.branding ?? {};
+    // Colors: store a valid hex, or "" to clear (fall back to the default).
+    const colorKeys: Record<string, string> = {
+      headerBg: "brand.headerBg",
+      headerFg: "brand.headerFg",
+      notice: "brand.notice",
+      handoff: "brand.handoff",
+      badge: "brand.badge",
+    };
+    for (const [field, key] of Object.entries(colorKeys)) {
+      if (b[field] !== undefined) {
+        await setSetting(key, isHexColor(b[field]) ? b[field] : "");
+      }
+    }
+    if (b.logo !== undefined) {
+      const logo =
+        typeof b.logo === "string" && b.logo.startsWith("data:image/")
+          ? b.logo
+          : "";
+      if (logo.length > 400_000) {
+        return NextResponse.json(
+          { error: "Logo is too large — use an image under ~250 KB." },
+          { status: 400 }
+        );
+      }
+      await setSetting("brand.logo", logo);
+    }
+  }
 
   await logActivity("Settings", "Updated settings");
-  const [dashboardName, rotation, scrollSpeed] = await Promise.all([
+  const [dashboardName, rotation, scrollSpeed, branding] = await Promise.all([
     getDashboardName(),
     getRotationConfig(),
     getScrollSpeed(),
+    getBranding(),
   ]);
   return NextResponse.json({
     dashboardName,
@@ -67,5 +103,6 @@ export async function PATCH(req: Request) {
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
     scrollSpeed,
+    branding,
   });
 }

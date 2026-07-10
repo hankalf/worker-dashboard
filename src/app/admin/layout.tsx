@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 import { AdminNav } from "@/components/AdminNav";
-import { getDashboardName } from "@/lib/settings";
+import { getDashboardName, getBranding } from "@/lib/settings";
 import { getTabs } from "@/lib/tabs";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +22,27 @@ export default async function AdminLayout({
     : null;
   const isAdmin = employee?.accessLevel === "ADMIN";
   const dashboardName = await getDashboardName();
+  const branding = await getBranding();
   const tabs = await getTabs();
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-4 sm:px-6">
-        <h1 className="text-lg font-semibold text-white">
+      <header
+        style={{
+          backgroundColor: branding.headerBg || undefined,
+          color: branding.headerFg || undefined,
+        }}
+        className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-4 sm:px-6"
+      >
+        <h1 className="flex items-center gap-3 text-lg font-semibold text-white">
+          {branding.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={branding.logo}
+              alt=""
+              className="h-8 w-auto max-w-[8rem] object-contain"
+            />
+          )}
           {dashboardName}
           <span className="ml-2 font-normal text-zinc-400">Admin</span>
           {!isAdmin && (

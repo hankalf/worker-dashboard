@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
@@ -19,6 +19,29 @@ export type EmployeeWithRelations = Employee & {
   roles: Role[];
   capabilities: { id: string; name: string }[];
 };
+
+// Optional brand accent colors (hex) for the board subtree.
+export type Brand = { notice?: string; handoff?: string; badge?: string };
+
+// A banner tint (border + translucent background) from a brand color, or
+// undefined to keep the element's default classes.
+export const tintStyle = (color?: string): CSSProperties | undefined =>
+  color
+    ? {
+        borderColor: color,
+        backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+      }
+    : undefined;
+
+// A badge tint (brand color text on a translucent brand background), or
+// undefined for the default classes.
+export const badgeStyle = (color?: string): CSSProperties | undefined =>
+  color
+    ? {
+        color,
+        backgroundColor: `color-mix(in srgb, ${color} 22%, transparent)`,
+      }
+    : undefined;
 
 export type JobWithRelations = Job & {
   assignedEmployee: (Employee & { position: Position | null }) | null;
@@ -133,11 +156,13 @@ function MemberBody({
   covering = false,
   today = null,
   hidePosition = false,
+  badgeColor,
 }: {
   member: EmployeeWithRelations;
   stayingOver?: boolean;
   covering?: boolean;
   today?: string | null;
+  badgeColor?: string;
   // Public board groups by position already, so the per-card position line is
   // redundant there — hide it and show only roles.
   hidePosition?: boolean;
@@ -153,7 +178,10 @@ function MemberBody({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium">{member.name}</span>
             {member.isLead && (
-              <span className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
+              <span
+                style={badgeStyle(badgeColor)}
+                className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300"
+              >
                 Lead
               </span>
             )}
@@ -217,7 +245,10 @@ function MemberBody({
         {(member.shift || member.breakStart || member.lunchStart) && (
           <span className="flex shrink-0 flex-col items-end gap-1">
             {member.shift && (
-              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span
+                style={badgeStyle(badgeColor)}
+                className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+              >
                 {SHIFTS[member.shift].label}
               </span>
             )}
@@ -255,6 +286,7 @@ export function DashboardSections({
   scrollSpeed = 4,
   hideEmptyPositions = false,
   showHandoff = false,
+  brand,
   fill = false,
   tv = false,
 }: {
@@ -273,6 +305,8 @@ export function DashboardSections({
   // Public board only: render the shift-handoff banner next to the notices
   // (the admin mirror edits handoff notes on the Assign tab instead).
   showHandoff?: boolean;
+  // Optional brand accent colors (notices, handoff, badges).
+  brand?: Brand;
   // Public board: lock to the viewport on lg+ screens — the positions section
   // flexes to the remaining height and scrolls inside itself (no page scroll).
   fill?: boolean;
@@ -371,7 +405,7 @@ export function DashboardSections({
         >
           {showHandoff && (
             <div className="min-w-[300px] flex-1 empty:hidden">
-              <ShiftHandoffBanner />
+              <ShiftHandoffBanner handoffColor={brand?.handoff} />
             </div>
           )}
           {announcements.length > 0 && (
@@ -379,6 +413,9 @@ export function DashboardSections({
               {announcements.map((message, i) => (
                 <div
                   key={i}
+                  // Brand color (when set) tints the border + background;
+                  // otherwise the default blue classes apply.
+                  style={tintStyle(brand?.notice)}
                   className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
                 >
                   <span className="mr-2 font-semibold uppercase tracking-wide">
@@ -615,7 +652,7 @@ export function DashboardSections({
                               : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} badgeColor={brand?.badge} />
                         </li>
                       ))}
                     </ul>
@@ -640,7 +677,7 @@ export function DashboardSections({
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} badgeColor={brand?.badge} />
               </div>
             ))}
           </div>

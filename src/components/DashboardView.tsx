@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Position } from "@/generated/prisma/client";
+import type { Branding } from "@/lib/settings";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_TZ } from "@/lib/time";
 import {
@@ -26,6 +27,7 @@ export function DashboardView({
   rotationSeconds = 30,
   rotatingEnabled = false,
   scrollSpeed = 4,
+  branding,
   tv = false,
 }: {
   positions: Position[];
@@ -35,6 +37,7 @@ export function DashboardView({
   announcements: string[];
   renderedAt: string;
   title: string;
+  branding?: Branding;
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
@@ -73,8 +76,20 @@ export function DashboardView({
           : undefined
       }
     >
-      <header className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-lg font-semibold">{title}</h1>
+      <header
+        style={{
+          backgroundColor: branding?.headerBg || undefined,
+          color: branding?.headerFg || undefined,
+        }}
+        className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <h1 className="flex items-center gap-3 text-lg font-semibold">
+          {branding?.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logo} alt="" className="h-8 w-auto max-w-[8rem] object-contain" />
+          )}
+          {title}
+        </h1>
         <div className="text-center">
           {now && (
             <>
@@ -163,6 +178,13 @@ export function DashboardView({
             autoScroll
             scrollSpeed={scrollSpeed}
             hideEmptyPositions
+            brand={
+              branding && {
+                notice: branding.notice,
+                handoff: branding.handoff,
+                badge: branding.badge,
+              }
+            }
             fill
             tv={tv}
           />
