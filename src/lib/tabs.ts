@@ -16,6 +16,7 @@ export const TABS: TabDef[] = [
   { key: "dashboard", label: "Admin Dashboard", href: "/admin", group: "top", adminOnly: false },
   { key: "notices", label: "Notices", href: "/admin/notices", group: "top", adminOnly: false },
   { key: "assign", label: "Assign", href: "/admin/assign", group: "top", adminOnly: false },
+  { key: "lunches", label: "Lunches", href: "/admin/lunches", group: "top", adminOnly: false },
   { key: "jobs", label: "Side Tasks", href: "/admin/jobs", group: "top", adminOnly: false },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", group: "top", adminOnly: true },
   { key: "general", label: "General", href: "/admin/settings", group: "setup", adminOnly: true },

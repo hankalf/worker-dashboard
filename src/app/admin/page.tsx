@@ -3,6 +3,7 @@ import { AdminDashboard } from "@/components/AdminDashboard";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
+import { recordLunchHistory, purgeOldLunchHistory } from "@/lib/lunchHistory";
 import { getBranding } from "@/lib/settings";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
 
@@ -69,6 +70,20 @@ export default async function AdminDashboardPage() {
           )
       );
       await purgeOldWorkHistory();
+
+      // Log today's scheduled lunches (present + has a lunch), then prune old.
+      await recordLunchHistory(
+        now,
+        employees
+          .filter(
+            (e) =>
+              e.attendance === "PRESENT" &&
+              e.lunchStart &&
+              e.accessLevel !== "ADMIN"
+          )
+          .map((e) => ({ id: e.id, name: e.name, lunchStart: e.lunchStart!, shift: e.shift }))
+      );
+      await purgeOldLunchHistory();
     }
   } catch (e) {
     console.error("snapshot failed:", e);
