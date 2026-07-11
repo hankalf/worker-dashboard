@@ -594,6 +594,37 @@ export function DashboardSections({
         </div>
       )}
 
+      {/* Position coverage: how many present crew this shift are on each
+          position (against its target min headcount, when set). */}
+      {showCoverage && !ignoreShift && columns.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Position coverage{shiftKey ? ` — ${SHIFTS[shiftKey].label}` : ""}
+          </h2>
+          <div className="flex flex-wrap gap-2 text-sm">
+            {columns.map((column) => {
+              const short = column.under || column.presentCount === 0;
+              return (
+                <span
+                  key={column.id}
+                  className={`rounded-lg border px-3 py-1.5 ${
+                    short
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
+                      : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                  }`}
+                >
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {column.presentCount}
+                    {column.target > 0 ? `/${column.target}` : ""}
+                  </span>{" "}
+                  {column.title}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Role coverage: how many present crew this shift can perform each role. */}
       {showCoverage && capabilities.length > 0 && (
         <div className="mb-8">
