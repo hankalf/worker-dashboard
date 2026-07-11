@@ -629,6 +629,51 @@ export default function AssignPage() {
     await fetch(`/api/schedule?date=${selectedDate}`, { method: "DELETE" });
   };
 
+  // The scheduling date that follows the selected one (for "copy to next day").
+  const nextScheduleDate = selectedDate
+    ? scheduleDates[scheduleDates.findIndex((d) => d.date === selectedDate) + 1]
+    : undefined;
+
+  // Copy a set of position assignments into the selected date's plan (from the
+  // live board) — so a day can start from where everyone is now.
+  const copyFromToday = async () => {
+    if (!selectedDate) return;
+    if (
+      !confirm(
+        "Copy everyone's current positions into this day's plan? Replaces the current plan."
+      )
+    )
+      return;
+    const res = await fetch("/api/schedule/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "today", to: selectedDate }),
+    });
+    if (res.ok) {
+      const rows: { employeeId: string; positionId: string | null }[] =
+        await res.json();
+      setSchedule(Object.fromEntries(rows.map((r) => [r.employeeId, r.positionId])));
+    } else {
+      alert("Could not copy. Please try again.");
+    }
+  };
+
+  // Copy the selected date's plan to the following scheduling day, then jump to
+  // it so the result is visible.
+  const copyToNextDay = async () => {
+    if (!selectedDate || !nextScheduleDate) return;
+    const res = await fetch("/api/schedule/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: selectedDate, to: nextScheduleDate.date }),
+    });
+    if (res.ok) {
+      setSelectedDate(nextScheduleDate.date); // the load effect re-fetches it
+    } else {
+      alert("Could not copy. Please try again.");
+    }
+  };
+
   const setLunch = async (employeeId: string, value: string) => {
     // Lunch is always 30 min; store the start and clear any old explicit end.
     setEmployees((current) =>
@@ -1013,6 +1058,25 @@ export default function AssignPage() {
           </>
         )}
       </p>
+
+      {scheduleMode && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={copyFromToday}
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-blue-500 hover:text-blue-400"
+          >
+            Copy today&apos;s positions here
+          </button>
+          {nextScheduleDate && (
+            <button
+              onClick={copyToNextDay}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-blue-500 hover:text-blue-400"
+            >
+              Copy to {nextScheduleDate.label} →
+            </button>
+          )}
+        </div>
+      )}
 
       {!scheduleMode && (
         <div className="mb-6 grid items-start gap-4 lg:grid-cols-[2fr_1fr]">
