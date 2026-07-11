@@ -32,8 +32,8 @@ type Employee = {
 
 const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
   { value: "NONE", label: "No login" },
-  { value: "LEAD", label: "Lead (dashboard, notices, assign, lunches)" },
-  { value: "SUPERVISOR", label: "Supervisor (Lead + side tasks & attendance)" },
+  { value: "LEAD", label: "Lead (dashboard, notices, assign, lunches, side tasks)" },
+  { value: "SUPERVISOR", label: "Supervisor (Lead + attendance)" },
   { value: "ADMIN", label: "Admin (full access)" },
 ];
 const ACCESS_LABEL: Record<AccessLevel, string> = {

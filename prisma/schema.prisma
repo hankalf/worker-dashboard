@@ -33,7 +33,7 @@ enum Attendance {
 }
 
 // Admin-panel access. NONE = no login; LEAD = dashboard, notices, assign,
-// lunches; SUPERVISOR = those + side tasks & attendance; ADMIN = full control.
+// lunches, side tasks; SUPERVISOR = those + attendance; ADMIN = full control.
 enum AccessLevel {
   NONE
   LEAD

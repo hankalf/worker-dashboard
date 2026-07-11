@@ -48,8 +48,8 @@ const emptyForm = {
 };
 
 export default function JobsPage() {
-  // Side Tasks is a Supervisor+ tab — leads land on the admin dashboard.
-  const guarded = useAccessGuard("SUPERVISOR");
+  // Side Tasks is available to Lead and up (NONE is bounced to login).
+  const guarded = useAccessGuard("LEAD");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<TaskLog[]>([]);

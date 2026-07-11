@@ -19,7 +19,7 @@ export const TABS: TabDef[] = [
   { key: "notices", label: "Notices", href: "/admin/notices", group: "top", minAccess: "LEAD" },
   { key: "assign", label: "Assign", href: "/admin/assign", group: "top", minAccess: "LEAD" },
   { key: "lunches", label: "Lunches", href: "/admin/lunches", group: "top", minAccess: "LEAD" },
-  { key: "jobs", label: "Side Tasks", href: "/admin/jobs", group: "top", minAccess: "SUPERVISOR" },
+  { key: "jobs", label: "Side Tasks", href: "/admin/jobs", group: "top", minAccess: "LEAD" },
   { key: "attendance", label: "Attendance", href: "/admin/attendance", group: "top", minAccess: "SUPERVISOR" },
   { key: "general", label: "General", href: "/admin/settings", group: "setup", minAccess: "ADMIN" },
   { key: "employees", label: "Employees", href: "/admin/employees", group: "setup", minAccess: "ADMIN" },

@@ -2,8 +2,8 @@
 // so both the nav and route guards can share it.
 //
 //  NONE       — no panel login
-//  LEAD       — Admin Dashboard, Notices, Assign, Lunches
-//  SUPERVISOR — the above + Side Tasks & Attendance
+//  LEAD       — Admin Dashboard, Notices, Assign, Lunches, Side Tasks
+//  SUPERVISOR — the above + Attendance
 //  ADMIN      — full control (incl. Setup)
 export type AccessLevel = "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN";
 
