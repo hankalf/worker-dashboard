@@ -11,7 +11,7 @@ const BASE: Record<string, number> = {
 };
 
 // Auto-stagger lunches: within each position + shift, present crew get lunch
-// times 15 min apart (from a shift base) so the position stays covered. Done
+// times 30 min apart (from a shift base) so the position stays covered. Done
 // server-side in one transaction — avoids firing many concurrent writes at the
 // single DB connection.
 export async function POST() {
@@ -40,7 +40,7 @@ export async function POST() {
       const hh = String(Math.floor(t / 60) % 24).padStart(2, "0");
       const mm = String(t % 60).padStart(2, "0");
       updates.push({ id: e.id, lunchStart: `${hh}:${mm}` });
-      t += 15;
+      t += 30;
     }
   }
 

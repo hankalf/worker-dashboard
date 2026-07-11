@@ -283,46 +283,49 @@ export function NoticesManager({
           {posting ? "Posting…" : "Post"}
         </button>
       </div>
-      <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-        Show starting at (Eastern, optional, up to 48h ahead):
-        <input
-          type="datetime-local"
-          value={startsInput}
-          min={scheduleMin}
-          max={scheduleMax}
-          onChange={(e) => setStartsInput(e.target.value)}
-          style={{ colorScheme: "dark" }}
-          className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
-        />
-        {startsInput && (
-          <button
-            type="button"
-            onClick={() => setStartsInput("")}
-            className="text-zinc-500 hover:text-zinc-300"
-          >
-            clear
-          </button>
-        )}
-      </label>
-      <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
-        Clear automatically at (Eastern, optional):
-        <input
-          type="datetime-local"
-          value={expiresInput}
-          onChange={(e) => setExpiresInput(e.target.value)}
-          style={{ colorScheme: "dark" }}
-          className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
-        />
-        {expiresInput && (
-          <button
-            type="button"
-            onClick={() => setExpiresInput("")}
-            className="text-zinc-500 hover:text-zinc-300"
-          >
-            clear
-          </button>
-        )}
-      </label>
+      {/* The two timing options sit side by side under the post bar. */}
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 sm:gap-x-6">
+        <label className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          Show starting at (Eastern, optional, up to 48h ahead):
+          <input
+            type="datetime-local"
+            value={startsInput}
+            min={scheduleMin}
+            max={scheduleMax}
+            onChange={(e) => setStartsInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+          {startsInput && (
+            <button
+              type="button"
+              onClick={() => setStartsInput("")}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              clear
+            </button>
+          )}
+        </label>
+        <label className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          Clear automatically at (Eastern, optional):
+          <input
+            type="datetime-local"
+            value={expiresInput}
+            onChange={(e) => setExpiresInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+          {expiresInput && (
+            <button
+              type="button"
+              onClick={() => setExpiresInput("")}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              clear
+            </button>
+          )}
+        </label>
+      </div>
       <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
         <input
           type="checkbox"

@@ -405,10 +405,9 @@ export function DashboardSections({
     .filter((e) => e.lunchStart && e.attendance === "PRESENT")
     .sort((a, b) => toMinutes(a.lunchStart!) - toMinutes(b.lunchStart!));
 
-  // With no notices posted, the lunch row has the whole top area to itself —
-  // let the two lunch sections grow taller (fewer entries hidden behind scroll).
-  const lunchMaxHeight =
-    announcements.length > 0 ? "max-h-[32vh]" : "max-h-[60vh]";
+  // Both lunch lists share one fixed height that fits ~4 compact rows, so they
+  // stay the same size all the time and the 5th+ entry scrolls into view.
+  const lunchBoxClass = "h-[9.5rem]";
 
   return (
     // One shared scroll clock keeps every auto-scrolling section in sync.
@@ -458,27 +457,39 @@ export function DashboardSections({
               On Lunch{onLunch.length > 0 ? ` (${onLunch.length})` : ""}
             </h2>
             {onLunch.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <div
+                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-200 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
+              >
                 No one is on lunch right now.
-              </p>
+              </div>
             ) : (
-              <AutoScroll enabled={autoScroll} speed={scrollPxPerFrame} maxHeightClass={lunchMaxHeight}>
-                <div className="flex flex-col gap-3">
+              <AutoScroll
+                enabled={autoScroll}
+                speed={scrollPxPerFrame}
+                maxHeightClass={lunchBoxClass}
+              >
+                <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {onLunch.map((emp) => (
-                    <div
+                    <li
                       key={emp.id}
-                      className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40"
+                      className="flex items-center justify-between gap-3 px-4 py-2"
                     >
-                      <div className="text-sm font-medium">{emp.name}</div>
-                      <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                        {emp.roles.length > 0
-                          ? `${emp.roles.map((r) => r.name).join(" · ")} · `
-                          : ""}
-                        back at {formatMinutes(lunchEndMinutes(emp)!)}
-                      </div>
-                    </div>
+                      <span className="flex min-w-0 items-baseline gap-2">
+                        <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                          {formatClock(formatMinutes(lunchEndMinutes(emp)!))}
+                        </span>
+                        <span className="truncate text-sm font-medium">
+                          {emp.name}
+                        </span>
+                      </span>
+                      {emp.roles.length > 0 && (
+                        <span className="shrink-0 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          {emp.roles.map((r) => r.name).join(" · ")}
+                        </span>
+                      )}
+                    </li>
                   ))}
-                </div>
+                </ul>
               </AutoScroll>
             )}
           </section>
@@ -488,16 +499,17 @@ export function DashboardSections({
               Lunch Schedule
             </h2>
             {lunchSchedule.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <div
+                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-200 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
+              >
                 No lunches scheduled.
-              </p>
+              </div>
             ) : (
               <AutoScroll
-                enabled={autoScroll && lunchSchedule.length > 4}
+                enabled={autoScroll}
                 speed={scrollPxPerFrame}
-                // Cap to ~4 rows so the 5th+ overflows and scrolls (matching the
-                // positions section's speed & direction); ≤4 renders unscrolled.
-                maxHeightClass="max-h-[9.5rem]"
+                // Same fixed height as On Lunch: ~4 rows, 5th+ scrolls.
+                maxHeightClass={lunchBoxClass}
               >
                 <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
                   {lunchSchedule.map((emp) => (

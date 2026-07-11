@@ -733,11 +733,11 @@ export default function AssignPage() {
   };
 
   // Auto-stagger lunches: one atomic server call spaces each position's present
-  // crew 15 min apart from a shift-appropriate base, so a position stays covered.
+  // crew 30 min apart from a shift-appropriate base, so a position stays covered.
   const staggerLunches = async () => {
     if (
       !confirm(
-        "Auto-stagger lunches for everyone present? Each position's crew is spaced 15 min apart. This overwrites existing lunch times."
+        "Auto-stagger lunches for everyone present? Each position's crew is spaced 30 min apart. This overwrites existing lunch times."
       )
     )
       return;
@@ -748,7 +748,9 @@ export default function AssignPage() {
       const emps = await fetch("/api/employees");
       if (emps.ok) {
         const all: Employee[] = await emps.json();
-        setEmployees(all.filter((e) => e.accessLevel === "NONE"));
+        // Match the initial load's filter (supervisors work the board too) —
+        // filtering to only NONE here was dropping supervisors after staggering.
+        setEmployees(all.filter((e) => e.accessLevel !== "ADMIN"));
       }
     } else {
       alert("Could not stagger lunches. Please try again.");
