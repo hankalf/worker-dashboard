@@ -108,40 +108,6 @@ export function useAutoRefresh(intervalMs = 15000) {
   }, [router, intervalMs]);
 }
 
-type WakeLockSentinelLike = { release: () => Promise<void> };
-type WakeLockNavigator = Navigator & {
-  wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> };
-};
-
-// Keep the screen awake while `enabled` (used in TV mode) so a wall-mounted
-// display doesn't dim or sleep. Re-acquires the lock when the tab becomes
-// visible again (the browser drops it when hidden). No-op where unsupported.
-export function useWakeLock(enabled: boolean) {
-  useEffect(() => {
-    if (!enabled || typeof navigator === "undefined") return;
-    const nav = navigator as WakeLockNavigator;
-    if (!nav.wakeLock) return;
-
-    let lock: WakeLockSentinelLike | null = null;
-    const request = async () => {
-      try {
-        lock = await nav.wakeLock!.request("screen");
-      } catch {
-        // ignore — e.g. denied while not visible
-      }
-    };
-    request();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") request();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      lock?.release().catch(() => {});
-    };
-  }, [enabled]);
-}
-
 // Live clock, initialised on mount to avoid a server/client time mismatch.
 export function useNow() {
   const [now, setNow] = useState<Date | null>(null);
@@ -304,7 +270,6 @@ export function DashboardSections({
   brand,
   laborShare = [],
   fill = false,
-  tv = false,
   ignoreShift = false,
   positionsOnly = false,
 }: {
@@ -330,7 +295,6 @@ export function DashboardSections({
   // Public board: lock to the viewport on lg+ screens — the positions section
   // flexes to the remaining height and scrolls inside itself (no page scroll).
   fill?: boolean;
-  tv?: boolean;
   // Show every shift's crew, not just the one active at `now`. Used by the
   // admin day-ahead preview, where the board isn't tied to the current clock.
   ignoreShift?: boolean;
@@ -719,14 +683,12 @@ export function DashboardSections({
             <AutoScroll
               // In fill mode the section flexes to the leftover viewport height
               // and AutoScroll no-ops when the content already fits.
-              enabled={autoScroll && (fill || (tv ? visibleColumns.length > 6 : true))}
+              enabled={autoScroll}
               speed={scrollPxPerFrame}
               maxHeightClass={
                 fill
                   ? "max-h-[48vh] lg:max-h-none lg:min-h-0 lg:flex-1"
-                  : tv
-                    ? "max-h-[80vh]"
-                    : "max-h-[48vh]"
+                  : "max-h-[48vh]"
               }
             >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

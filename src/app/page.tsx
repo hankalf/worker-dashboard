@@ -14,13 +14,8 @@ import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ tv?: string }>;
-}) {
+export default async function Home() {
   const session = await auth();
-  const tv = (await searchParams).tv === "1";
 
   const now = new Date();
   // If a plan was scheduled for today, push it onto the live board (once/day).
@@ -82,7 +77,6 @@ export default async function Home({
       branding={branding}
       laborShare={laborShare}
       version={APP_VERSION}
-      tv={tv}
     />
   );
 }

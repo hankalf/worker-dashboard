@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Position } from "@/generated/prisma/client";
 import type { Branding } from "@/lib/settings";
@@ -11,7 +10,6 @@ import {
   DashboardSections,
   useNow,
   useAutoRefresh,
-  useWakeLock,
   type EmployeeWithRelations,
   type JobWithRelations,
   type LaborShareItem,
@@ -32,7 +30,6 @@ export function DashboardView({
   branding,
   laborShare = [],
   version = "",
-  tv = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -48,23 +45,9 @@ export function DashboardView({
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
   scrollSpeed?: number;
-  tv?: boolean;
 }) {
   const now = useNow();
-  const router = useRouter();
   useAutoRefresh();
-  useWakeLock(tv);
-
-  // Enter/leave TV mode. Request fullscreen so the board fills the whole TV,
-  // and navigate client-side (soft) so the fullscreen state survives.
-  const enterTv = () => {
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    router.push("/?tv=1");
-  };
-  const exitTv = () => {
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-    router.push("/");
-  };
 
   // Rotating display: alternate the body between the board and an external URL
   // (the header with the clock/date stays put). Off unless enabled + a URL set.
@@ -84,21 +67,8 @@ export function DashboardView({
 
   return (
     // On lg+ screens the board locks to the viewport height (no page scroll —
-    // long sections scroll inside themselves instead). TV mode zooms 1.35× for
-    // readability; both width AND height compensate (/1.35) so the enlarged
-    // board still fits the screen exactly — nothing is cut off.
-    <div
-      className="flex flex-1 flex-col lg:h-screen lg:flex-none lg:overflow-hidden"
-      style={
-        tv
-          ? ({
-              zoom: 1.35,
-              width: "calc(100vw / 1.35)",
-              height: "calc(100vh / 1.35)",
-            } as React.CSSProperties)
-          : undefined
-      }
-    >
+    // long sections scroll inside themselves instead).
+    <div className="flex flex-1 flex-col lg:h-screen lg:flex-none lg:overflow-hidden">
       <header
         style={{
           backgroundColor: branding?.headerBg || undefined,
@@ -150,38 +120,21 @@ export function DashboardView({
           )}
         </div>
         <div className="flex items-center justify-end gap-4 text-sm">
-          {tv ? (
-            <button
-              onClick={exitTv}
-              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-white"
+          <ThemeToggle />
+          {isAdmin ? (
+            <Link
+              href="/admin/assign"
+              className="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              Exit TV
-            </button>
+              Admin Panel
+            </Link>
           ) : (
-            <>
-              <ThemeToggle />
-              <button
-                onClick={enterTv}
-                className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
-              >
-                TV mode
-              </button>
-              {isAdmin ? (
-                <Link
-                  href="/admin/assign"
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  Admin Panel
-                </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
-                >
-                  Admin login
-                </Link>
-              )}
-            </>
+            <Link
+              href="/login"
+              className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+            >
+              Admin login
+            </Link>
           )}
         </div>
       </header>
@@ -214,7 +167,6 @@ export function DashboardView({
             }
             laborShare={laborShare}
             fill
-            tv={tv}
           />
         )}
       </main>
