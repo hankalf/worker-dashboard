@@ -389,11 +389,23 @@ export function DashboardSections({
           ? position.minThird
           : 0;
 
+  // 1st → 2nd → 3rd, no-shift last (used when several shifts show together).
+  const shiftRank = (s: string | null) =>
+    s === "FIRST" ? 0 : s === "SECOND" ? 1 : s === "THIRD" ? 2 : 3;
   const columns = positions.map((position) => {
     const members = employees
       .filter((e) => e.positionId === position.id && onShift(e))
-      // Lead(s) first, everyone else keeps the incoming name order.
-      .sort((a, b) => Number(b.isLead) - Number(a.isLead));
+      // Leads first. In the day-ahead preview (all shifts shown together) then
+      // by shift, then name; on the live board leads-first keeps the incoming
+      // name order.
+      .sort(
+        (a, b) =>
+          Number(b.isLead) - Number(a.isLead) ||
+          (ignoreShift
+            ? shiftRank(a.shift) - shiftRank(b.shift) ||
+              a.name.localeCompare(b.name)
+            : 0)
+      );
     const labor = laborByPosition(position.id);
     // Labor-share count toward coverage.
     const presentCount = members.filter(present).length + labor.length;
