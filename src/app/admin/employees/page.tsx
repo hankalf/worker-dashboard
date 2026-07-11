@@ -245,6 +245,7 @@ export default function EmployeesPage() {
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [capabilityIds, setCapabilityIds] = useState<string[]>([]);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("NONE");
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [shift, setShift] = useState<Shift | "">("");
@@ -316,6 +317,7 @@ export default function EmployeesPage() {
     setAccessLevel("NONE");
     setUsername("");
     setPassword("");
+    setShowPassword(false);
     setShift("");
     setAttendance("PRESENT");
     setIsLead(false);
@@ -689,16 +691,26 @@ export default function EmployeesPage() {
               required
               className={inputClass}
             />
-            <input
-              type="password"
-              placeholder={
-                editingId ? "New password (blank = keep current)" : "Password"
-              }
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required={!editingId}
-              className={inputClass}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder={
+                  editingId ? "New password (blank = keep current)" : "Password"
+                }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required={!editingId}
+                className={`${inputClass} w-full pr-14`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
         )}
         </div>
