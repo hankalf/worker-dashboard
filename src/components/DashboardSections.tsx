@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
@@ -96,6 +96,31 @@ export const formatClock = (hhmm: string) => {
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
+
+// A lunch list container. On the wall display (autoScroll) it joins the shared
+// animated scroll clock, capped to ~4 rows so it stays a fixed slim size.
+// Otherwise (the admin mirror) it gets a native scrollbar showing ~8 rows at a
+// time, so a long lunch list is slimmed down but still fully scrollable.
+function LunchPanel({
+  autoScroll,
+  speed,
+  children,
+}: {
+  autoScroll: boolean;
+  speed: number;
+  children: ReactNode;
+}) {
+  const listClass =
+    "divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900";
+  if (autoScroll) {
+    return (
+      <AutoScroll enabled speed={speed} maxHeightClass="h-[9.5rem]">
+        <ul className={`overflow-hidden ${listClass}`}>{children}</ul>
+      </AutoScroll>
+    );
+  }
+  return <ul className={`max-h-72 overflow-y-auto ${listClass}`}>{children}</ul>;
+}
 
 // Periodically soft-refreshes the current route's server data so displays
 // pick up admin-panel changes without a manual reload (no full-page refresh,
@@ -463,34 +488,28 @@ export function DashboardSections({
                 No one is on lunch right now.
               </div>
             ) : (
-              <AutoScroll
-                enabled={autoScroll}
-                speed={scrollPxPerFrame}
-                maxHeightClass={lunchBoxClass}
-              >
-                <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-                  {onLunch.map((emp) => (
-                    <li
-                      key={emp.id}
-                      className="flex items-center justify-between gap-3 px-4 py-2"
-                    >
-                      <span className="flex min-w-0 items-baseline gap-2">
-                        <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">
-                          {formatClock(formatMinutes(lunchEndMinutes(emp)!))}
-                        </span>
-                        <span className="truncate text-sm font-medium">
-                          {emp.name}
-                        </span>
+              <LunchPanel autoScroll={autoScroll} speed={scrollPxPerFrame}>
+                {onLunch.map((emp) => (
+                  <li
+                    key={emp.id}
+                    className="flex items-center justify-between gap-3 px-4 py-2"
+                  >
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                        {formatClock(formatMinutes(lunchEndMinutes(emp)!))}
                       </span>
-                      {emp.roles.length > 0 && (
-                        <span className="shrink-0 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                          {emp.roles.map((r) => r.name).join(" · ")}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </AutoScroll>
+                      <span className="truncate text-sm font-medium">
+                        {emp.name}
+                      </span>
+                    </span>
+                    {emp.roles.length > 0 && (
+                      <span className="shrink-0 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                        {emp.roles.map((r) => r.name).join(" · ")}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </LunchPanel>
             )}
           </section>
 
@@ -505,35 +524,28 @@ export function DashboardSections({
                 No lunches scheduled.
               </div>
             ) : (
-              <AutoScroll
-                enabled={autoScroll}
-                speed={scrollPxPerFrame}
-                // Same fixed height as On Lunch: ~4 rows, 5th+ scrolls.
-                maxHeightClass={lunchBoxClass}
-              >
-                <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-                  {lunchSchedule.map((emp) => (
-                    <li
-                      key={emp.id}
-                      className="flex items-center justify-between gap-3 px-4 py-2"
-                    >
-                      <span className="flex min-w-0 items-baseline gap-2">
-                        <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-700 dark:text-teal-300">
-                          {formatClock(emp.lunchStart!)}
-                        </span>
-                        <span className="truncate text-sm font-medium">
-                          {emp.name}
-                        </span>
+              <LunchPanel autoScroll={autoScroll} speed={scrollPxPerFrame}>
+                {lunchSchedule.map((emp) => (
+                  <li
+                    key={emp.id}
+                    className="flex items-center justify-between gap-3 px-4 py-2"
+                  >
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-700 dark:text-teal-300">
+                        {formatClock(emp.lunchStart!)}
                       </span>
-                      {showCoverage && emp.position && (
-                        <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                          {emp.position.title}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </AutoScroll>
+                      <span className="truncate text-sm font-medium">
+                        {emp.name}
+                      </span>
+                    </span>
+                    {showCoverage && emp.position && (
+                      <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                        {emp.position.title}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </LunchPanel>
             )}
           </section>
         </div>
