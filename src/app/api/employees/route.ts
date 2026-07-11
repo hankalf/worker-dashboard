@@ -5,7 +5,7 @@ import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 
-const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
+const LEVELS = ["NONE", "LEAD", "SUPERVISOR", "ADMIN"];
 
 export async function GET(req: Request) {
   // Supervisors need the roster to run the Assign board.

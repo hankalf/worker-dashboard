@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { atLeast } from "@/lib/access";
 
 // Re-reads the live access level so changes take effect immediately, rather
 // than trusting a possibly-stale session token.
@@ -19,12 +20,21 @@ export async function requireAdmin() {
   return session;
 }
 
-// Admin or supervisor (anyone with panel access). Returns the session plus the
-// resolved level so handlers can further restrict fields for supervisors.
+// Anyone with panel access (LEAD, SUPERVISOR, or ADMIN). Returns the session
+// plus the resolved level so handlers can further restrict fields.
 export async function requireStaff() {
   const session = await auth();
   if (!session?.user?.id) return null;
   const level = await levelOf(session.user.id);
   if (level === "NONE") return null;
+  return { session, level, isAdmin: level === "ADMIN" };
+}
+
+// Supervisor or admin (for Side Tasks + Attendance, above the Lead level).
+export async function requireSupervisor() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  const level = await levelOf(session.user.id);
+  if (!atLeast(level, "SUPERVISOR")) return null;
   return { session, level, isAdmin: level === "ADMIN" };
 }

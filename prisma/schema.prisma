@@ -32,10 +32,11 @@ enum Attendance {
   PTO
 }
 
-// Admin-panel access. NONE = no login; SUPERVISOR = limited (assign, attendance,
-// lunch, shift, side tasks, announcements); ADMIN = full control.
+// Admin-panel access. NONE = no login; LEAD = dashboard, notices, assign,
+// lunches; SUPERVISOR = those + side tasks & attendance; ADMIN = full control.
 enum AccessLevel {
   NONE
+  LEAD
   SUPERVISOR
   ADMIN
 }

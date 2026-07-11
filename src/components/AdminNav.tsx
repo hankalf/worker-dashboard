@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { TabItem } from "@/lib/tabs";
+import { atLeast, type AccessLevel } from "@/lib/access";
 
 function isActive(pathname: string, href: string) {
   return href === "/admin"
@@ -12,19 +13,16 @@ function isActive(pathname: string, href: string) {
 }
 
 export function AdminNav({
-  isAdmin,
+  level,
   tabs,
 }: {
-  isAdmin: boolean;
+  level: AccessLevel;
   tabs: TabItem[];
 }) {
   const pathname = usePathname();
-  const topItems = tabs.filter(
-    (t) => t.group === "top" && (isAdmin || !t.adminOnly)
-  );
-  const setupItems = tabs.filter(
-    (t) => t.group === "setup" && (isAdmin || !t.adminOnly)
-  );
+  const visible = tabs.filter((t) => atLeast(level, t.minAccess));
+  const topItems = visible.filter((t) => t.group === "top");
+  const setupItems = visible.filter((t) => t.group === "setup");
   const inSetup = setupItems.some((i) => isActive(pathname, i.href));
   const [open, setOpen] = useState(inSetup);
 

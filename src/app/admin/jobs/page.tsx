@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { APP_TZ } from "@/lib/time";
 import { PRIORITY_LEVELS, priorityLabel, priorityBadgeClass } from "@/lib/priority";
+import { useAccessGuard } from "@/lib/useAdminGuard";
 
 type Employee = { id: string; name: string };
 type Job = {
@@ -47,6 +48,8 @@ const emptyForm = {
 };
 
 export default function JobsPage() {
+  // Side Tasks is a Supervisor+ tab — leads land on the admin dashboard.
+  const guarded = useAccessGuard("SUPERVISOR");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<TaskLog[]>([]);
@@ -128,6 +131,10 @@ export default function JobsPage() {
 
   const inputClass =
     "rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500";
+
+  if (!guarded) {
+    return <p className="text-sm text-zinc-500">Checking access…</p>;
+  }
 
   return (
     <div>

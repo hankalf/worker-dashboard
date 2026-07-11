@@ -10,7 +10,7 @@ type Role = { id: string; name: string };
 type Capability = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
 type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
-type AccessLevel = "NONE" | "SUPERVISOR" | "ADMIN";
+type AccessLevel = "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN";
 type Employee = {
   id: string;
   name: string;
@@ -32,11 +32,13 @@ type Employee = {
 
 const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
   { value: "NONE", label: "No login" },
-  { value: "SUPERVISOR", label: "Supervisor (assign only)" },
+  { value: "LEAD", label: "Lead (dashboard, notices, assign, lunches)" },
+  { value: "SUPERVISOR", label: "Supervisor (Lead + side tasks & attendance)" },
   { value: "ADMIN", label: "Admin (full access)" },
 ];
 const ACCESS_LABEL: Record<AccessLevel, string> = {
   NONE: "",
+  LEAD: "Lead",
   SUPERVISOR: "Supervisor",
   ADMIN: "Admin",
 };

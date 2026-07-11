@@ -1,6 +1,6 @@
 import type { DefaultSession } from "@auth/core/types";
 
-type AccessLevel = "NONE" | "SUPERVISOR" | "ADMIN";
+type AccessLevel = "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN";
 
 declare module "@auth/core/types" {
   interface Session {

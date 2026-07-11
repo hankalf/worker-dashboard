@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/rbac";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
@@ -10,6 +12,7 @@ import { getActiveLaborShare } from "@/lib/laborShareServer";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  if (!(await requireStaff())) redirect("/login");
   const now = new Date();
   const shiftBounds = await getShiftBounds();
 

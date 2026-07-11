@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/rbac";
+import { requireSupervisor } from "@/lib/rbac";
 import { SHIFTS, type ShiftKey } from "@/lib/shift";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +18,8 @@ function formatDate(date: string) {
 }
 
 export default async function AttendanceHistoryPage() {
-  // Admin-only: supervisors are sent back to their assign board.
-  if (!(await requireAdmin())) redirect("/admin/assign");
+  // Supervisor+ — leads and below are sent to the admin dashboard.
+  if (!(await requireSupervisor())) redirect("/admin");
 
   const snaps = await prisma.headcountSnapshot.findMany({
     orderBy: [{ date: "desc" }, { shift: "asc" }],

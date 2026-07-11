@@ -1,9 +1,12 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/rbac";
 import { NoticesManager } from "@/components/NoticesManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function NoticesPage() {
+  if (!(await requireStaff())) redirect("/login");
   const now = new Date();
 
   // Tidy up notices that expired more than a week ago.

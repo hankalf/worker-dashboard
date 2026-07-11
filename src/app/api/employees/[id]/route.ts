@@ -5,7 +5,7 @@ import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { recordWorkHistory } from "@/lib/workHistory";
 
-const LEVELS = ["NONE", "SUPERVISOR", "ADMIN"];
+const LEVELS = ["NONE", "LEAD", "SUPERVISOR", "ADMIN"];
 
 const SHIFT_LABEL: Record<string, string> = {
   FIRST: "1st Shift",

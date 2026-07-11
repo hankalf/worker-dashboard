@@ -22,7 +22,8 @@ export default async function AdminLayout({
         select: { accessLevel: true },
       })
     : null;
-  const isAdmin = employee?.accessLevel === "ADMIN";
+  const level = employee?.accessLevel ?? "NONE";
+  const isAdmin = level === "ADMIN";
   const dashboardName = await getDashboardName();
   const branding = await getBranding();
   const buildVersion = await getBuildVersion();
@@ -51,9 +52,9 @@ export default async function AdminLayout({
           <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-semibold text-blue-300">
             {buildVersion}
           </span>
-          {!isAdmin && (
+          {!isAdmin && level !== "NONE" && (
             <span className="ml-2 rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-400">
-              Supervisor
+              {level === "SUPERVISOR" ? "Supervisor" : "Lead"}
             </span>
           )}
         </h1>
@@ -66,7 +67,7 @@ export default async function AdminLayout({
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="shrink-0 border-b border-zinc-800 bg-zinc-900 p-2 md:w-48 md:border-b-0 md:border-r md:p-4">
-          <AdminNav isAdmin={isAdmin} tabs={tabs} />
+          <AdminNav level={level} tabs={tabs} />
         </nav>
         <main className="flex-1 p-4 sm:p-6">
           {children}

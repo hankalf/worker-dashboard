@@ -12,7 +12,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id as string;
         token.accessLevel = (
-          user as { accessLevel?: "NONE" | "SUPERVISOR" | "ADMIN" }
+          user as { accessLevel?: "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN" }
         ).accessLevel;
       }
       return token;
