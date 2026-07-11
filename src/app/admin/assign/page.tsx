@@ -17,7 +17,13 @@ import {
 import { ShiftHandoffEditor } from "@/components/ShiftHandoffEditor";
 import { TasksPeek } from "@/components/TasksPeek";
 import { LaborShareEditor } from "@/components/LaborShareEditor";
-import { shiftEndDate, shiftStartDate, currentShift } from "@/lib/shift";
+import {
+  shiftEndDate,
+  shiftStartDate,
+  currentShift,
+  DEFAULT_SHIFT_BOUNDS,
+  type ShiftBounds,
+} from "@/lib/shift";
 import { APP_TZ, easternDateKey, easternInputToUtcISO } from "@/lib/time";
 import { upcomingScheduleDates } from "@/lib/schedule";
 
@@ -509,6 +515,9 @@ export default function AssignPage() {
   // through them with the ‹ › arrows. `dayWindow` is the index of the first
   // visible day.
   const [dayWindow, setDayWindow] = useState(0);
+  // Admin-configured shift boundaries (drives the active highlight + stay-over
+  // / coming-in windows). Loaded from /api/settings; defaults until it arrives.
+  const [shiftBounds, setShiftBounds] = useState<ShiftBounds>(DEFAULT_SHIFT_BOUNDS);
 
   // Live-ish clock (30s) so the "active shift" highlight tracks the time.
   const [now, setNow] = useState(() => new Date());
@@ -549,7 +558,7 @@ export default function AssignPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
-  const nowShift = currentShift(now);
+  const nowShift = currentShift(now, shiftBounds);
   // Active = present and either on the current shift or still within a stay-over
   // window — i.e. the people showing as active on the main dashboard.
   const isActive = (e: Employee) =>
@@ -569,6 +578,17 @@ export default function AssignPage() {
     }),
     useSensor(KeyboardSensor)
   );
+
+  // Load the configured shift boundaries so the active highlight + stay-over /
+  // coming-in math match the rest of the dashboard.
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.shiftBounds) setShiftBounds(d.shiftBounds);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -791,7 +811,8 @@ export default function AssignPage() {
     const stayOverUntil =
       minutes > 0
         ? new Date(
-            shiftEndDate(emp.shift, new Date()).getTime() + minutes * 60000
+            shiftEndDate(emp.shift, new Date(), shiftBounds).getTime() +
+              minutes * 60000
           ).toISOString()
         : null;
     setEmployees((current) =>
@@ -831,8 +852,8 @@ export default function AssignPage() {
       // current shift's end.
       coverUntil = (
         emp.shift
-          ? shiftStartDate(emp.shift, at)
-          : shiftEndDate(currentShift(now), now)
+          ? shiftStartDate(emp.shift, at, shiftBounds)
+          : shiftEndDate(currentShift(now, shiftBounds), now, shiftBounds)
       ).toISOString();
     }
 

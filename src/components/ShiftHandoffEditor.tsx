@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { currentShift, SHIFTS, type ShiftKey } from "@/lib/shift";
+import {
+  currentShift,
+  SHIFTS,
+  DEFAULT_SHIFT_BOUNDS,
+  type ShiftKey,
+  type ShiftBounds,
+} from "@/lib/shift";
 import { useNow } from "@/components/DashboardSections";
 
 type ShiftNote = {
@@ -28,6 +34,7 @@ export function ShiftHandoffEditor() {
   });
   const [savingShift, setSavingShift] = useState<string | null>(null);
   const [savedShift, setSavedShift] = useState<string | null>(null);
+  const [shiftBounds, setShiftBounds] = useState<ShiftBounds>(DEFAULT_SHIFT_BOUNDS);
 
   useEffect(() => {
     (async () => {
@@ -42,9 +49,15 @@ export function ShiftHandoffEditor() {
         THIRD: map.THIRD?.message ?? "",
       });
     })();
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.shiftBounds) setShiftBounds(d.shiftBounds);
+      })
+      .catch(() => {});
   }, []);
 
-  const nowShift = now ? currentShift(now) : null;
+  const nowShift = now ? currentShift(now, shiftBounds) : null;
 
   const save = async (shift: ShiftKey) => {
     setSavingShift(shift);

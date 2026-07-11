@@ -16,6 +16,7 @@ import {
 } from "@/components/DashboardSections";
 import type { Notice } from "@/components/NoticesManager";
 import type { Branding } from "@/lib/settings";
+import type { ShiftBounds } from "@/lib/shift";
 
 // The admin's live mirror of the wall display (with coverage extras). Notices
 // are managed on their own tab (/admin/notices). A day selector at the top lets
@@ -29,6 +30,7 @@ export function AdminDashboard({
   notices,
   branding,
   laborShare = [],
+  shiftBounds,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -37,6 +39,7 @@ export function AdminDashboard({
   notices: Notice[];
   branding?: Branding;
   laborShare?: LaborShareItem[];
+  shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -201,6 +204,7 @@ export function AdminDashboard({
             positionsOnly
             ignoreShift
             capabilities={capabilities}
+            shiftBounds={shiftBounds}
           />
         ) : (
           <DashboardSections
@@ -220,6 +224,7 @@ export function AdminDashboard({
               }
             }
             laborShare={laborShare}
+            shiftBounds={shiftBounds}
           />
         )}
       </div>

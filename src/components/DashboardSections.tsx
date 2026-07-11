@@ -4,7 +4,13 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
-import { currentShift, SHIFTS } from "@/lib/shift";
+import {
+  currentShift,
+  SHIFTS,
+  shiftRange,
+  DEFAULT_SHIFT_BOUNDS,
+  type ShiftBounds,
+} from "@/lib/shift";
 import {
   todayKey,
   anniversaryYearsThisMonth,
@@ -297,6 +303,7 @@ export function DashboardSections({
   fill = false,
   ignoreShift = false,
   positionsOnly = false,
+  shiftBounds = DEFAULT_SHIFT_BOUNDS,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -326,12 +333,14 @@ export function DashboardSections({
   // Render only the "Team by Position" grid (skip notices, lunches, coverage,
   // side tasks) — a focused view for the day-ahead schedule preview.
   positionsOnly?: boolean;
+  // Admin-configured shift boundaries (drives currentShift + the range label).
+  shiftBounds?: ShiftBounds;
 }) {
   // Admins never appear on the boards; supervisors are working staff and do.
   const employees = allEmployees.filter((e) => e.accessLevel !== "ADMIN");
   // Show only the crew whose shift is active now (employees with no shift set
   // are always shown). Recomputes as the clock crosses a shift boundary.
-  const shiftKey = now ? currentShift(now) : null;
+  const shiftKey = now ? currentShift(now, shiftBounds) : null;
   const today = now ? todayKey(now) : null;
   // Slider value (1–10) → pixels per frame; 4 → 0.4px/frame (~24px/s).
   const scrollPxPerFrame = Math.max(1, Math.min(10, scrollSpeed)) * 0.1;
@@ -447,7 +456,10 @@ export function DashboardSections({
         >
           {showHandoff && (
             <div className="min-w-[300px] flex-1 empty:hidden">
-              <ShiftHandoffBanner handoffColor={brand?.handoff} />
+              <ShiftHandoffBanner
+                handoffColor={brand?.handoff}
+                shiftBounds={shiftBounds}
+              />
             </div>
           )}
           {announcements.length > 0 && (
@@ -693,7 +705,7 @@ export function DashboardSections({
           {showPositions ? "Team by Position" : "Position"}
           {showPositions && shiftKey && !ignoreShift && (
             <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
-              — {SHIFTS[shiftKey].label} ({SHIFTS[shiftKey].range})
+              — {SHIFTS[shiftKey].label} ({shiftRange(shiftKey, shiftBounds)})
             </span>
           )}
         </h2>
@@ -711,6 +723,8 @@ export function DashboardSections({
               // and AutoScroll no-ops when the content already fits.
               enabled={autoScroll}
               speed={scrollPxPerFrame}
+              // Positions is the scroll leader — every other section tracks it.
+              syncLeader
               maxHeightClass={
                 fill
                   ? "max-h-[48vh] lg:max-h-none lg:min-h-0 lg:flex-1"

@@ -1,6 +1,41 @@
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_SHIFT_BOUNDS, type ShiftBounds } from "@/lib/shift";
 
 // Editable site settings, stored as key/value rows in the Setting table.
+
+// Parse "HH:MM" (24h) to minute-of-day, or null if malformed.
+export function parseHhmm(v: string | undefined | null): number | null {
+  if (!v) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+const SHIFT_KEYS = ["shiftFirstStart", "shiftSecondStart", "shiftThirdStart"] as const;
+
+// The configured shift boundaries, or the defaults if unset/invalid. The three
+// starts must be strictly increasing (first < second < third) to partition the
+// day cleanly; otherwise we fall back to the defaults.
+export async function getShiftBounds(): Promise<ShiftBounds> {
+  try {
+    const rows = await prisma.setting.findMany({
+      where: { key: { in: [...SHIFT_KEYS] } },
+    });
+    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const f = parseHhmm(m.shiftFirstStart);
+    const s = parseHhmm(m.shiftSecondStart);
+    const t = parseHhmm(m.shiftThirdStart);
+    if (f !== null && s !== null && t !== null && f < s && s < t) {
+      return { firstStart: f, secondStart: s, thirdStart: t };
+    }
+    return DEFAULT_SHIFT_BOUNDS;
+  } catch {
+    return DEFAULT_SHIFT_BOUNDS;
+  }
+}
 
 export const DEFAULT_DASHBOARD_NAME = "Warehouse Dashboard";
 const DASHBOARD_NAME_KEY = "dashboardName";

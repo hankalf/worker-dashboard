@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Position } from "@/generated/prisma/client";
 import type { Branding } from "@/lib/settings";
+import type { ShiftBounds } from "@/lib/shift";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_TZ } from "@/lib/time";
 import {
@@ -30,6 +31,7 @@ export function DashboardView({
   branding,
   laborShare = [],
   version = "",
+  shiftBounds,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -45,6 +47,7 @@ export function DashboardView({
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
   scrollSpeed?: number;
+  shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -167,6 +170,7 @@ export function DashboardView({
             }
             laborShare={laborShare}
             fill
+            shiftBounds={shiftBounds}
           />
         )}
       </main>

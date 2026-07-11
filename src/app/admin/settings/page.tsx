@@ -63,6 +63,111 @@ function ScrollSpeed() {
   );
 }
 
+// Shift time frames (start of each shift). Each shift ends where the next
+// begins; the 3rd wraps past midnight to the 1st's start. Drives currentShift
+// and the shift ranges shown across the whole dashboard.
+function ShiftTimes() {
+  const [first, setFirst] = useState("06:00");
+  const [second, setSecond] = useState("14:00");
+  const [third, setThird] = useState("22:00");
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const minToHHMM = (min: number) =>
+    `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.shiftBounds) {
+          setFirst(minToHHMM(d.shiftBounds.firstStart));
+          setSecond(minToHHMM(d.shiftBounds.secondStart));
+          setThird(minToHHMM(d.shiftBounds.thirdStart));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // "06:00" -> "6:00 AM" for the range preview.
+  const to12 = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    if (Number.isNaN(h)) return hhmm;
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  };
+
+  const save = async () => {
+    setError(null);
+    setSaved(false);
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shift: { firstStart: first, secondStart: second, thirdStart: third },
+      }),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      setError(b.error ?? "Could not save shift times.");
+      return;
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  const rows: { label: string; value: string; set: (v: string) => void; end: string }[] = [
+    { label: "1st shift", value: first, set: setFirst, end: second },
+    { label: "2nd shift", value: second, set: setSecond, end: third },
+    { label: "3rd shift", value: third, set: setThird, end: first },
+  ];
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-white">Shift times</h3>
+      <p className="mb-3 mt-1 text-sm text-zinc-400">
+        Set when each shift starts. Each shift ends when the next begins (the 3rd
+        wraps past midnight to the 1st). Times increase: 1st &lt; 2nd &lt; 3rd.
+        Reflected across the whole dashboard.
+      </p>
+      <div className="flex flex-col gap-3">
+        {rows.map((r) => (
+          <label key={r.label} className="flex flex-wrap items-center gap-3 text-sm text-zinc-300">
+            <span className="w-20 shrink-0">{r.label} starts</span>
+            <input
+              type="time"
+              value={r.value}
+              onChange={(e) => {
+                r.set(e.target.value);
+                setSaved(false);
+              }}
+              disabled={loading}
+              style={{ colorScheme: "dark" }}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+            />
+            <span className="text-xs text-zinc-500">
+              {to12(r.value)} – {to12(r.end)}
+            </span>
+          </label>
+        ))}
+      </div>
+      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={loading}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+        >
+          Save shift times
+        </button>
+        {saved && <span className="text-sm text-green-400">Saved</span>}
+      </div>
+    </div>
+  );
+}
+
 type DescItem = {
   id: string;
   name?: string;
@@ -523,6 +628,8 @@ export default function SettingsPage() {
               Download full backup (.xlsx)
             </a>
           </div>
+
+          <ShiftTimes />
 
           <RotatingDashboard />
 

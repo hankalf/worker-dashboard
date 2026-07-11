@@ -7,6 +7,7 @@ import {
   getRotationConfig,
   getScrollSpeed,
   getBranding,
+  getShiftBounds,
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
@@ -57,6 +58,7 @@ export default async function Home() {
   const rotation = await getRotationConfig();
   const scrollSpeed = await getScrollSpeed();
   const branding = await getBranding();
+  const shiftBounds = await getShiftBounds();
   const laborShare = await getActiveLaborShare(now);
 
   const { visible } = splitNotices(activeNotices);
@@ -77,6 +79,7 @@ export default async function Home() {
       branding={branding}
       laborShare={laborShare}
       version={APP_VERSION}
+      shiftBounds={shiftBounds}
     />
   );
 }

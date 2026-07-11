@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { currentShift, SHIFTS, type ShiftKey } from "@/lib/shift";
+import {
+  currentShift,
+  SHIFTS,
+  DEFAULT_SHIFT_BOUNDS,
+  type ShiftKey,
+  type ShiftBounds,
+} from "@/lib/shift";
 import { useNow } from "@/components/DashboardSections";
 
 type ShiftNote = { id: string; message: string };
@@ -20,8 +26,10 @@ const PREV_SHIFT: Record<ShiftKey, ShiftKey> = {
 // without a full page reload.
 export function ShiftHandoffBanner({
   handoffColor,
+  shiftBounds = DEFAULT_SHIFT_BOUNDS,
 }: {
   handoffColor?: string;
+  shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -44,7 +52,10 @@ export function ShiftHandoffBanner({
 
   if (!now) return null;
   // Which shift is (about to be) working — flips 5 minutes before it begins.
-  const workingShift = currentShift(new Date(now.getTime() + 5 * 60 * 1000));
+  const workingShift = currentShift(
+    new Date(now.getTime() + 5 * 60 * 1000),
+    shiftBounds
+  );
   // Show the note the OUTGOING crew left for them.
   const fromShift = PREV_SHIFT[workingShift];
   const message = notes[fromShift];

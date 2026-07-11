@@ -4,13 +4,14 @@ import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
 import { recordLunchHistory, purgeOldLunchHistory } from "@/lib/lunchHistory";
-import { getBranding } from "@/lib/settings";
+import { getBranding, getShiftBounds } from "@/lib/settings";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
   const now = new Date();
+  const shiftBounds = await getShiftBounds();
 
   const [positions, employees, jobs, capabilities, active] =
     await Promise.all([
@@ -44,7 +45,7 @@ export default async function AdminDashboardPage() {
   // throttled to at most once every 2 minutes so the 15s auto-refresh doesn't
   // hammer the DB. Best-effort — never let it break the dashboard.
   try {
-    const shiftKey = currentShift(now);
+    const shiftKey = currentShift(now, shiftBounds);
     const dateKey = easternDateKey(now);
     const roster = employees.filter(
       (e) => e.shift === null || e.shift === shiftKey
@@ -117,6 +118,7 @@ export default async function AdminDashboardPage() {
       notices={active.map(toDto)}
       branding={branding}
       laborShare={laborShare}
+      shiftBounds={shiftBounds}
     />
   );
 }

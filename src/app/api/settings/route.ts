@@ -8,6 +8,8 @@ import {
   getRotationConfig,
   getScrollSpeed,
   getBranding,
+  getShiftBounds,
+  parseHhmm,
 } from "@/lib/settings";
 
 const isHexColor = (v: unknown): v is string =>
@@ -17,12 +19,14 @@ export const dynamic = "force-dynamic";
 
 // Public: current site settings (login page + rotating-dashboard editor).
 export async function GET() {
-  const [dashboardName, rotation, scrollSpeed, branding] = await Promise.all([
-    getDashboardName(),
-    getRotationConfig(),
-    getScrollSpeed(),
-    getBranding(),
-  ]);
+  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+    await Promise.all([
+      getDashboardName(),
+      getRotationConfig(),
+      getScrollSpeed(),
+      getBranding(),
+      getShiftBounds(),
+    ]);
   return NextResponse.json({
     dashboardName,
     rotatingUrl: rotation.url,
@@ -30,6 +34,7 @@ export async function GET() {
     rotatingEnabled: rotation.enabled,
     scrollSpeed,
     branding,
+    shiftBounds,
   });
 }
 
@@ -59,6 +64,28 @@ export async function PATCH(req: Request) {
   if (body.scrollSpeed !== undefined) {
     const speed = Math.max(1, Math.min(10, Math.round(Number(body.scrollSpeed) || 4)));
     await setSetting("scrollSpeed", String(speed));
+  }
+  if (body.shift !== undefined) {
+    // { firstStart, secondStart, thirdStart } as "HH:MM"; must be increasing.
+    const s = body.shift ?? {};
+    const f = parseHhmm(s.firstStart);
+    const sec = parseHhmm(s.secondStart);
+    const t = parseHhmm(s.thirdStart);
+    if (f === null || sec === null || t === null) {
+      return NextResponse.json(
+        { error: "Shift times must be valid times (HH:MM)." },
+        { status: 400 }
+      );
+    }
+    if (!(f < sec && sec < t)) {
+      return NextResponse.json(
+        { error: "Shift start times must increase: 1st < 2nd < 3rd." },
+        { status: 400 }
+      );
+    }
+    await setSetting("shiftFirstStart", String(s.firstStart).trim());
+    await setSetting("shiftSecondStart", String(s.secondStart).trim());
+    await setSetting("shiftThirdStart", String(s.thirdStart).trim());
   }
   if (body.branding !== undefined) {
     const b = body.branding ?? {};
@@ -91,12 +118,14 @@ export async function PATCH(req: Request) {
   }
 
   await logActivity("Settings", "Updated settings");
-  const [dashboardName, rotation, scrollSpeed, branding] = await Promise.all([
-    getDashboardName(),
-    getRotationConfig(),
-    getScrollSpeed(),
-    getBranding(),
-  ]);
+  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+    await Promise.all([
+      getDashboardName(),
+      getRotationConfig(),
+      getScrollSpeed(),
+      getBranding(),
+      getShiftBounds(),
+    ]);
   return NextResponse.json({
     dashboardName,
     rotatingUrl: rotation.url,
@@ -104,5 +133,6 @@ export async function PATCH(req: Request) {
     rotatingEnabled: rotation.enabled,
     scrollSpeed,
     branding,
+    shiftBounds,
   });
 }

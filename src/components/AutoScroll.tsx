@@ -10,12 +10,15 @@ import {
 } from "react";
 
 // A single shared scroll clock so every AutoScroll section on the board moves
-// together. One driver advances a shared position from 0 to the tallest
-// section's overflow and back; each section sets its scrollTop to
-// min(position, itsOwnOverflow). So a shorter section reaches its end first,
-// then holds there while the taller sections keep going, and resumes in sync
-// once they scroll back past it.
-type ScrollSync = { register: (el: HTMLDivElement) => () => void };
+// together. One driver advances a shared position and each section sets its
+// scrollTop to min(position, itsOwnOverflow). The designated leader (the
+// positions section) sets the range: the driver runs 0 → leader's overflow and
+// back, so everything tracks the positions scroll. A shorter section reaches
+// its end first, holds there, and resumes once the leader scrolls back past it.
+// (Falls back to the tallest section only when the leader isn't overflowing.)
+type ScrollSync = {
+  register: (el: HTMLDivElement, leader: boolean) => () => void;
+};
 const ScrollSyncContext = createContext<ScrollSync | null>(null);
 
 const END_PAUSE = 120; // frames held at each end (~2s at 60fps)
@@ -28,10 +31,11 @@ export function ScrollSyncProvider({
   speed?: number;
   children: ReactNode;
 }) {
-  const members = useRef<Set<HTMLDivElement>>(new Set());
+  // element -> is this the leader (positions) section?
+  const members = useRef<Map<HTMLDivElement, boolean>>(new Map());
 
-  const register = useCallback((el: HTMLDivElement) => {
-    members.current.add(el);
+  const register = useCallback((el: HTMLDivElement, leader: boolean) => {
+    members.current.set(el, leader);
     return () => {
       members.current.delete(el);
     };
@@ -44,17 +48,26 @@ export function ScrollSyncProvider({
     let pos = 0;
 
     const tick = () => {
-      const els = [...members.current];
+      const entries = [...members.current];
+      const els = entries.map(([el]) => el);
       const overflows = els.map((el) => el.scrollHeight - el.clientHeight);
       const maxOverflow = overflows.reduce((m, o) => Math.max(m, o), 0);
 
-      if (maxOverflow > 2) {
+      // The leader (positions) drives the range; fall back to the tallest
+      // section only when the leader has nothing to scroll.
+      let range = 0;
+      entries.forEach(([, leader], i) => {
+        if (leader) range = Math.max(range, overflows[i]);
+      });
+      if (range <= 2) range = maxOverflow;
+
+      if (range > 2) {
         if (pause > 0) {
           pause--;
         } else {
           pos += dir * speed;
-          if (pos >= maxOverflow) {
-            pos = maxOverflow;
+          if (pos >= range) {
+            pos = range;
             dir = -1;
             pause = END_PAUSE;
           } else if (pos <= 0) {
@@ -64,7 +77,7 @@ export function ScrollSyncProvider({
           }
         }
         // Content can shrink between frames (data refresh) — keep pos in range.
-        if (pos > maxOverflow) pos = maxOverflow;
+        if (pos > range) pos = range;
         els.forEach((el, i) => {
           el.scrollTop = Math.max(0, Math.min(pos, overflows[i]));
         });
@@ -93,6 +106,7 @@ export function AutoScroll({
   enabled,
   maxHeightClass = "",
   speed = 0.4,
+  syncLeader = false,
   children,
 }: {
   enabled: boolean;
@@ -100,6 +114,9 @@ export function AutoScroll({
   // Pixels per frame (~60fps); 0.4 ≈ 24px/s, the original pace. Ignored when a
   // ScrollSyncProvider is driving (the provider owns the shared speed).
   speed?: number;
+  // In a ScrollSyncProvider, mark this section as the one whose scroll range
+  // drives all the others (the positions section on the board).
+  syncLeader?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -113,7 +130,7 @@ export function AutoScroll({
     // Synced mode: hand the element to the shared driver and let it own scroll.
     if (sync) {
       el.scrollTop = 0;
-      return sync.register(el);
+      return sync.register(el, syncLeader);
     }
 
     // Standalone mode: independent up/down loop.
@@ -147,7 +164,7 @@ export function AutoScroll({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [enabled, speed, sync]);
+  }, [enabled, speed, sync, syncLeader]);
 
   return (
     <div ref={ref} className={enabled ? `overflow-hidden ${maxHeightClass}` : ""}>
