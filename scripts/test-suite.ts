@@ -199,21 +199,22 @@ function unitTests() {
   {
     const wed = easternAt("2026-07-08T12:00"); // a Wednesday
     const days = upcomingScheduleDates(wed);
-    eq("5 weekdays within 7 days", days.length, 5);
+    eq("7 upcoming days", days.length, 7);
     eq("dates in order", days.map((d) => d.date), [
       "2026-07-09",
       "2026-07-10",
+      "2026-07-11",
+      "2026-07-12",
       "2026-07-13",
       "2026-07-14",
       "2026-07-15",
     ]);
-    ok("all Mon–Fri", days.every((d) => ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(d.weekday)));
+    ok("includes the weekend", days.some((d) => d.date === "2026-07-11") && days.some((d) => d.date === "2026-07-12"));
     ok("excludes today", days.every((d) => d.date !== "2026-07-08"));
-    ok("skips the weekend", !days.some((d) => d.date === "2026-07-11" || d.date === "2026-07-12"));
     ok("isScheduleDate accepts in-window weekday", isScheduleDate("2026-07-09", wed));
+    ok("isScheduleDate accepts in-window weekend", isScheduleDate("2026-07-11", wed));
     ok("isScheduleDate rejects today", !isScheduleDate("2026-07-08", wed));
-    ok("isScheduleDate rejects weekend", !isScheduleDate("2026-07-11", wed));
-    ok("isScheduleDate rejects beyond 7 days", !isScheduleDate("2026-07-20", wed));
+    ok("isScheduleDate rejects beyond 7 days", !isScheduleDate("2026-07-16", wed));
   }
 
   group("celebrations");

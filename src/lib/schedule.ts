@@ -1,9 +1,10 @@
 import { APP_TZ, easternDateKey } from "@/lib/time";
 
-// Advance scheduling: admins plan each employee's position for upcoming weekdays
-// (Mon–Fri) up to ~7 days out. Each plan is keyed to a specific Eastern date.
-// When that date becomes "today", applyDueSchedules() (in scheduleServer.ts)
-// copies the plan onto the live board.
+// Advance scheduling: admins plan each employee's position for the upcoming week
+// — all 7 days (Mon–Sun, weekends included so people can be planned in for
+// weekend work). Each plan is keyed to a specific Eastern date. When that date
+// becomes "today", applyDueSchedules() (in scheduleServer.ts) copies the plan
+// onto the live board.
 //
 // This module holds only the pure date helpers, so it's safe to import from
 // client components (the assign board). The DB-touching apply function lives in
@@ -11,14 +12,14 @@ import { APP_TZ, easternDateKey } from "@/lib/time";
 
 export type ScheduleDay = { date: string; label: string; weekday: string };
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-
-// The selectable planning days: the upcoming weekdays (Mon–Fri) within the next
-// 7 days, as Eastern date keys. Excludes today (today is the live board).
+// The selectable planning days: the next 7 calendar days (every day of the
+// week), as Eastern date keys. Excludes today (today is the live board).
 export function upcomingScheduleDates(now: Date): ScheduleDay[] {
   const out: ScheduleDay[] = [];
   const seen = new Set<string>();
-  for (let d = 1; d <= 7; d++) {
+  // Iterate a little past 7 so a DST day-length wobble can't drop us below 7
+  // distinct dates; stop once we've collected the week.
+  for (let d = 1; out.length < 7 && d <= 10; d++) {
     const inst = new Date(now.getTime() + d * 24 * 3600 * 1000);
     const date = easternDateKey(inst);
     if (seen.has(date)) continue;
@@ -27,7 +28,6 @@ export function upcomingScheduleDates(now: Date): ScheduleDay[] {
       timeZone: APP_TZ,
       weekday: "short",
     }).format(inst);
-    if (!WEEKDAYS.includes(weekday)) continue;
     const label = new Intl.DateTimeFormat("en-US", {
       timeZone: APP_TZ,
       weekday: "short",

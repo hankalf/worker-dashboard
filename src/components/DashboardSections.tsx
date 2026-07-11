@@ -11,7 +11,7 @@ import {
   isBirthday,
 } from "@/lib/celebrations";
 import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
-import { AutoScroll } from "@/components/AutoScroll";
+import { AutoScroll, ScrollSyncProvider } from "@/components/AutoScroll";
 import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 
 export type EmployeeWithRelations = Employee & {
@@ -411,6 +411,8 @@ export function DashboardSections({
     announcements.length > 0 ? "max-h-[32vh]" : "max-h-[60vh]";
 
   return (
+    // One shared scroll clock keeps every auto-scrolling section in sync.
+    <ScrollSyncProvider speed={scrollPxPerFrame}>
     <>
       {/* Row A: shift-handoff notes (public board only) next to the notices.
           A cell disappears when it has nothing to show; the other takes the
@@ -786,6 +788,7 @@ export function DashboardSections({
       </section>
 
     </>
+    </ScrollSyncProvider>
   );
 }
 

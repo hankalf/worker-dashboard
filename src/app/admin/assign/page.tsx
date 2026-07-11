@@ -96,6 +96,9 @@ const ATTENDANCE_OPTIONS: { value: Attendance; label: string }[] = [
 
 const UNASSIGNED = "unassigned";
 
+// How many upcoming-day tabs to show at once (the week is paged 5 at a time).
+const DAYS_VISIBLE = 5;
+
 // Lunch start times in 15-minute steps across the day. Lunch is always 30
 // minutes, so only the start is chosen; the end is start + 30 everywhere.
 const LUNCH_TIMES = Array.from({ length: 96 }, (_, i) => {
@@ -502,6 +505,10 @@ export default function AssignPage() {
   // selected date (loaded from /api/schedule).
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<Record<string, string | null>>({});
+  // The upcoming week now spans all 7 days; show 5 day-tabs at a time and page
+  // through them with the ‹ › arrows. `dayWindow` is the index of the first
+  // visible day.
+  const [dayWindow, setDayWindow] = useState(0);
 
   // Live-ish clock (30s) so the "active shift" highlight tracks the time.
   const [now, setNow] = useState(() => new Date());
@@ -510,6 +517,10 @@ export default function AssignPage() {
     return () => clearInterval(id);
   }, []);
   const scheduleDates = upcomingScheduleDates(now);
+  // Clamp the paging window to the available days and take the visible slice.
+  const maxDayWindow = Math.max(0, scheduleDates.length - DAYS_VISIBLE);
+  const dayStart = Math.min(dayWindow, maxDayWindow);
+  const visibleDates = scheduleDates.slice(dayStart, dayStart + DAYS_VISIBLE);
 
   // Load the selected date's plan; clear when back on the live board. If the
   // selected date rolls out of the window (e.g. past midnight), fall back to Today.
@@ -1012,8 +1023,9 @@ export default function AssignPage() {
         </div>
       </div>
 
-      {/* Day selector: Today (live board) + upcoming weekdays to plan ahead. */}
-      <div className="mb-3 flex flex-wrap gap-2">
+      {/* Day selector: Today (live board) + the upcoming week (Mon–Sun),
+          shown 5 days at a time and paged with the ‹ › arrows. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setSelectedDate(null)}
           className={`rounded-md border px-3 py-1.5 text-sm ${
@@ -1024,7 +1036,17 @@ export default function AssignPage() {
         >
           Today
         </button>
-        {scheduleDates.map((d) => (
+        {scheduleDates.length > DAYS_VISIBLE && (
+          <button
+            onClick={() => setDayWindow(Math.max(0, dayStart - DAYS_VISIBLE))}
+            disabled={dayStart <= 0}
+            aria-label="Earlier days"
+            className="rounded-md border border-zinc-700 px-2 py-1.5 text-sm text-zinc-300 enabled:hover:border-zinc-500 disabled:opacity-30"
+          >
+            ‹
+          </button>
+        )}
+        {visibleDates.map((d) => (
           <button
             key={d.date}
             onClick={() => setSelectedDate(d.date)}
@@ -1037,6 +1059,16 @@ export default function AssignPage() {
             {d.label}
           </button>
         ))}
+        {scheduleDates.length > DAYS_VISIBLE && (
+          <button
+            onClick={() => setDayWindow(Math.min(maxDayWindow, dayStart + DAYS_VISIBLE))}
+            disabled={dayStart >= maxDayWindow}
+            aria-label="Later days"
+            className="rounded-md border border-zinc-700 px-2 py-1.5 text-sm text-zinc-300 enabled:hover:border-zinc-500 disabled:opacity-30"
+          >
+            ›
+          </button>
+        )}
       </div>
 
       <p className="mb-4 text-sm text-zinc-400">
