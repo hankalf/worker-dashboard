@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
-import { logActivity } from "@/lib/activity";
+import { logActivity, getActorName } from "@/lib/activity";
 
 // Public read — notices that are live now (started and not expired), oldest first.
 export async function GET() {
@@ -42,6 +42,10 @@ export async function POST(req: Request) {
   const expires = expiresAt ? new Date(expiresAt) : null;
   const announcement = await prisma.announcement.create({
     data: { message: trimmed, startsAt: starts, expiresAt: expires, pinned: !!pinned },
+  });
+  // Append to the notice history (survives deletion) with who posted it.
+  await prisma.noticeLog.create({
+    data: { message: trimmed, postedBy: await getActorName() },
   });
   await logActivity(
     "Announcement",

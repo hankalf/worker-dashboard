@@ -305,6 +305,8 @@ export function DashboardSections({
   laborShare = [],
   fill = false,
   tv = false,
+  ignoreShift = false,
+  positionsOnly = false,
 }: {
   positions: Position[];
   employees: EmployeeWithRelations[];
@@ -329,6 +331,12 @@ export function DashboardSections({
   // flexes to the remaining height and scrolls inside itself (no page scroll).
   fill?: boolean;
   tv?: boolean;
+  // Show every shift's crew, not just the one active at `now`. Used by the
+  // admin day-ahead preview, where the board isn't tied to the current clock.
+  ignoreShift?: boolean;
+  // Render only the "Team by Position" grid (skip notices, lunches, coverage,
+  // side tasks) — a focused view for the day-ahead schedule preview.
+  positionsOnly?: boolean;
 }) {
   // Admins never appear on the boards; supervisors are working staff and do.
   const employees = allEmployees.filter((e) => e.accessLevel !== "ADMIN");
@@ -348,7 +356,9 @@ export function DashboardSections({
   const covering = (e: EmployeeWithRelations) =>
     !!e.coverUntil && !!now && new Date(e.coverUntil).getTime() > now.getTime();
   // Show current shift's crew (by clock) + anyone staying over or covering.
+  // In `ignoreShift` mode (day-ahead preview) every shift's crew is shown.
   const onShift = (e: EmployeeWithRelations) =>
+    ignoreShift ||
     !shiftKey ||
     e.shift === null ||
     e.shift === shiftKey ||
@@ -441,7 +451,7 @@ export function DashboardSections({
       {/* Row A: shift-handoff notes (public board only) next to the notices.
           A cell disappears when it has nothing to show; the other takes the
           full row (the banner renders null without a note → empty:hidden). */}
-      {(showHandoff || announcements.length > 0) && (
+      {!positionsOnly && (showHandoff || announcements.length > 0) && (
         <div
           className={`${fill ? "mb-4 shrink-0" : "mb-8"} flex flex-wrap items-start gap-6`}
         >
@@ -472,6 +482,7 @@ export function DashboardSections({
       )}
 
       {/* Row B: lunches (On Lunch + Lunch Schedule) next to the side tasks. */}
+      {!positionsOnly && (
       <div
         className={`${fill ? "mb-4 shrink-0" : "mb-10"} flex flex-wrap items-start gap-6`}
       >
@@ -558,6 +569,7 @@ export function DashboardSections({
           />
         </div>
       </div>
+      )}
 
       {showCoverage && understaffed.length > 0 && (
         <div className="mb-8 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
@@ -658,7 +670,7 @@ export function DashboardSections({
       >
         <h2 className="mb-4 flex shrink-0 flex-wrap items-baseline gap-x-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           {showPositions ? "Team by Position" : "Position"}
-          {showPositions && shiftKey && (
+          {showPositions && shiftKey && !ignoreShift && (
             <span className="font-medium normal-case tracking-normal text-zinc-400 dark:text-zinc-500">
               — {SHIFTS[shiftKey].label} ({SHIFTS[shiftKey].range})
             </span>

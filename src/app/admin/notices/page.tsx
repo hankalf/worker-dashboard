@@ -11,7 +11,7 @@ export default async function NoticesPage() {
     where: { expiresAt: { lt: new Date(now.getTime() - 7 * 24 * 3600 * 1000) } },
   });
 
-  const [active, expired] = await Promise.all([
+  const [active, expired, log] = await Promise.all([
     // Active notices (live + queued + scheduled), oldest first.
     prisma.announcement.findMany({
       where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
@@ -23,6 +23,8 @@ export default async function NoticesPage() {
       orderBy: { expiresAt: "desc" },
       take: 10,
     }),
+    // Full history of everything posted (kept even after deletion).
+    prisma.noticeLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
   ]);
 
   const toDto = (n: {
@@ -42,11 +44,17 @@ export default async function NoticesPage() {
   });
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Notices</h2>
       <NoticesManager
         notices={active.map(toDto)}
         expiredNotices={expired.map(toDto)}
+        log={log.map((l) => ({
+          id: l.id,
+          message: l.message,
+          postedBy: l.postedBy,
+          createdAt: l.createdAt.toISOString(),
+        }))}
       />
     </div>
   );

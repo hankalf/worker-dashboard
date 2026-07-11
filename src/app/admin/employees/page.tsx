@@ -449,7 +449,7 @@ export default function EmployeesPage() {
     <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Employees</h2>
 
-      <div className="mb-6 max-w-3xl rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <h3 className="mb-1 text-sm font-medium text-white">Import from CSV</h3>
         <p className="mb-3 text-sm text-zinc-400">
           Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
@@ -494,11 +494,15 @@ export default function EmployeesPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mb-6 flex max-w-3xl flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+        className="mb-6 flex flex-col gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
       >
         <h3 className="text-sm font-medium text-white">
           {editingId ? "Edit employee" : "Add employee"}
         </h3>
+        {/* Two columns so the form spans the width and stays short: identity +
+            assignment on the left, capabilities + panel access on the right. */}
+        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-3">
         <input
           placeholder="Name"
           value={name}
@@ -591,7 +595,9 @@ export default function EmployeesPage() {
             Lead (shown first in their position)
           </label>
         </div>
+        </div>
 
+        <div className="flex flex-col gap-4">
         <div>
           <div className="mb-1 text-xs font-medium text-zinc-400">
             Equipment this employee can operate
@@ -693,6 +699,8 @@ export default function EmployeesPage() {
             />
           </div>
         )}
+        </div>
+        </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">

@@ -1,6 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
+// The display name of the current session's user (best-effort, may be null).
+export async function getActorName(): Promise<string | null> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return null;
+    const actor = await prisma.employee.findUnique({
+      where: { id: session.user.id },
+      select: { name: true },
+    });
+    return actor?.name ?? session.user.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Records a site-wide activity entry, stamping who made the change (from the
 // current session). `subjectId` optionally links the entry to an employee for
 // per-person history. Never throws — logging must not break the mutation.

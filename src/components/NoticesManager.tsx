@@ -33,13 +33,22 @@ function fmtExpiry(iso: string | null) {
 
 // The notices manager: post a notice (immediate or scheduled, optional expiry,
 // pinnable) and manage the live / queued / scheduled / recently-expired lists.
+export type NoticeLogEntry = {
+  id: string;
+  message: string;
+  postedBy: string | null;
+  createdAt: string;
+};
+
 // Lives on its own Notices tab.
 export function NoticesManager({
   notices,
   expiredNotices,
+  log = [],
 }: {
   notices: Notice[];
   expiredNotices: Notice[];
+  log?: NoticeLogEntry[];
 }) {
   const now = useNow();
   useAutoRefresh();
@@ -100,6 +109,18 @@ export function NoticesManager({
     setExpiresInput(easternDateTimeInput(new Date()));
     setPinNew(false);
     setPosting(false);
+    router.refresh();
+  };
+
+  // Re-post a message from the history as a fresh, immediate notice.
+  const repost = async (id: string, text: string) => {
+    setBusyId(id);
+    await fetch("/api/announcement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    setBusyId(null);
     router.refresh();
   };
 
@@ -239,6 +260,7 @@ export function NoticesManager({
   };
 
   return (
+    <>
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
       <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
         Post a notice
@@ -371,5 +393,45 @@ export function NoticesManager({
         </div>
       )}
     </div>
+
+    {/* Full posting history — every notice ever posted and by whom; repostable. */}
+    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">
+        Notice history ({log.length})
+      </div>
+      {log.length === 0 ? (
+        <p className="text-xs text-zinc-600">No notices posted yet.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-800">
+          {log.map((l) => (
+            <li key={l.id} className="flex items-center gap-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-zinc-200">
+                  {l.message}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  {new Date(l.createdAt).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    timeZone: APP_TZ,
+                  })}
+                  {l.postedBy ? ` · ${l.postedBy}` : ""}
+                </span>
+              </span>
+              <button
+                onClick={() => repost(l.id, l.message)}
+                disabled={busyId === l.id}
+                className="shrink-0 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-blue-700 hover:bg-blue-950/30 hover:text-blue-300 disabled:opacity-50"
+              >
+                {busyId === l.id ? "…" : "Repost"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+    </>
   );
 }

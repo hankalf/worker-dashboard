@@ -138,6 +138,18 @@ model Announcement {
   updatedAt DateTime  @updatedAt
 }
 
+// Append-only log of every notice posted (kept even after the notice is
+// deleted/expires), with who posted it — powers the Notices-tab history and
+// one-click repost.
+model NoticeLog {
+  id        String   @id @default(cuid())
+  message   String
+  postedBy  String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // One handoff note per shift (id is the shift key: FIRST | SECOND | THIRD),
 // shown above the notices for the currently-active shift and carried until the
 // next crew edits it.
