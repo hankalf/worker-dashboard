@@ -41,6 +41,7 @@ export default async function LunchesPage() {
       id: e.id,
       name: e.name,
       lunchStart: e.lunchStart!,
+      breakStart: e.breakStart,
       position: e.position?.title ?? null,
       shift: e.shift,
     }));
