@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
-import { logActivity } from "@/lib/activity";
+import { logActivity, getActorName } from "@/lib/activity";
 
 export async function GET() {
   const jobs = await prisma.job.findMany({
@@ -42,7 +42,12 @@ export async function POST(req: Request) {
     ? `Created and assigned to ${job.assignedEmployee.name}`
     : "Created";
   await prisma.taskLog.create({
-    data: { jobId: job.id, jobTitle: job.title, action: createdAction },
+    data: {
+      jobId: job.id,
+      jobTitle: job.title,
+      action: createdAction,
+      actorName: await getActorName(),
+    },
   });
   await logActivity("Side Task", `${job.title}: ${createdAction}`);
 

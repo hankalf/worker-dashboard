@@ -277,6 +277,8 @@ model TaskLog {
   jobId     String?
   jobTitle  String
   action    String
+  // Who performed the action (snapshotted display name), best-effort.
+  actorName String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])

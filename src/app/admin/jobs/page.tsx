@@ -21,6 +21,7 @@ type TaskLog = {
   id: string;
   jobTitle: string;
   action: string;
+  actorName: string | null;
   createdAt: string;
 };
 
@@ -160,38 +161,48 @@ export default function JobsPage() {
           className={inputClass}
         />
         <div className="grid grid-cols-2 gap-3">
-          <select
-            value={form.assignedEmployeeId}
-            onChange={(e) =>
-              setForm({ ...form, assignedEmployeeId: e.target.value })
-            }
-            className={inputClass}
-          >
-            <option value="">Unassigned</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={form.status}
-            onChange={(e) =>
-              setForm({ ...form, status: e.target.value as Job["status"] })
-            }
-            className={inputClass}
-          >
-            <option value="UNASSIGNED">Unassigned</option>
-            <option value="ASSIGNED">Assigned</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
-          <input
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            className={inputClass}
-          />
+          <label className="text-xs text-zinc-400">
+            Assigned to
+            <select
+              value={form.assignedEmployeeId}
+              onChange={(e) =>
+                setForm({ ...form, assignedEmployeeId: e.target.value })
+              }
+              className={`mt-1 block w-full ${inputClass}`}
+            >
+              <option value="">Unassigned</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-zinc-400">
+            Status
+            <select
+              value={form.status}
+              onChange={(e) =>
+                setForm({ ...form, status: e.target.value as Job["status"] })
+              }
+              className={`mt-1 block w-full ${inputClass}`}
+            >
+              <option value="UNASSIGNED">Unassigned</option>
+              <option value="ASSIGNED">Assigned</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="DONE">Done</option>
+            </select>
+          </label>
+          <label className="text-xs text-zinc-400">
+            Due date
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+              style={{ colorScheme: "dark" }}
+              className={`mt-1 block w-full ${inputClass}`}
+            />
+          </label>
           <label className="text-xs text-zinc-400">
             Priority
             <select
@@ -296,6 +307,9 @@ export default function JobsPage() {
                 <span className="font-medium text-white">{log.jobTitle}</span>
                 {" — "}
                 {log.action}
+                {log.actorName && (
+                  <span className="text-zinc-500"> by {log.actorName}</span>
+                )}
               </span>
               <span className="whitespace-nowrap text-xs text-zinc-500">
                 {new Date(log.createdAt).toLocaleString(undefined, {
