@@ -55,10 +55,10 @@ export function NoticesManager({
   const router = useRouter();
 
   const [message, setMessage] = useState("");
-  // Prefilled with the current Eastern date/time as a starting point; the admin
-  // bumps it forward, or clears it for a notice with no expiry.
+  // Standard expiry is 24 hours out; the admin adjusts it, or clears it for a
+  // notice with no expiry.
   const [expiresInput, setExpiresInput] = useState(() =>
-    easternDateTimeInput(new Date())
+    easternDateTimeInput(new Date(Date.now() + 24 * 3600 * 1000))
   );
   // Optional scheduled start, prefilled with the current Eastern time (bump it
   // forward to schedule, or "clear" to show immediately); limited to 48h ahead.
@@ -106,7 +106,7 @@ export function NoticesManager({
     });
     setMessage("");
     setStartsInput(easternDateTimeInput(new Date()));
-    setExpiresInput(easternDateTimeInput(new Date()));
+    setExpiresInput(easternDateTimeInput(new Date(Date.now() + 24 * 3600 * 1000)));
     setPinNew(false);
     setPosting(false);
     router.refresh();
