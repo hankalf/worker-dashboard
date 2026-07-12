@@ -14,17 +14,25 @@ export default async function NoticesPage() {
     where: { expiresAt: { lt: new Date(now.getTime() - 7 * 24 * 3600 * 1000) } },
   });
 
-  const [active, expired, log] = await Promise.all([
-    // Active notices (live + queued + scheduled), oldest first.
+  const [active, expired, events, log] = await Promise.all([
+    // Active regular notices (live + queued + scheduled), oldest first.
     prisma.announcement.findMany({
-      where: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      where: {
+        isEvent: false,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
       orderBy: { createdAt: "asc" },
     }),
-    // The most recently expired notices, so admins can see what dropped off.
+    // The most recently expired regular notices, so admins see what dropped off.
     prisma.announcement.findMany({
-      where: { expiresAt: { lte: now } },
+      where: { isEvent: false, expiresAt: { lte: now } },
       orderBy: { expiresAt: "desc" },
       take: 10,
+    }),
+    // Preplanned events (not yet expired), soonest first.
+    prisma.announcement.findMany({
+      where: { isEvent: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
     // Full history of everything posted (kept even after deletion).
     prisma.noticeLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
@@ -52,6 +60,7 @@ export default async function NoticesPage() {
       <NoticesManager
         notices={active.map(toDto)}
         expiredNotices={expired.map(toDto)}
+        events={events.map(toDto)}
         log={log.map((l) => ({
           id: l.id,
           message: l.message,

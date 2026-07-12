@@ -130,11 +130,14 @@ model Position {
 model Announcement {
   id        String    @id @default(cuid())
   message   String
-  // Optional scheduled start: hidden from the board until this time (max 48h
-  // ahead). Null = show immediately.
+  // Optional scheduled start: hidden from the board until this time. Regular
+  // notices allow up to 48h ahead; events (isEvent) allow far-future dates.
+  // Null = show immediately.
   startsAt  DateTime?
   expiresAt DateTime?
   pinned    Boolean   @default(false)
+  // Preplanned event scheduled months ahead; managed in its own admin section.
+  isEvent   Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }

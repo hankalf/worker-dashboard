@@ -19,16 +19,20 @@ export type Notice = {
   createdAt: string;
 };
 
-// Format an expiry timestamp for display in the app's timezone.
+// Format an expiry/start timestamp for display in the app's timezone. Includes
+// the year only when it differs from now (so far-future events read clearly).
 function fmtExpiry(iso: string | null) {
   if (!iso) return "no expiry";
-  return new Date(iso).toLocaleString(undefined, {
+  const d = new Date(iso);
+  const opts: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
     timeZone: APP_TZ,
-  });
+  };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  return d.toLocaleString(undefined, opts);
 }
 
 // The notices manager: post a notice (immediate or scheduled, optional expiry,
@@ -44,10 +48,12 @@ export type NoticeLogEntry = {
 export function NoticesManager({
   notices,
   expiredNotices,
+  events = [],
   log = [],
 }: {
   notices: Notice[];
   expiredNotices: Notice[];
+  events?: Notice[];
   log?: NoticeLogEntry[];
 }) {
   const now = useNow();
@@ -67,6 +73,13 @@ export function NoticesManager({
   );
   const [pinNew, setPinNew] = useState(false);
   const [posting, setPosting] = useState(false);
+  // Preplanned-event form (far-future scheduling).
+  const [eventMessage, setEventMessage] = useState("");
+  const [eventStartsInput, setEventStartsInput] = useState(() =>
+    easternDateTimeInput(new Date(Date.now() + 7 * 24 * 3600 * 1000))
+  );
+  const [eventExpiresInput, setEventExpiresInput] = useState("");
+  const [postingEvent, setPostingEvent] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -109,6 +122,29 @@ export function NoticesManager({
     setExpiresInput(easternDateTimeInput(new Date(Date.now() + 24 * 3600 * 1000)));
     setPinNew(false);
     setPosting(false);
+    router.refresh();
+  };
+
+  // Schedule a preplanned event far in the future.
+  const postEvent = async () => {
+    if (!eventMessage.trim()) return;
+    setPostingEvent(true);
+    await fetch("/api/announcement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: eventMessage,
+        startsAt: eventStartsInput ? easternInputToUtcISO(eventStartsInput) : null,
+        expiresAt: eventExpiresInput ? easternInputToUtcISO(eventExpiresInput) : null,
+        isEvent: true,
+      }),
+    });
+    setEventMessage("");
+    setEventStartsInput(
+      easternDateTimeInput(new Date(Date.now() + 7 * 24 * 3600 * 1000))
+    );
+    setEventExpiresInput("");
+    setPostingEvent(false);
     router.refresh();
   };
 
@@ -395,6 +431,86 @@ export function NoticesManager({
           </div>
         </div>
       )}
+    </div>
+
+    {/* Upcoming events — preplanned notices scheduled weeks or months out. */}
+    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-400">
+        Upcoming events
+      </label>
+      <p className="mb-2 text-xs text-zinc-500">
+        Preplanned company events (weeks or months ahead). Each appears on the
+        board on its start date and clears at its end.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={eventMessage}
+          onChange={(e) => setEventMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") postEvent();
+          }}
+          placeholder="Event notice (e.g. Company picnic — noon in the break room)"
+          className="flex-1 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500"
+        />
+        <button
+          onClick={postEvent}
+          disabled={postingEvent || !eventMessage.trim()}
+          className="shrink-0 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+        >
+          {postingEvent ? "Adding…" : "Add event"}
+        </button>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 sm:gap-x-6">
+        <label className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          Show on the board starting (Eastern):
+          <input
+            type="datetime-local"
+            value={eventStartsInput}
+            min={scheduleMin}
+            onChange={(e) => setEventStartsInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+        </label>
+        <label className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          Clear at (Eastern, optional):
+          <input
+            type="datetime-local"
+            value={eventExpiresInput}
+            onChange={(e) => setEventExpiresInput(e.target.value)}
+            style={{ colorScheme: "dark" }}
+            className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+          />
+          {eventExpiresInput && (
+            <button
+              type="button"
+              onClick={() => setEventExpiresInput("")}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              clear
+            </button>
+          )}
+        </label>
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
+          Scheduled events ({events.length})
+        </div>
+        {events.length === 0 ? (
+          <p className="text-xs text-zinc-600">No events scheduled.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {events.map((n) => (
+              <NoticeRow
+                key={n.id}
+                n={n}
+                tone={isScheduled(n) ? "scheduled" : "live"}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
 
     {/* Full posting history — every notice ever posted and by whom; repostable. */}
