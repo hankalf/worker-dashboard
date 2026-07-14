@@ -27,6 +27,11 @@ import {
   PRIORITY_LEVELS,
 } from "@/lib/priority";
 import {
+  taskDueState,
+  dueStateBadgeClass,
+  DUE_STATE_LABEL,
+} from "@/lib/tasks";
+import {
   getDashboardName,
   setDashboardName,
   DEFAULT_DASHBOARD_NAME,
@@ -194,6 +199,41 @@ function unitTests() {
   ok("badge 1 amber", (priorityBadgeClass(1) ?? "").includes("amber"));
   ok("badge 2 red", (priorityBadgeClass(2) ?? "").includes("red"));
   eq("3 priority levels", PRIORITY_LEVELS.length, 3);
+
+  group("tasks.taskDueState");
+  // Anchor "now" at noon UTC on 2026-07-08 — comfortably inside the Eastern day
+  // 2026-07-08 (08:00 EDT), so the Eastern calendar day is 2026-07-08.
+  const dsNow = new Date("2026-07-08T12:00:00Z");
+  eq("no due date → none", taskDueState(null, "ASSIGNED", dsNow), "none");
+  eq(
+    "yesterday, open → overdue",
+    taskDueState("2026-07-07", "IN_PROGRESS", dsNow),
+    "overdue"
+  );
+  eq(
+    "today, open → due-today",
+    taskDueState("2026-07-08", "ASSIGNED", dsNow),
+    "due-today"
+  );
+  eq(
+    "tomorrow, open → none",
+    taskDueState("2026-07-09", "ASSIGNED", dsNow),
+    "none"
+  );
+  eq("past but DONE → none", taskDueState("2026-07-01", "DONE", dsNow), "none");
+  eq(
+    "accepts a Date instance",
+    taskDueState(new Date("2026-07-07T00:00:00Z"), "UNASSIGNED", dsNow),
+    "overdue"
+  );
+  ok("overdue badge is red", (dueStateBadgeClass("overdue") ?? "").includes("red"));
+  ok(
+    "due-today badge is amber",
+    (dueStateBadgeClass("due-today") ?? "").includes("amber")
+  );
+  ok("none badge is null", dueStateBadgeClass("none") === null);
+  eq("overdue label", DUE_STATE_LABEL["overdue"], "Overdue");
+  eq("due-today label", DUE_STATE_LABEL["due-today"], "Due today");
 
   group("schedule.upcomingScheduleDates");
   {

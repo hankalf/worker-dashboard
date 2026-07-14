@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { APP_TZ } from "@/lib/time";
 import { PRIORITY_LEVELS, priorityLabel, priorityBadgeClass } from "@/lib/priority";
+import { taskDueState, DUE_STATE_LABEL, dueStateBadgeClass } from "@/lib/tasks";
 import { useAccessGuard } from "@/lib/useAdminGuard";
 
 type Employee = { id: string; name: string };
@@ -48,6 +49,15 @@ const emptyForm = {
   priority: 0,
 };
 
+// List filters: which side tasks to show. "open" = anything not yet done.
+type Filter = "all" | "open" | "overdue" | "done";
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "open", label: "Open" },
+  { key: "overdue", label: "Overdue" },
+  { key: "done", label: "Done" },
+];
+
 export default function JobsPage() {
   // Side Tasks is available to Lead and up (NONE is bounced to login).
   const guarded = useAccessGuard("LEAD");
@@ -57,6 +67,7 @@ export default function JobsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
 
   const load = async () => {
     const [jobsRes, employeesRes, logsRes] = await Promise.all([
@@ -239,57 +250,129 @@ export default function JobsPage() {
       </form>
 
       <div className="min-w-0 flex-1">
-      <ul className="flex flex-col gap-2">
-        {jobs.map((job) => (
-          <li
-            key={job.id}
-            className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3"
-          >
-            <div className="min-w-0">
-              <div className="font-medium text-white">{job.title}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                <span
-                  className={`rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[job.status]}`}
-                >
-                  {STATUS_LABELS[job.status]}
-                </span>
-                <span>
-                  {job.assignedEmployee?.name ?? "Unassigned"}
-                </span>
-                {job.dueDate && (
-                  <span>
-                    Due{" "}
-                    {new Date(job.dueDate).toLocaleDateString(undefined, {
-                      timeZone: "UTC",
-                    })}
-                  </span>
-                )}
-                {priorityBadgeClass(job.priority) && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-medium ${priorityBadgeClass(job.priority)}`}
+      {(() => {
+        const now = new Date();
+        const openCount = jobs.filter((j) => j.status !== "DONE").length;
+        const overdueCount = jobs.filter(
+          (j) => taskDueState(j.dueDate, j.status, now) === "overdue"
+        ).length;
+        const visible = jobs.filter((job) => {
+          switch (filter) {
+            case "open":
+              return job.status !== "DONE";
+            case "overdue":
+              return taskDueState(job.dueDate, job.status, now) === "overdue";
+            case "done":
+              return job.status === "DONE";
+            default:
+              return true;
+          }
+        });
+
+        return (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setFilter(f.key)}
+                    className={`rounded-md px-3 py-1 text-sm font-medium ${
+                      filter === f.key
+                        ? "bg-blue-600 text-white"
+                        : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                    }`}
                   >
-                    {priorityLabel(job.priority)}
-                  </span>
-                )}
+                    {f.label}
+                    {f.key === "overdue" && overdueCount > 0 && (
+                      <span className="ml-1.5 rounded-full bg-red-500/80 px-1.5 text-xs text-white">
+                        {overdueCount}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
+              <span className="text-xs text-zinc-500">
+                {openCount} open
+                {overdueCount > 0 && (
+                  <span className="text-red-400"> · {overdueCount} overdue</span>
+                )}
+              </span>
             </div>
-            <div className="flex gap-3 text-sm">
-              <button
-                onClick={() => handleEdit(job)}
-                className="text-zinc-400 hover:text-white"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(job.id)}
-                className="text-red-400 hover:text-red-300"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+
+            <ul className="flex flex-col gap-2">
+              {visible.length === 0 ? (
+                <li className="rounded-lg border border-dashed border-zinc-800 p-3 text-sm text-zinc-500">
+                  No side tasks match this filter.
+                </li>
+              ) : (
+                visible.map((job) => {
+                  const dueState = taskDueState(job.dueDate, job.status, now);
+                  return (
+                    <li
+                      key={job.id}
+                      className={`flex items-center justify-between rounded-lg border bg-zinc-900 p-3 ${
+                        dueState === "overdue"
+                          ? "border-l-2 border-l-red-500 border-zinc-800"
+                          : "border-zinc-800"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-white">{job.title}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[job.status]}`}
+                          >
+                            {STATUS_LABELS[job.status]}
+                          </span>
+                          <span>{job.assignedEmployee?.name ?? "Unassigned"}</span>
+                          {job.dueDate && (
+                            <span>
+                              Due{" "}
+                              {new Date(job.dueDate).toLocaleDateString(undefined, {
+                                timeZone: "UTC",
+                              })}
+                            </span>
+                          )}
+                          {dueState !== "none" && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 font-medium ${dueStateBadgeClass(dueState)}`}
+                            >
+                              {DUE_STATE_LABEL[dueState]}
+                            </span>
+                          )}
+                          {priorityBadgeClass(job.priority) && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 font-medium ${priorityBadgeClass(job.priority)}`}
+                            >
+                              {priorityLabel(job.priority)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-3 text-sm">
+                        <button
+                          onClick={() => handleEdit(job)}
+                          className="text-zinc-400 hover:text-white"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(job.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </>
+        );
+      })()}
 
       <h3 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-400">
         Activity Log
