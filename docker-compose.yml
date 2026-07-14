@@ -1,0 +1,43 @@
+# Warehouse Dashboard — self-host on a mini PC / LAN box.
+#
+#   1. Copy .env.docker.example to .env and set NEXTAUTH_SECRET (+ optionally
+#      SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD and POSTGRES_PASSWORD).
+#   2. docker compose up -d --build
+#   3. Point the wall screen at http://<this-box-ip>:3000
+#
+# Data lives in the named `db-data` volume, so it survives restarts and rebuilds.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-worker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-worker}
+      POSTGRES_DB: ${POSTGRES_DB:-worker}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-worker} -d ${POSTGRES_DB:-worker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # In-cluster Postgres connection (service name `db` resolves on the compose network).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-worker}:${POSTGRES_PASSWORD:-worker}@db:5432/${POSTGRES_DB:-worker}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env (npx auth secret)}
+      # Bootstraps / recovers the first admin login on startup (idempotent).
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db-data:
