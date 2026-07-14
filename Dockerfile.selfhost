@@ -24,6 +24,10 @@ COPY . .
 RUN npx prisma generate
 # NEXTAUTH_SECRET is only needed at runtime; a placeholder keeps the build happy.
 ENV NEXT_TELEMETRY_DISABLED=1
+# In a memory-limited Docker VM, Node auto-sizes its heap low and `next build`
+# can die with "JavaScript heap out of memory" (exit 1). Pin a generous heap so
+# the build is stable on modest machines (needs the container to have ~4GB+).
+ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm run build
 
 # ---- runner: production runtime ---------------------------------------------
