@@ -56,6 +56,25 @@ This repo includes a `render.yaml` Blueprint that provisions both services in on
 
 **Note:** Render's free PostgreSQL databases expire after 30 days. For anything beyond a demo, upgrade `warehouse-db` to a paid plan in `render.yaml` (or the dashboard) before that happens.
 
+## Self-hosting (mini PC / LAN)
+
+Two paths, both bundling the app + Postgres via Docker Compose:
+
+- **Build locally** — `docker-compose.yml` builds from `Dockerfile.selfhost`. Needs ~4–6 GB free for the build:
+  ```bash
+  cp .env.docker.example .env    # set NEXTAUTH_SECRET, SUPERADMIN_PASSWORD, …
+  docker compose up -d --build
+  ```
+- **Run a prebuilt image (recommended for modest boxes)** — GitHub Actions builds the image on every push to `master` and publishes it to `ghcr.io/hankalf/worker-dashboard`, so the box only pulls & runs it (no compile). If the package is private, run `docker login ghcr.io -u <github-user>` once (PAT with `read:packages`), then:
+  ```bash
+  cp .env.docker.example .env
+  docker compose -f docker-compose.prebuilt.yml pull
+  docker compose -f docker-compose.prebuilt.yml up -d
+  ```
+  Update later with `docker compose -f docker-compose.prebuilt.yml pull && docker compose -f docker-compose.prebuilt.yml up -d`.
+
+Either way the container migrates, seeds the admin/superadmin, and serves on `http://<box-ip>:${APP_PORT:-3000}`. Point wall displays at `/screen/<token>`.
+
 ## Project structure
 
 ```

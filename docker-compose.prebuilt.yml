@@ -1,0 +1,48 @@
+# Run the PREBUILT image published by GitHub Actions (ghcr.io) — no local build.
+# Ideal for modest on-prem boxes that can't/shouldn't compile the app.
+#
+#   1. If the ghcr package is private, log in once on this box:
+#        docker login ghcr.io -u <your-github-username>
+#      (paste a GitHub Personal Access Token with the read:packages scope)
+#   2. cp .env.docker.example .env   (and fill it in, same as docker-compose.yml)
+#   3. docker compose -f docker-compose.prebuilt.yml pull
+#   4. docker compose -f docker-compose.prebuilt.yml up -d
+#
+# Update later with:  docker compose -f docker-compose.prebuilt.yml pull && \
+#                     docker compose -f docker-compose.prebuilt.yml up -d
+#
+# Override the image (e.g. pin a specific build) via IMAGE in .env.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-worker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-worker}
+      POSTGRES_DB: ${POSTGRES_DB:-worker}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-worker} -d ${POSTGRES_DB:-worker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${IMAGE:-ghcr.io/hankalf/worker-dashboard:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-worker}:${POSTGRES_PASSWORD:-worker}@db:5432/${POSTGRES_DB:-worker}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env (npx auth secret)}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db-data:
