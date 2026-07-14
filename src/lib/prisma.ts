@@ -232,3 +232,15 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 export async function getActiveLocationId(): Promise<string | null> {
   return resolveLocationId(basePrisma ?? (prisma as unknown as PrismaClient));
 }
+
+// Whether any super-admin exists anywhere. Uses the un-extended base client so
+// the count spans ALL locations (the extension would otherwise scope it to the
+// active one). Drives the first-admin bootstrap in auth.ts.
+export async function hasAnySuperAdmin(): Promise<boolean> {
+  const client = basePrisma ?? (prisma as unknown as PrismaClient);
+  try {
+    return (await client.employee.count({ where: { isSuperAdmin: true } })) > 0;
+  } catch {
+    return true; // on error, don't auto-promote
+  }
+}

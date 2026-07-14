@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { prisma, hasAnySuperAdmin } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -31,11 +31,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isValid = await bcrypt.compare(password, employee.passwordHash);
         if (!isValid) return null;
 
+        // First-admin bootstrap: if the deployment has no super-admin yet, the
+        // first admin to sign in becomes it — so multi-location management is
+        // never locked out by a missed seed/migration promotion. Persisted, so
+        // it survives the session and the switcher works immediately.
+        let isSuperAdmin = employee.isSuperAdmin;
+        if (
+          !isSuperAdmin &&
+          employee.accessLevel === "ADMIN" &&
+          !(await hasAnySuperAdmin())
+        ) {
+          await prisma.employee.update({
+            where: { id: employee.id },
+            data: { isSuperAdmin: true },
+          });
+          isSuperAdmin = true;
+        }
+
         return {
           id: employee.id,
           name: employee.name,
           accessLevel: employee.accessLevel,
-          isSuperAdmin: employee.isSuperAdmin,
+          isSuperAdmin,
           locationId: employee.locationId,
         };
       },
