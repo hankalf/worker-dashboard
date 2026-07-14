@@ -565,7 +565,11 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-white">General</h2>
+      <h2 className="mb-1 text-lg font-semibold text-white">General</h2>
+      <p className="mb-4 text-sm text-zinc-400">
+        These apply to the location selected in the header — each warehouse has
+        its own name, branding, scroll speed, and shift times.
+      </p>
 
       {/* Simple settings cards flow into as many columns as the window allows. */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">

@@ -1,7 +1,29 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, getActiveLocationId } from "@/lib/prisma";
 import { DEFAULT_SHIFT_BOUNDS, type ShiftBounds } from "@/lib/shift";
 
-// Editable site settings, stored as key/value rows in the Setting table.
+// Editable display settings, stored per-location in the LocationSetting table
+// (keyed by the active location) so each warehouse's board has its own name,
+// branding, scroll speed, rotation, and shift bounds.
+
+// Read several per-location settings at once → { key: value }.
+async function readSettings(keys: string[]): Promise<Record<string, string>> {
+  const locationId = await getActiveLocationId();
+  if (!locationId) return {};
+  const rows = await prisma.locationSetting.findMany({
+    where: { locationId, key: { in: keys } },
+  });
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
+// Read one per-location setting, or null if unset.
+async function readSetting(key: string): Promise<string | null> {
+  const locationId = await getActiveLocationId();
+  if (!locationId) return null;
+  const row = await prisma.locationSetting.findUnique({
+    where: { locationId_key: { locationId, key } },
+  });
+  return row?.value ?? null;
+}
 
 // Parse "HH:MM" (24h) to minute-of-day, or null if malformed.
 export function parseHhmm(v: string | undefined | null): number | null {
@@ -21,10 +43,7 @@ const SHIFT_KEYS = ["shiftFirstStart", "shiftSecondStart", "shiftThirdStart"] as
 // day cleanly; otherwise we fall back to the defaults.
 export async function getShiftBounds(): Promise<ShiftBounds> {
   try {
-    const rows = await prisma.setting.findMany({
-      where: { key: { in: [...SHIFT_KEYS] } },
-    });
-    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const m = await readSettings([...SHIFT_KEYS]);
     const f = parseHhmm(m.shiftFirstStart);
     const s = parseHhmm(m.shiftSecondStart);
     const t = parseHhmm(m.shiftThirdStart);
@@ -45,10 +64,8 @@ const DASHBOARD_NAME_KEY = "dashboardName";
 // there yet (e.g. before the migration runs) so the dashboard never crashes.
 export async function getDashboardName(): Promise<string> {
   try {
-    const row = await prisma.setting.findUnique({
-      where: { key: DASHBOARD_NAME_KEY },
-    });
-    return row?.value?.trim() || DEFAULT_DASHBOARD_NAME;
+    const v = await readSetting(DASHBOARD_NAME_KEY);
+    return v?.trim() || DEFAULT_DASHBOARD_NAME;
   } catch {
     return DEFAULT_DASHBOARD_NAME;
   }
@@ -60,12 +77,14 @@ export async function setDashboardName(name: string): Promise<string> {
   return value;
 }
 
-// Generic key/value setter.
+// Generic per-location key/value setter (writes to the active location).
 export async function setSetting(key: string, value: string): Promise<void> {
-  await prisma.setting.upsert({
-    where: { key },
+  const locationId = await getActiveLocationId();
+  if (!locationId) return;
+  await prisma.locationSetting.upsert({
+    where: { locationId_key: { locationId, key } },
     update: { value },
-    create: { key, value },
+    create: { locationId, key, value },
   });
 }
 
@@ -73,8 +92,7 @@ export async function setSetting(key: string, value: string): Promise<void> {
 // slider value (default 4 ≈ the original 24px/s pace).
 export async function getScrollSpeed(): Promise<number> {
   try {
-    const row = await prisma.setting.findUnique({ where: { key: "scrollSpeed" } });
-    const n = Number(row?.value);
+    const n = Number(await readSetting("scrollSpeed"));
     return n >= 1 && n <= 10 ? Math.round(n) : 4;
   } catch {
     return 4;
@@ -106,10 +124,14 @@ export async function getBranding(): Promise<Branding> {
     badge: "",
   };
   try {
-    const rows = await prisma.setting.findMany({
-      where: { key: { startsWith: "brand." } },
-    });
-    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const m = await readSettings([
+      "brand.logo",
+      "brand.headerBg",
+      "brand.headerFg",
+      "brand.notice",
+      "brand.handoff",
+      "brand.badge",
+    ]);
     const color = (v: unknown) => (isHexColor(v) ? v : "");
     const logo =
       typeof m["brand.logo"] === "string" &&
@@ -135,10 +157,11 @@ export type RotationConfig = { url: string; seconds: number; enabled: boolean };
 
 export async function getRotationConfig(): Promise<RotationConfig> {
   try {
-    const rows = await prisma.setting.findMany({
-      where: { key: { in: ["rotatingUrl", "rotationSeconds", "rotatingEnabled"] } },
-    });
-    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const m = await readSettings([
+      "rotatingUrl",
+      "rotationSeconds",
+      "rotatingEnabled",
+    ]);
     return {
       url: m.rotatingUrl ?? "",
       seconds: Number(m.rotationSeconds) || 30,

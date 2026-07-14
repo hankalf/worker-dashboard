@@ -71,6 +71,20 @@ model Location {
   taskLogs             TaskLog[]
   activityLogs         ActivityLog[]
   screens              Screen[]
+  settings             LocationSetting[]
+}
+
+// Per-location display settings (dashboard name, branding, scroll speed,
+// rotation, shift bounds) — a key/value store scoped to a location, so each
+// warehouse's board shows its own identity. Deploy-wide state (build version,
+// tab overrides) stays in the global Setting table.
+model LocationSetting {
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String
+  key        String
+  value      String
+
+  @@id([locationId, key])
 }
 
 // A physical wall display registered to a location. Each screen has an
