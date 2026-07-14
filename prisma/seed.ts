@@ -24,13 +24,14 @@ async function main() {
   const admin = await prisma.employee.upsert({
     where: { username },
     update: process.env.SEED_ADMIN_PASSWORD
-      ? { passwordHash, accessLevel: "ADMIN" }
+      ? { passwordHash, accessLevel: "ADMIN", isSuperAdmin: true }
       : {},
     create: {
       name: "Admin",
       username,
       passwordHash,
       accessLevel: "ADMIN",
+      isSuperAdmin: true,
       locationId: location.id,
     },
   });

@@ -7,6 +7,8 @@ declare module "@auth/core/types" {
     user: {
       id: string;
       accessLevel?: AccessLevel;
+      isSuperAdmin?: boolean;
+      locationId?: string;
     } & DefaultSession["user"];
   }
 }
@@ -15,5 +17,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     id: string;
     accessLevel?: AccessLevel;
+    isSuperAdmin?: boolean;
+    locationId?: string;
   }
 }

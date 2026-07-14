@@ -59,11 +59,24 @@ async function readCookieLocationId(): Promise<string | null> {
   }
 }
 
-// The active location for the current request: an explicit cookie selection if
-// present, otherwise the oldest (default) location. Uses the un-extended base
-// client so the lookup itself is never re-scoped. `null` only when the DB has
-// no locations yet (a brand-new install before the seed runs).
+// The active location for the current request. Resolution order:
+//  1. A signed-in NON-super-admin is confined to their own location (from the
+//     JWT), so a tampered cookie can never cross into another tenant.
+//  2. A super-admin (or the public board) uses the cookie selection set by the
+//     location switcher.
+//  3. Otherwise the oldest (default) location.
+// Uses the un-extended base client so the lookup itself is never re-scoped.
+// `null` only when the DB has no locations yet (a brand-new install pre-seed).
 async function resolveLocationId(base: PrismaClient): Promise<string | null> {
+  try {
+    // Lazy import avoids a static prisma <-> auth import cycle; auth() only
+    // reads the signed JWT (no DB) outside of login, so this can't recurse.
+    const { auth } = await import("@/lib/auth");
+    const user = (await auth())?.user;
+    if (user && !user.isSuperAdmin && user.locationId) return user.locationId;
+  } catch {
+    // no session / outside a request — fall through to cookie/default
+  }
   const fromCookie = await readCookieLocationId();
   if (fromCookie) return fromCookie;
   if (cachedDefaultLocationId) return cachedDefaultLocationId;
@@ -132,6 +145,16 @@ function makeClient() {
     query: {
       async $allOperations({ model, operation, args, query }) {
         if (!model || !TENANT_MODELS.has(model)) return query(args);
+        // Only collection reads / bulk writes / creates need scoping. Skipping
+        // findUnique/update/delete (keyed by id) also means the login lookup —
+        // a findUnique — never triggers resolveLocationId → auth(), so there's
+        // no recursion.
+        const needsScope =
+          WHERE_SCOPED_OPS.has(operation) ||
+          operation === "create" ||
+          operation === "createMany" ||
+          operation === "upsert";
+        if (!needsScope) return query(args);
         const locationId = await resolveLocationId(basePrisma!);
         // No location yet (fresh DB pre-seed) — don't block the query; the
         // NOT NULL column would reject a bad create anyway.

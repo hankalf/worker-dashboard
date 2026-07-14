@@ -80,6 +80,10 @@ model Employee {
   locationId   String    @default("")
   name         String
   accessLevel  AccessLevel @default(NONE)
+  // A super-admin (only meaningful for ADMIN) manages every location: they can
+  // switch the active location, create/rename/delete locations, and oversee the
+  // fleet. Regular admins are confined to their own location.
+  isSuperAdmin Boolean     @default(false)
   username     String?     @unique
   passwordHash String?
   position     Position? @relation(fields: [positionId], references: [id])

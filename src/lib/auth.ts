@@ -35,6 +35,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: employee.id,
           name: employee.name,
           accessLevel: employee.accessLevel,
+          isSuperAdmin: employee.isSuperAdmin,
+          locationId: employee.locationId,
         };
       },
     }),

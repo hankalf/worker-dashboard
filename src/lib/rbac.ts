@@ -30,6 +30,19 @@ export async function requireStaff() {
   return { session, level, isAdmin: level === "ADMIN" };
 }
 
+// Super-admin only (manage locations, switch active location, fleet). Re-reads
+// the live flag so a demotion takes effect immediately.
+export async function requireSuperAdmin() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  const emp = await prisma.employee.findUnique({
+    where: { id: session.user.id },
+    select: { accessLevel: true, isSuperAdmin: true },
+  });
+  if (emp?.accessLevel !== "ADMIN" || !emp.isSuperAdmin) return null;
+  return session;
+}
+
 // Supervisor or admin (for Side Tasks + Attendance, above the Lead level).
 export async function requireSupervisor() {
   const session = await auth();

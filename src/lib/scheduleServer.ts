@@ -1,19 +1,21 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, getActiveLocationId } from "@/lib/prisma";
 import { easternDateKey } from "@/lib/time";
 
 // Server-only half of advance scheduling (imports Prisma — never import this
 // from a client component; the pure date helpers live in @/lib/schedule).
 
-const SCHEDULE_APPLIED_KEY = "scheduleAppliedDate";
-
 // Once per day, on the first board/dashboard load after midnight, push any plan
 // for today onto the live board, then purge past-date plans. Idempotent and
 // self-guarded via a Setting so same-day live edits are never re-overwritten.
+// The guard is per-location so each warehouse applies its own plan once a day
+// (Setting is a global table, so the location id is baked into the key).
 export async function applyDueSchedules(now = new Date()): Promise<void> {
   const today = easternDateKey(now);
   try {
+    const locationId = (await getActiveLocationId()) ?? "default";
+    const appliedKey = `scheduleAppliedDate:${locationId}`;
     const applied = await prisma.setting.findUnique({
-      where: { key: SCHEDULE_APPLIED_KEY },
+      where: { key: appliedKey },
     });
     if (applied?.value !== today) {
       const due = await prisma.scheduledAssignment.findMany({
@@ -30,9 +32,9 @@ export async function applyDueSchedules(now = new Date()): Promise<void> {
           });
       }
       await prisma.setting.upsert({
-        where: { key: SCHEDULE_APPLIED_KEY },
+        where: { key: appliedKey },
         update: { value: today },
-        create: { key: SCHEDULE_APPLIED_KEY, value: today },
+        create: { key: appliedKey, value: today },
       });
     }
     // Clean up plans whose date has passed (today's stay until tomorrow).

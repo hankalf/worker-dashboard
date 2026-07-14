@@ -33,3 +33,27 @@ export async function getActiveLocation(): Promise<Location | null> {
 export function getLocationBySlug(slug: string): Promise<Location | null> {
   return prisma.location.findUnique({ where: { slug } });
 }
+
+// URL-safe slug from a free-text name ("Shipping Dock #2" -> "shipping-dock-2").
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+// Create a location, deriving a unique slug from its name (or an explicit slug),
+// appending -2, -3, … on collision. Returns the created location.
+export async function createLocation(
+  name: string,
+  desiredSlug?: string
+): Promise<Location> {
+  const base = slugify(desiredSlug || name) || "location";
+  let slug = base;
+  for (let n = 2; await prisma.location.findUnique({ where: { slug } }); n++) {
+    slug = `${base}-${n}`;
+  }
+  return prisma.location.create({ data: { name: name.trim(), slug } });
+}

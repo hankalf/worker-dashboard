@@ -10,11 +10,19 @@ export async function GET() {
   }
   const employee = await prisma.employee.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, accessLevel: true },
+    select: {
+      id: true,
+      name: true,
+      accessLevel: true,
+      isSuperAdmin: true,
+      locationId: true,
+    },
   });
   return NextResponse.json({
     id: employee?.id ?? null,
     name: employee?.name ?? null,
     accessLevel: employee?.accessLevel ?? "NONE",
+    isSuperAdmin: employee?.isSuperAdmin ?? false,
+    locationId: employee?.locationId ?? null,
   });
 }

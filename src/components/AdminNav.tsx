@@ -15,15 +15,22 @@ function isActive(pathname: string, href: string) {
 export function AdminNav({
   level,
   tabs,
+  isSuperAdmin = false,
 }: {
   level: AccessLevel;
   tabs: TabItem[];
+  isSuperAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const visible = tabs.filter((t) => atLeast(level, t.minAccess));
   const topItems = visible.filter((t) => t.group === "top");
   const setupItems = visible.filter((t) => t.group === "setup");
-  const inSetup = setupItems.some((i) => isActive(pathname, i.href));
+  // Locations is super-admin-only and lives at the end of Setup.
+  const setupExtras = isSuperAdmin
+    ? [{ key: "locations", label: "Locations", href: "/admin/locations", description: "" }]
+    : [];
+  const allSetup = [...setupItems, ...setupExtras];
+  const inSetup = allSetup.some((i) => isActive(pathname, i.href));
   const [open, setOpen] = useState(inSetup);
 
   const linkClass = (href: string) =>
@@ -47,7 +54,7 @@ export function AdminNav({
         </li>
       ))}
 
-      {setupItems.length > 0 && (
+      {allSetup.length > 0 && (
         <>
           <li className="md:mt-2">
             <button
@@ -70,7 +77,7 @@ export function AdminNav({
             </button>
           </li>
           {open &&
-            setupItems.map((item) => (
+            allSetup.map((item) => (
               <li key={item.key}>
                 <Link
                   href={item.href}

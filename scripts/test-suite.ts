@@ -533,7 +533,7 @@ async function dbTests(now: Date, specs: Spec[]) {
     const yesterday = easternDateKey(new Date(Date.now() - 24 * 3600 * 1000));
 
     await db.scheduledAssignment.deleteMany({});
-    await db.setting.deleteMany({ where: { key: "scheduleAppliedDate" } });
+    await db.setting.deleteMany({ where: { key: `scheduleAppliedDate:${LOCATION_ID}` } });
     // Employee starts at posB live; plan them to posA for "today".
     await db.employee.update({ where: { id: emp!.id }, data: { positionId: posB.id } });
     await db.scheduledAssignment.create({
@@ -543,7 +543,7 @@ async function dbTests(now: Date, specs: Spec[]) {
     await applyDueSchedules(new Date());
     const applied1 = await db.employee.findUnique({ where: { id: emp!.id } });
     eq("today's plan lands on the live board", applied1!.positionId, posA.id);
-    const guard = await db.setting.findUnique({ where: { key: "scheduleAppliedDate" } });
+    const guard = await db.setting.findUnique({ where: { key: `scheduleAppliedDate:${LOCATION_ID}` } });
     eq("apply guard set to today", guard?.value, today);
 
     // A same-day live change must not be re-overwritten on the next load.
@@ -564,7 +564,7 @@ async function dbTests(now: Date, specs: Spec[]) {
     );
 
     await db.scheduledAssignment.deleteMany({});
-    await db.setting.deleteMany({ where: { key: "scheduleAppliedDate" } });
+    await db.setting.deleteMany({ where: { key: `scheduleAppliedDate:${LOCATION_ID}` } });
   }
 
   return { roster, positions };

@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminSignOutButton } from "@/components/AdminSignOutButton";
 import { AdminNav } from "@/components/AdminNav";
+import { LocationSwitcher } from "@/components/LocationSwitcher";
 import { getDashboardName, getBranding } from "@/lib/settings";
 import { getTabs } from "@/lib/tabs";
+import { listLocations, getActiveLocation } from "@/lib/location";
 import { APP_VERSION } from "@/lib/version";
 import { getBuildVersion } from "@/lib/buildVersionServer";
 
@@ -19,15 +21,20 @@ export default async function AdminLayout({
   const employee = session?.user?.id
     ? await prisma.employee.findUnique({
         where: { id: session.user.id },
-        select: { accessLevel: true },
+        select: { accessLevel: true, isSuperAdmin: true },
       })
     : null;
   const level = employee?.accessLevel ?? "NONE";
   const isAdmin = level === "ADMIN";
+  const isSuperAdmin = !!employee?.isSuperAdmin;
   const dashboardName = await getDashboardName();
   const branding = await getBranding();
   const buildVersion = await getBuildVersion();
   const tabs = await getTabs();
+  // Location context for the header: super-admins get a switcher across all
+  // locations; everyone else sees a static badge for the one they're in.
+  const activeLocation = await getActiveLocation();
+  const locations = isSuperAdmin ? await listLocations() : [];
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
@@ -59,6 +66,21 @@ export default async function AdminLayout({
           )}
         </h1>
         <div className="flex items-center gap-4 text-sm">
+          {isSuperAdmin ? (
+            <LocationSwitcher
+              locations={locations}
+              activeId={activeLocation?.id ?? null}
+            />
+          ) : (
+            activeLocation && (
+              <span
+                title="Your warehouse"
+                className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-300"
+              >
+                {activeLocation.name}
+              </span>
+            )
+          )}
           <Link href="/" className="text-zinc-400 hover:text-white">
             Dashboard
           </Link>
@@ -67,7 +89,7 @@ export default async function AdminLayout({
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="shrink-0 border-b border-zinc-800 bg-zinc-900 p-2 md:w-48 md:border-b-0 md:border-r md:p-4">
-          <AdminNav level={level} tabs={tabs} />
+          <AdminNav level={level} tabs={tabs} isSuperAdmin={isSuperAdmin} />
         </nav>
         <main className="flex-1 p-4 sm:p-6">
           {children}
