@@ -18,14 +18,16 @@ async function main() {
     create: { id: "loc_default", name: "Main Warehouse", slug: "default" },
   });
 
-  // When SEED_ADMIN_PASSWORD is set we also reset an existing admin's password
-  // and restore ADMIN access — this is the account-recovery path (set the env
-  // var and redeploy to regain access if a password is lost).
+  // The bootstrap admin is always restored to a full super-admin on seed, so a
+  // redeploy reliably grants panel access + location control (the recovery
+  // path). SEED_ADMIN_PASSWORD additionally resets the password.
   const admin = await prisma.employee.upsert({
     where: { username },
-    update: process.env.SEED_ADMIN_PASSWORD
-      ? { passwordHash, accessLevel: "ADMIN", isSuperAdmin: true }
-      : {},
+    update: {
+      accessLevel: "ADMIN",
+      isSuperAdmin: true,
+      ...(process.env.SEED_ADMIN_PASSWORD ? { passwordHash } : {}),
+    },
     create: {
       name: "Admin",
       username,
