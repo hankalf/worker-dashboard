@@ -25,9 +25,12 @@ export function AdminNav({
   const visible = tabs.filter((t) => atLeast(level, t.minAccess));
   const topItems = visible.filter((t) => t.group === "top");
   const setupItems = visible.filter((t) => t.group === "setup");
-  // Locations is super-admin-only and lives at the end of Setup.
+  // Locations + Fleet are super-admin-only and live at the end of Setup.
   const setupExtras = isSuperAdmin
-    ? [{ key: "locations", label: "Locations", href: "/admin/locations", description: "" }]
+    ? [
+        { key: "locations", label: "Locations", href: "/admin/locations", description: "" },
+        { key: "fleet", label: "Fleet", href: "/admin/fleet", description: "" },
+      ]
     : [];
   const allSetup = [...setupItems, ...setupExtras];
   const inSetup = allSetup.some((i) => isActive(pathname, i.href));

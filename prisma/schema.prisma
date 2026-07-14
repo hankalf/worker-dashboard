@@ -70,6 +70,21 @@ model Location {
   jobs                 Job[]
   taskLogs             TaskLog[]
   activityLogs         ActivityLog[]
+  screens              Screen[]
+}
+
+// A physical wall display registered to a location. Each screen has an
+// unguessable token; pointing a monitor at /screen/<token> renders that
+// location's board (read-only), so one deployment can drive many screens across
+// several warehouses. lastSeenAt powers the Fleet tab's online/offline status.
+model Screen {
+  id         String    @id @default(cuid())
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String
+  name       String
+  token      String    @unique
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 // Every person in the warehouse. Employees with admin access get a

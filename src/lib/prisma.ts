@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -44,6 +45,20 @@ const WHERE_SCOPED_OPS = new Set([
 // Cookie set by the location switcher (Phase 2). Absent → the default location.
 export const ACTIVE_LOCATION_COOKIE = "wd_active_location";
 
+// An explicit active-location override for the current async context. A public
+// screen route (which has no session/cookie) uses runWithLocation() to pin all
+// its queries to the screen's location, overriding cookie/default resolution.
+const locationOverride = new AsyncLocalStorage<string>();
+
+// Run `fn` (and everything it awaits) with the active location forced to
+// `locationId`. Returns fn's result.
+export function runWithLocation<T>(
+  locationId: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  return locationOverride.run(locationId, fn);
+}
+
 let cachedDefaultLocationId: string | null = null;
 
 // The active-location cookie, if we're inside a request. `next/headers` is
@@ -68,6 +83,9 @@ async function readCookieLocationId(): Promise<string | null> {
 // Uses the un-extended base client so the lookup itself is never re-scoped.
 // `null` only when the DB has no locations yet (a brand-new install pre-seed).
 async function resolveLocationId(base: PrismaClient): Promise<string | null> {
+  // An explicit override (screen routes) wins over everything.
+  const override = locationOverride.getStore();
+  if (override) return override;
   try {
     // Lazy import avoids a static prisma <-> auth import cycle; auth() only
     // reads the signed JWT (no DB) outside of login, so this can't recurse.
