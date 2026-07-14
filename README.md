@@ -50,7 +50,9 @@ This repo includes a `render.yaml` Blueprint that provisions both services in on
 
 **Locked out?** Set `SEED_ADMIN_USERNAME` (defaults to `admin`) and a new `SEED_ADMIN_PASSWORD` in the web service's environment, then redeploy. On startup the seed resets that account's password and restores full admin access — the account-recovery path when no admin can sign in.
 
-**Access levels:** each employee's *Panel access* is No login, **Supervisor** (assign positions, attendance, lunches, shifts, side tasks, announcements — no employee/position/role management), or **Admin** (full control).
+**Access levels:** each employee's *Panel access* is No login, **Lead**, **Supervisor**, **Admin** (full control of their own location), or **SuperUser** (full control of every location). Supervisor/Lead/Admin are confined to the location their account belongs to; only a SuperUser can switch locations, manage locations, and drive the fleet — and only a SuperUser can grant SuperUser.
+
+**Built-in superadmin:** a protected `superadmin` SuperUser account is always seeded and can't be deleted or demoted, so a deployment can't lock itself out. Set `SUPERADMIN_PASSWORD` in the environment to set/reset its password (on first create without it, a default of `superadmin` is used — set the variable and redeploy to secure it).
 
 **Note:** Render's free PostgreSQL databases expire after 30 days. For anything beyond a demo, upgrade `warehouse-db` to a paid plan in `render.yaml` (or the dashboard) before that happens.
 

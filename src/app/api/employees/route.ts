@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireStaff } from "@/lib/rbac";
+import { requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 
@@ -32,8 +32,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const staff = await requireStaff();
+  if (!staff || !staff.isAdmin)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const {
     name,
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
     roleIds,
     capabilityIds,
     accessLevel,
+    isSuperAdmin,
     username,
     password,
     shift,
@@ -55,6 +57,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
   const level = LEVELS.includes(accessLevel) ? accessLevel : "NONE";
+  // Only a SuperUser can mint another SuperUser; per-location admins can't
+  // escalate. SuperUser implies full ADMIN access.
+  const makeSuper = level === "ADMIN" && !!isSuperAdmin && staff.isSuperAdmin;
   if (level !== "NONE" && (!username || !password)) {
     return NextResponse.json(
       { error: "Panel access requires a username and password" },
@@ -68,6 +73,7 @@ export async function POST(req: Request) {
         name,
         positionId: positionId || null,
         accessLevel: level,
+        isSuperAdmin: makeSuper,
         username: username || null,
         passwordHash: password ? await bcrypt.hash(password, 10) : null,
         shift: shift || null,

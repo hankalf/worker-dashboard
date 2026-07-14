@@ -42,6 +42,38 @@ async function main() {
   if (!process.env.SEED_ADMIN_PASSWORD) {
     console.log(`Default password: ${password} (change this after first login)`);
   }
+
+  // The built-in "superadmin" SuperUser — always present, always super, and
+  // protected from deletion/demotion (see src/lib/access.ts). Its password is
+  // set/reset from SUPERADMIN_PASSWORD when provided; on first creation without
+  // it, a default is used and a warning printed. accessLevel + isSuperAdmin are
+  // always restored so this account can never be locked out.
+  const superPassword = process.env.SUPERADMIN_PASSWORD;
+  const superadmin = await prisma.employee.upsert({
+    where: { username: "superadmin" },
+    update: {
+      accessLevel: "ADMIN",
+      isSuperAdmin: true,
+      ...(superPassword
+        ? { passwordHash: await bcrypt.hash(superPassword, 10) }
+        : {}),
+    },
+    create: {
+      name: "Super Admin",
+      username: "superadmin",
+      passwordHash: await bcrypt.hash(superPassword ?? "superadmin", 10),
+      accessLevel: "ADMIN",
+      isSuperAdmin: true,
+      locationId: location.id,
+    },
+  });
+  console.log(`Ensured superadmin account: ${superadmin.username}`);
+  if (!superPassword) {
+    console.warn(
+      "  ⚠ SUPERADMIN_PASSWORD not set — 'superadmin' uses the default password " +
+        "'superadmin' on first create. Set SUPERADMIN_PASSWORD and redeploy to secure it."
+    );
+  }
 }
 
 main()

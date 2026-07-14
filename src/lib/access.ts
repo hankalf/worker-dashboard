@@ -7,6 +7,10 @@
 //  ADMIN      — full control (incl. Setup)
 export type AccessLevel = "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN";
 
+// The built-in super-user account: always seeded, always a SuperUser, and
+// protected from deletion/demotion so a deployment can never lock itself out.
+export const SUPERADMIN_USERNAME = "superadmin";
+
 export const ACCESS_RANK: Record<AccessLevel, number> = {
   NONE: 0,
   LEAD: 1,

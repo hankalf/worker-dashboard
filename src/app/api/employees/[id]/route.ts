@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { recordWorkHistory } from "@/lib/workHistory";
+import { SUPERADMIN_USERNAME } from "@/lib/access";
 
 const LEVELS = ["NONE", "LEAD", "SUPERVISOR", "ADMIN"];
 
@@ -39,10 +40,22 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
+  // The built-in superadmin can't be locked out (terminated or demoted).
+  const target = await prisma.employee.findUnique({
+    where: { id },
+    select: { username: true },
+  });
+  const isProtected = target?.username === SUPERADMIN_USERNAME;
+
   // Terminate / reactivate is an admin-only action with side effects.
   if (body.terminated !== undefined) {
     if (!isAdmin)
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (body.terminated && isProtected)
+      return NextResponse.json(
+        { error: "The superadmin account can't be terminated" },
+        { status: 400 }
+      );
     if (body.terminated && id === session.user.id)
       return NextResponse.json(
         { error: "You cannot terminate your own account" },
@@ -123,6 +136,12 @@ export async function PATCH(
           { status: 400 }
         );
       }
+      if (isProtected && level !== "ADMIN") {
+        return NextResponse.json(
+          { error: "The superadmin account can't be demoted" },
+          { status: 400 }
+        );
+      }
       if (level !== "NONE" && body.username !== undefined && !body.username) {
         return NextResponse.json(
           { error: "Panel access requires a username" },
@@ -130,6 +149,18 @@ export async function PATCH(
         );
       }
       data.accessLevel = level;
+    }
+    // SuperUser (all-locations) can only be granted/revoked by a SuperUser, and
+    // never revoked from the built-in superadmin.
+    if (body.isSuperAdmin !== undefined && staff.isSuperAdmin) {
+      const makeSuper = data.accessLevel === "ADMIN" && !!body.isSuperAdmin;
+      if (isProtected && !makeSuper) {
+        return NextResponse.json(
+          { error: "The superadmin account can't be demoted" },
+          { status: 400 }
+        );
+      }
+      data.isSuperAdmin = makeSuper;
     }
   }
 
@@ -236,6 +267,12 @@ export async function DELETE(
   }
 
   const employee = await prisma.employee.findUnique({ where: { id } });
+  if (employee?.username === SUPERADMIN_USERNAME) {
+    return NextResponse.json(
+      { error: "The superadmin account can't be deleted" },
+      { status: 400 }
+    );
+  }
   await prisma.employee.delete({ where: { id } });
   if (employee) await logActivity("Employee", `Removed ${employee.name}`, id);
   return NextResponse.json({ ok: true });

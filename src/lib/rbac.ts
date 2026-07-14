@@ -21,13 +21,23 @@ export async function requireAdmin() {
 }
 
 // Anyone with panel access (LEAD, SUPERVISOR, or ADMIN). Returns the session
-// plus the resolved level so handlers can further restrict fields.
+// plus the resolved level + super-user flag so handlers can further restrict
+// fields (e.g. only a SuperUser may grant SuperUser).
 export async function requireStaff() {
   const session = await auth();
   if (!session?.user?.id) return null;
-  const level = await levelOf(session.user.id);
+  const emp = await prisma.employee.findUnique({
+    where: { id: session.user.id },
+    select: { accessLevel: true, isSuperAdmin: true },
+  });
+  const level = emp?.accessLevel ?? "NONE";
   if (level === "NONE") return null;
-  return { session, level, isAdmin: level === "ADMIN" };
+  return {
+    session,
+    level,
+    isAdmin: level === "ADMIN",
+    isSuperAdmin: !!emp?.isSuperAdmin,
+  };
 }
 
 // Super-admin only (manage locations, switch active location, fleet). Re-reads

@@ -11,10 +11,14 @@ type Capability = { id: string; name: string };
 type Shift = "FIRST" | "SECOND" | "THIRD";
 type Attendance = "PRESENT" | "ABSENT" | "CALLED_OUT" | "PTO";
 type AccessLevel = "NONE" | "LEAD" | "SUPERVISOR" | "ADMIN";
+// The access dropdown adds "SUPERUSER" (ADMIN across all locations) on top of
+// the stored AccessLevel; it maps to accessLevel=ADMIN + isSuperAdmin on save.
+type AccessChoice = AccessLevel | "SUPERUSER";
 type Employee = {
   id: string;
   name: string;
   accessLevel: AccessLevel;
+  isSuperAdmin: boolean;
   username: string | null;
   positionId: string | null;
   position: Position | null;
@@ -30,11 +34,12 @@ type Employee = {
   terminatedAt: string | null;
 };
 
-const ACCESS_OPTIONS: { value: AccessLevel; label: string }[] = [
+const ACCESS_OPTIONS: { value: AccessChoice; label: string; superOnly?: boolean }[] = [
   { value: "NONE", label: "No login" },
   { value: "LEAD", label: "Lead (dashboard, notices, assign, lunches, side tasks)" },
   { value: "SUPERVISOR", label: "Supervisor (Lead + attendance)" },
-  { value: "ADMIN", label: "Admin (full access)" },
+  { value: "ADMIN", label: "Admin (full access to this location)" },
+  { value: "SUPERUSER", label: "SuperUser (full access to all locations)", superOnly: true },
 ];
 const ACCESS_LABEL: Record<AccessLevel, string> = {
   NONE: "",
@@ -145,10 +150,16 @@ function EmployeeCardRow({
                 Lead
               </span>
             )}
-            {employee.accessLevel !== "NONE" && (
-              <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
-                {ACCESS_LABEL[employee.accessLevel]}
+            {employee.isSuperAdmin ? (
+              <span className="rounded-full bg-violet-600/30 px-2 py-0.5 text-xs font-semibold text-violet-300">
+                SuperUser
               </span>
+            ) : (
+              employee.accessLevel !== "NONE" && (
+                <span className="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+                  {ACCESS_LABEL[employee.accessLevel]}
+                </span>
+              )
             )}
             {employee.attendance !== "PRESENT" && (
               <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-xs font-medium text-red-300">
@@ -244,7 +255,8 @@ export default function EmployeesPage() {
   const [positionId, setPositionId] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [capabilityIds, setCapabilityIds] = useState<string[]>([]);
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>("NONE");
+  const [accessLevel, setAccessLevel] = useState<AccessChoice>("NONE");
+  const [iAmSuper, setIAmSuper] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -285,6 +297,11 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     load();
+    // Only a SuperUser may grant SuperUser, so gate that option on my own status.
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((me) => setIAmSuper(!!me.isSuperAdmin))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -357,7 +374,10 @@ export default function EmployeesPage() {
         positionId,
         roleIds,
         capabilityIds,
-        accessLevel,
+        // SuperUser is ADMIN across all locations; everything else is stored
+        // as-is with isSuperAdmin off.
+        accessLevel: accessLevel === "SUPERUSER" ? "ADMIN" : accessLevel,
+        isSuperAdmin: accessLevel === "SUPERUSER",
         username,
         password,
         shift,
@@ -385,7 +405,7 @@ export default function EmployeesPage() {
     setPositionId(employee.positionId ?? "");
     setRoleIds(employee.roles.map((role) => role.id));
     setCapabilityIds(employee.capabilities.map((c) => c.id));
-    setAccessLevel(employee.accessLevel);
+    setAccessLevel(employee.isSuperAdmin ? "SUPERUSER" : employee.accessLevel);
     setUsername(employee.username ?? "");
     setPassword("");
     setShift(employee.shift ?? "");
@@ -670,10 +690,10 @@ export default function EmployeesPage() {
           Panel access
           <select
             value={accessLevel}
-            onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
+            onChange={(e) => setAccessLevel(e.target.value as AccessChoice)}
             className={`mt-1 block w-full ${inputClass}`}
           >
-            {ACCESS_OPTIONS.map((a) => (
+            {ACCESS_OPTIONS.filter((a) => iAmSuper || !a.superOnly).map((a) => (
               <option key={a.value} value={a.value}>
                 {a.label}
               </option>
