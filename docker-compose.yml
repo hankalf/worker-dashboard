@@ -40,6 +40,8 @@ services:
       # Bootstraps / recovers the first admin login on startup (idempotent).
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      # Password for the built-in, protected `superadmin` SuperUser account.
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin}
     ports:
       - "${APP_PORT:-3000}:3000"
 
