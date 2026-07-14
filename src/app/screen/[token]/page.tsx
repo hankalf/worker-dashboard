@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma, runWithLocation } from "@/lib/prisma";
 import { DashboardView } from "@/components/DashboardView";
+import { ScreenController } from "@/components/ScreenController";
 import { fetchBoardProps } from "@/lib/boardData";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,11 @@ export default async function ScreenPage({
   });
   if (!screen) notFound();
 
-  // Best-effort heartbeat so the Fleet tab can show this screen as online.
-  prisma.screen
-    .update({ where: { id: screen.id }, data: { lastSeenAt: new Date() } })
-    .catch(() => {});
-
   const props = await runWithLocation(screen.locationId, fetchBoardProps);
-  return <DashboardView {...props} title={screen.location.name} isAdmin={false} />;
+  return (
+    <>
+      <ScreenController token={screen.token} name={screen.name} />
+      <DashboardView {...props} title={screen.location.name} isAdmin={false} />
+    </>
+  );
 }

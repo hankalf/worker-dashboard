@@ -84,6 +84,12 @@ model Screen {
   name       String
   token      String    @unique
   lastSeenAt DateTime?
+  // A one-shot command pushed to this screen, picked up (and cleared) on its
+  // next heartbeat poll: "refresh" | "identify" | "message". commandArg carries
+  // the message text; commandAt gates it to a short freshness window.
+  command    String?
+  commandArg String?
+  commandAt  DateTime?
   createdAt  DateTime  @default(now())
 }
 

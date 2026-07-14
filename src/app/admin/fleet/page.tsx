@@ -36,6 +36,7 @@ export default function FleetPage() {
   const [locationId, setLocationId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
 
   const load = async () => {
@@ -81,6 +82,22 @@ export default function FleetPage() {
       return;
     await fetch(`/api/screens/${screen.id}`, { method: "DELETE" });
     load();
+  };
+
+  const sendCommand = async (screen: Screen, command: string) => {
+    let arg: string | undefined;
+    if (command === "message") {
+      const text = prompt(`Message to show on "${screen.name}":`);
+      if (!text || !text.trim()) return;
+      arg = text.trim();
+    }
+    const res = await fetch(`/api/screens/${screen.id}/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command, arg }),
+    });
+    setSent(res.ok ? `${screen.id}:${command}` : null);
+    setTimeout(() => setSent((s) => (s === `${screen.id}:${command}` ? null : s)), 1500);
   };
 
   const copyUrl = async (token: string) => {
@@ -193,6 +210,18 @@ export default function FleetPage() {
                       >
                         Open
                       </a>
+                    </div>
+                    <div className="flex items-center gap-2 border-t border-zinc-800 pt-2">
+                      <span className="text-xs text-zinc-500">Send:</span>
+                      {(["refresh", "identify", "message"] as const).map((cmd) => (
+                        <button
+                          key={cmd}
+                          onClick={() => sendCommand(screen, cmd)}
+                          className="rounded-md border border-zinc-700 px-2 py-1 text-xs capitalize text-zinc-300 hover:bg-zinc-800"
+                        >
+                          {sent === `${screen.id}:${cmd}` ? "Sent ✓" : cmd}
+                        </button>
+                      ))}
                     </div>
                   </li>
                 );
