@@ -234,6 +234,9 @@ function unitTests() {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const db = new PrismaClient({ adapter });
 
+// The single location every seeded record belongs to (multi-tenant scoping).
+const LOCATION_ID = "loc_test";
+
 const EQUIPMENT = ["Forklift", "Pallet Jack", "Scanner", "Hard Hat", "Box Cutter"];
 // "Roles" = job functions (Capability model), distinct from Equipment.
 const ROLES = ["Receive", "Ship", "Pick", "Putaway", "DAX"];
@@ -288,6 +291,16 @@ function buildEmployeeSpecs(): Spec[] {
 }
 
 async function seed(now: Date) {
+  // Single-location test world: ensure exactly one location so the app's
+  // default-location resolution (oldest location) is deterministic across runs.
+  await db.location.upsert({
+    where: { slug: "test" },
+    update: {},
+    create: { id: LOCATION_ID, name: "Test Warehouse", slug: "test" },
+  });
+  // Drop any other locations (cascades their tenant rows), leaving just ours.
+  await db.location.deleteMany({ where: { id: { not: LOCATION_ID } } });
+
   // Clear in FK-safe order: jobs → employees → positions → roles → notices.
   await db.job.deleteMany();
   await db.employee.deleteMany();
@@ -297,10 +310,14 @@ async function seed(now: Date) {
   await db.announcement.deleteMany();
 
   const roles: { id: string }[] = [];
-  for (const name of EQUIPMENT) roles.push(await db.role.create({ data: { name } }));
+  for (const name of EQUIPMENT)
+    roles.push(await db.role.create({ data: { name, locationId: LOCATION_ID } }));
 
   const caps: { id: string }[] = [];
-  for (const name of ROLES) caps.push(await db.capability.create({ data: { name } }));
+  for (const name of ROLES)
+    caps.push(
+      await db.capability.create({ data: { name, locationId: LOCATION_ID } })
+    );
 
   const positions: { id: string }[] = [];
   for (let i = 0; i < POSITIONS.length; i++) {
@@ -309,6 +326,7 @@ async function seed(now: Date) {
         data: {
           title: POSITIONS[i],
           sortOrder: i,
+          locationId: LOCATION_ID,
           // Two positions require equipment (assign-warning feature).
           requiredRoleId:
             i === 0 ? roles[0].id : i === 5 ? roles[1].id : null,
@@ -322,6 +340,7 @@ async function seed(now: Date) {
     await db.employee.create({
       data: {
         name: s.name,
+        locationId: LOCATION_ID,
         shift: s.shift ?? undefined,
         positionId: s.positionIdx === null ? null : positions[s.positionIdx].id,
         attendance: s.attendance,
@@ -341,10 +360,10 @@ async function seed(now: Date) {
   const adminHash = await bcrypt.hash("admin123", 10);
   const supHash = await bcrypt.hash("sup12345", 10);
   await db.employee.create({
-    data: { name: "Admin", username: "admin", passwordHash: adminHash, accessLevel: "ADMIN" },
+    data: { name: "Admin", username: "admin", passwordHash: adminHash, accessLevel: "ADMIN", locationId: LOCATION_ID },
   });
   await db.employee.create({
-    data: { name: "Sue Supervisor", username: "sup", passwordHash: supHash, accessLevel: "SUPERVISOR" },
+    data: { name: "Sue Supervisor", username: "sup", passwordHash: supHash, accessLevel: "SUPERVISOR", locationId: LOCATION_ID },
   });
 
   // Notices: 2 pinned active, 6 unpinned active, 1 scheduled (future), 1 expired.
@@ -356,7 +375,7 @@ async function seed(now: Date) {
     extra: { startsAt?: Date; expiresAt?: Date } = {}
   ) =>
     db.announcement.create({
-      data: { message, pinned, createdAt: new Date(base + order * 1000), ...extra },
+      data: { message, pinned, locationId: LOCATION_ID, createdAt: new Date(base + order * 1000), ...extra },
     });
   await notice("PINNED-ALPHA", true, 0);
   await notice("PINNED-BETA", true, 1);
@@ -518,7 +537,7 @@ async function dbTests(now: Date, specs: Spec[]) {
     // Employee starts at posB live; plan them to posA for "today".
     await db.employee.update({ where: { id: emp!.id }, data: { positionId: posB.id } });
     await db.scheduledAssignment.create({
-      data: { employeeId: emp!.id, date: today, positionId: posA.id },
+      data: { employeeId: emp!.id, date: today, positionId: posA.id, locationId: LOCATION_ID },
     });
 
     await applyDueSchedules(new Date());
@@ -535,7 +554,7 @@ async function dbTests(now: Date, specs: Spec[]) {
 
     // Past-date plans are purged.
     await db.scheduledAssignment.create({
-      data: { employeeId: emp!.id, date: yesterday, positionId: posA.id },
+      data: { employeeId: emp!.id, date: yesterday, positionId: posA.id, locationId: LOCATION_ID },
     });
     await applyDueSchedules(new Date());
     eq(

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prisma, getActiveLocationId } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { currentShift } from "@/lib/shift";
@@ -54,12 +54,22 @@ export default async function AdminDashboardPage() {
       (e) => e.shift === null || e.shift === shiftKey
     );
     const present = roster.filter((e) => e.attendance === "PRESENT").length;
-    const existing = await prisma.headcountSnapshot.findUnique({
-      where: { date_shift: { date: dateKey, shift: shiftKey } },
-    });
-    if (!existing || now.getTime() - existing.updatedAt.getTime() > 120_000) {
+    const locationId = await getActiveLocationId();
+    const existing = locationId
+      ? await prisma.headcountSnapshot.findUnique({
+          where: {
+            locationId_date_shift: { locationId, date: dateKey, shift: shiftKey },
+          },
+        })
+      : null;
+    if (
+      locationId &&
+      (!existing || now.getTime() - existing.updatedAt.getTime() > 120_000)
+    ) {
       await prisma.headcountSnapshot.upsert({
-        where: { date_shift: { date: dateKey, shift: shiftKey } },
+        where: {
+          locationId_date_shift: { locationId, date: dateKey, shift: shiftKey },
+        },
         update: { present, total: roster.length },
         create: { date: dateKey, shift: shiftKey, present, total: roster.length },
       });

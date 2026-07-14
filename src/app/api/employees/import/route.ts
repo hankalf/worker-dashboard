@@ -91,34 +91,30 @@ export async function POST(req: Request) {
     }
 
     try {
+      // Get-or-create within the active location (scoping/stamping handled by
+      // the Prisma extension); title/name are unique per-location, not globally.
       let positionId: string | null = null;
       const positionTitle = get("position");
       if (positionTitle) {
-        const position = await prisma.position.upsert({
-          where: { title: positionTitle },
-          update: {},
-          create: { title: positionTitle },
-        });
+        const position =
+          (await prisma.position.findFirst({ where: { title: positionTitle } })) ??
+          (await prisma.position.create({ data: { title: positionTitle } }));
         positionId = position.id;
       }
 
       const roleIds: string[] = [];
       for (const roleName of get("equipment").split(";").map((r) => r.trim()).filter(Boolean)) {
-        const role = await prisma.role.upsert({
-          where: { name: roleName },
-          update: {},
-          create: { name: roleName },
-        });
+        const role =
+          (await prisma.role.findFirst({ where: { name: roleName } })) ??
+          (await prisma.role.create({ data: { name: roleName } }));
         roleIds.push(role.id);
       }
 
       const capabilityIds: string[] = [];
       for (const capName of get("roles").split(";").map((r) => r.trim()).filter(Boolean)) {
-        const cap = await prisma.capability.upsert({
-          where: { name: capName },
-          update: {},
-          create: { name: capName },
-        });
+        const cap =
+          (await prisma.capability.findFirst({ where: { name: capName } })) ??
+          (await prisma.capability.create({ data: { name: capName } }));
         capabilityIds.push(cap.id);
       }
 

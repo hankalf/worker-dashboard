@@ -45,10 +45,10 @@ export async function POST(req: Request) {
       continue;
     }
     try {
-      const existing = await prisma.role.findUnique({ where: { name } });
+      const existing = await prisma.role.findFirst({ where: { name } });
       if (existing) {
         await prisma.role.update({
-          where: { name },
+          where: { id: existing.id },
           data: { description: get("description") || existing.description },
         });
         updated++;

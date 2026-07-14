@@ -53,28 +53,24 @@ export async function POST(req: Request) {
       let requiredRoleId: string | null = null;
       const eq = get("equipment");
       if (eq) {
-        const r = await prisma.role.upsert({
-          where: { name: eq },
-          update: {},
-          create: { name: eq },
-        });
+        const r =
+          (await prisma.role.findFirst({ where: { name: eq } })) ??
+          (await prisma.role.create({ data: { name: eq } }));
         requiredRoleId = r.id;
       }
       let requiredCapabilityId: string | null = null;
       const role = get("role");
       if (role) {
-        const c = await prisma.capability.upsert({
-          where: { name: role },
-          update: {},
-          create: { name: role },
-        });
+        const c =
+          (await prisma.capability.findFirst({ where: { name: role } })) ??
+          (await prisma.capability.create({ data: { name: role } }));
         requiredCapabilityId = c.id;
       }
 
-      const existing = await prisma.position.findUnique({ where: { title } });
+      const existing = await prisma.position.findFirst({ where: { title } });
       if (existing) {
         await prisma.position.update({
-          where: { title },
+          where: { id: existing.id },
           data: {
             description: get("description") || existing.description,
             requiredRoleId: requiredRoleId ?? existing.requiredRoleId,

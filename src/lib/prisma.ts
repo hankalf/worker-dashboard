@@ -1,6 +1,84 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+// ---- Multi-location (multi-tenant) scoping ---------------------------------
+// Every operational record belongs to a Location. Rather than thread a
+// locationId through ~130 query call sites (and risk one leaking across
+// tenants), a Prisma client extension does it centrally: collection reads and
+// bulk writes are constrained to the active location, and creates are stamped
+// with it. Operations keyed by a globally-unique id (findUnique/update/delete)
+// are left alone — the id already targets one row; the request layer decides
+// which ids a user may act on. Setting stays global (deploy-level state), so
+// it is intentionally excluded here.
+const TENANT_MODELS = new Set([
+  "Employee",
+  "Position",
+  "Role",
+  "Capability",
+  "Announcement",
+  "NoticeLog",
+  "ShiftNote",
+  "HeadcountSnapshot",
+  "WorkHistory",
+  "LunchHistory",
+  "LaborShare",
+  "ScheduledAssignment",
+  "Job",
+  "TaskLog",
+  "ActivityLog",
+]);
+
+// Operations whose `where` is a collection filter we can safely constrain to
+// the active location.
+const WHERE_SCOPED_OPS = new Set([
+  "findMany",
+  "findFirst",
+  "findFirstOrThrow",
+  "count",
+  "aggregate",
+  "groupBy",
+  "updateMany",
+  "deleteMany",
+]);
+
+// Cookie set by the location switcher (Phase 2). Absent → the default location.
+export const ACTIVE_LOCATION_COOKIE = "wd_active_location";
+
+let cachedDefaultLocationId: string | null = null;
+
+// The active-location cookie, if we're inside a request. `next/headers` is
+// imported lazily so importing this module from a plain Node context (the seed
+// script, the test suite) never pulls in the request-only runtime.
+async function readCookieLocationId(): Promise<string | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    return store.get(ACTIVE_LOCATION_COOKIE)?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The active location for the current request: an explicit cookie selection if
+// present, otherwise the oldest (default) location. Uses the un-extended base
+// client so the lookup itself is never re-scoped. `null` only when the DB has
+// no locations yet (a brand-new install before the seed runs).
+async function resolveLocationId(base: PrismaClient): Promise<string | null> {
+  const fromCookie = await readCookieLocationId();
+  if (fromCookie) return fromCookie;
+  if (cachedDefaultLocationId) return cachedDefaultLocationId;
+  try {
+    const loc = await base.location.findFirst({
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    cachedDefaultLocationId = loc?.id ?? null;
+  } catch {
+    cachedDefaultLocationId = null;
+  }
+  return cachedDefaultLocationId;
+}
+
 // Render's free Postgres (and the network in front of it) drops idle
 // connections. The default pg pool does NOT validate a connection before
 // handing it out, so after an idle period the next query hits a server-closed
@@ -38,13 +116,50 @@ const adapter = new PrismaPg(
 // to retry, since no work was committed.
 const RETRYABLE_CODES = new Set(["P1017", "P1001", "P1002"]);
 
+// The un-extended base client, captured so the tenancy resolver can run
+// un-scoped lookups (e.g. the default-location query) without recursing.
+let basePrisma: PrismaClient | null = null;
+
 function makeClient() {
   const base = new PrismaClient({
     adapter,
     omit: { employee: { passwordHash: true } },
   });
+  basePrisma = base as unknown as PrismaClient;
 
-  const extended = base.$extends({
+  // Inner extension: scope tenant models to the active location.
+  const scoped = base.$extends({
+    query: {
+      async $allOperations({ model, operation, args, query }) {
+        if (!model || !TENANT_MODELS.has(model)) return query(args);
+        const locationId = await resolveLocationId(basePrisma!);
+        // No location yet (fresh DB pre-seed) — don't block the query; the
+        // NOT NULL column would reject a bad create anyway.
+        if (!locationId) return query(args);
+
+        const a: Record<string, unknown> = { ...(args as object) };
+        if (WHERE_SCOPED_OPS.has(operation)) {
+          a.where = a.where ? { AND: [a.where, { locationId }] } : { locationId };
+        } else if (operation === "create") {
+          a.data = { locationId, ...((a.data as object) ?? {}) };
+        } else if (operation === "createMany") {
+          const d = a.data;
+          a.data = Array.isArray(d)
+            ? d.map((x) => ({ locationId, ...(x as object) }))
+            : { locationId, ...((d as object) ?? {}) };
+        } else if (operation === "upsert") {
+          // `where` is a unique key (often already location-composite); only
+          // the create branch needs the stamp.
+          a.create = { locationId, ...((a.create as object) ?? {}) };
+        }
+        // findUnique / update / delete: keyed by unique id — left untouched.
+        return query(a);
+      },
+    },
+  });
+
+  // Outer extension: retry a query that lost its pooled connection.
+  const withRetry = scoped.$extends({
     query: {
       async $allOperations({ args, query }) {
         for (let attempt = 0; ; attempt++) {
@@ -72,12 +187,11 @@ function makeClient() {
   });
 
   // The extended client is runtime-identical to the base for all model queries
-  // (the extension only wraps them with a retry), but $extends widens the result
-  // types in a way that clashes with the app's EmployeeWithRelations/JobWithRelations
-  // annotations. Cast to the plain PrismaClient type — the same type the app used
-  // before this change — so callers see unchanged types while still getting the
-  // retry at runtime.
-  return extended as unknown as PrismaClient;
+  // (the extensions only add location-scoping + a retry), but $extends widens
+  // the result types in a way that clashes with the app's
+  // EmployeeWithRelations/JobWithRelations annotations. Cast to the plain
+  // PrismaClient type so callers see unchanged types.
+  return withRetry as unknown as PrismaClient;
 }
 
 const globalForPrisma = globalThis as unknown as {
@@ -87,3 +201,11 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma = globalForPrisma.prisma ?? makeClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// The active location id for the current request (cookie selection, else the
+// default location). Call sites that build a location-composite unique key
+// (headcount snapshots, shift notes) need this explicitly; most code relies on
+// the extension above and never touches it.
+export async function getActiveLocationId(): Promise<string | null> {
+  return resolveLocationId(basePrisma ?? (prisma as unknown as PrismaClient));
+}

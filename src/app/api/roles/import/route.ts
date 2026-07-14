@@ -46,10 +46,10 @@ export async function POST(req: Request) {
       continue;
     }
     try {
-      const existing = await prisma.capability.findUnique({ where: { name } });
+      const existing = await prisma.capability.findFirst({ where: { name } });
       if (existing) {
         await prisma.capability.update({
-          where: { name },
+          where: { id: existing.id },
           data: { description: get("description") || existing.description },
         });
         updated++;

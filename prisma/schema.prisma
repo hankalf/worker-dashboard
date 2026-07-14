@@ -41,10 +41,43 @@ enum AccessLevel {
   ADMIN
 }
 
+// A warehouse / site. Every operational record belongs to exactly one Location,
+// so one deployment can run several independent warehouses from a single admin
+// login (each with its own employees, positions, notices, attendance, etc.).
+// The active location is resolved per-request (see src/lib/location.ts) and all
+// tenant-scoped queries are filtered to it automatically by the Prisma
+// extension in src/lib/prisma.ts.
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  // URL-safe identifier used on the public board (e.g. /?loc=shipping-dock) and
+  // by fleet screens. Unique across the whole deployment.
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  employees            Employee[]
+  positions            Position[]
+  roles                Role[]
+  capabilities         Capability[]
+  announcements        Announcement[]
+  noticeLogs           NoticeLog[]
+  shiftNotes           ShiftNote[]
+  headcountSnapshots   HeadcountSnapshot[]
+  workHistory          WorkHistory[]
+  lunchHistory         LunchHistory[]
+  laborShares          LaborShare[]
+  scheduledAssignments ScheduledAssignment[]
+  jobs                 Job[]
+  taskLogs             TaskLog[]
+  activityLogs         ActivityLog[]
+}
+
 // Every person in the warehouse. Employees with admin access get a
 // username + password and can sign in to the admin panel.
 model Employee {
   id           String      @id @default(cuid())
+  location     Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId   String    @default("")
   name         String
   accessLevel  AccessLevel @default(NONE)
   username     String?     @unique
@@ -84,10 +117,14 @@ model Employee {
 // is named Role for historical reasons but the entire UI calls it "Equipment".
 model Role {
   id                   String     @id @default(cuid())
-  name                 String     @unique
+  location             Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId           String    @default("")
+  name                 String
   description          String?
   employees            Employee[] @relation("EmployeeRoles")
   requiredForPositions Position[] @relation("PositionRequiredRole")
+
+  @@unique([locationId, name])
 }
 
 // A job function an employee can perform (e.g. Receive, Ship, Pick, Putaway,
@@ -95,17 +132,23 @@ model Role {
 // have several.
 model Capability {
   id          String     @id @default(cuid())
-  name        String     @unique
+  location    Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId  String    @default("")
+  name        String
   description String?
   // Display order on employee cards (and the Roles setup list).
   sortOrder   Int        @default(0)
   employees   Employee[] @relation("EmployeeCapabilities")
   requiredForPositions Position[] @relation("PositionRequiredCapability")
+
+  @@unique([locationId, name])
 }
 
 model Position {
   id             String     @id @default(cuid())
-  title          String     @unique
+  location       Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId     String    @default("")
+  title          String
   description    String?
   sortOrder      Int        @default(0)
   // Target minimum present headcount per shift (0 = no target). Drives the
@@ -122,6 +165,8 @@ model Position {
   // Optional role (job function) a person should be able to perform here.
   requiredCapability   Capability? @relation("PositionRequiredCapability", fields: [requiredCapabilityId], references: [id])
   requiredCapabilityId String?
+
+  @@unique([locationId, title])
 }
 
 // Notices shown on the dashboards. The board shows up to 5 active notices at a
@@ -129,6 +174,8 @@ model Position {
 // Pinned notices always show (above the cap) and never queue out.
 model Announcement {
   id        String    @id @default(cuid())
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
   message   String
   // Optional scheduled start: hidden from the board until this time. Regular
   // notices allow up to 48h ahead; events (isEvent) allow far-future dates.
@@ -147,36 +194,44 @@ model Announcement {
 // one-click repost.
 model NoticeLog {
   id        String   @id @default(cuid())
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
   message   String
   postedBy  String?
   createdAt DateTime @default(now())
 
-  @@index([createdAt])
+  @@index([locationId, createdAt])
 }
 
-// One handoff note per shift (id is the shift key: FIRST | SECOND | THIRD),
-// shown above the notices for the currently-active shift and carried until the
-// next crew edits it.
+// One handoff note per shift per location (shift is the key: FIRST | SECOND |
+// THIRD), shown above the notices for the currently-active shift and carried
+// until the next crew edits it.
 model ShiftNote {
-  id            String   @id
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId    String    @default("")
+  shift         String
   message       String
   updatedByName String?
   updatedAt     DateTime @updatedAt
+
+  @@id([locationId, shift])
 }
 
 // Daily per-shift headcount snapshot for attendance history. One row per
 // (date, shift); date is the Eastern calendar day as "YYYY-MM-DD".
 model HeadcountSnapshot {
-  id        String   @id @default(cuid())
-  date      String
-  shift     String
-  present   Int
-  total     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
+  date       String
+  shift      String
+  present    Int
+  total      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@unique([date, shift])
-  @@index([date])
+  @@unique([locationId, date, shift])
+  @@index([locationId, date])
 }
 
 // Which position each employee worked on which day (Eastern date). Name/title
@@ -184,6 +239,8 @@ model HeadcountSnapshot {
 // auto-purged after ~2 weeks; the Employee/Position records themselves are kept.
 model WorkHistory {
   id            String   @id @default(cuid())
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId    String    @default("")
   date          String
   employeeId    String
   employeeName  String
@@ -193,7 +250,7 @@ model WorkHistory {
   updatedAt     DateTime @updatedAt
 
   @@unique([date, employeeId, positionId])
-  @@index([createdAt])
+  @@index([locationId, createdAt])
 }
 
 // Each employee's scheduled lunch time on a given Eastern day. Name is
@@ -201,6 +258,8 @@ model WorkHistory {
 // attendance history; drives the Lunches admin tab.
 model LunchHistory {
   id           String   @id @default(cuid())
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId   String    @default("")
   date         String
   employeeId   String
   employeeName String
@@ -211,7 +270,7 @@ model LunchHistory {
 
   @@unique([date, employeeId])
   @@index([createdAt])
-  @@index([date])
+  @@index([locationId, date])
 }
 
 // Simple key/value store for editable site settings (e.g. the dashboard name
@@ -227,6 +286,8 @@ model Setting {
 // (endsAt = the leaving time, or the shift's end if none was given).
 model LaborShare {
   id         String    @id @default(cuid())
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
   name       String
   shift      Shift
   position   Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
@@ -246,6 +307,8 @@ model LaborShare {
 // the live board (Employee.positionId) once; past-date rows are then purged.
 model ScheduledAssignment {
   id         String    @id @default(cuid())
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
   date       String
   employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId String
@@ -254,11 +317,13 @@ model ScheduledAssignment {
   updatedAt  DateTime  @updatedAt
 
   @@unique([employeeId, date])
-  @@index([date])
+  @@index([locationId, date])
 }
 
 model Job {
   id                 String    @id @default(cuid())
+  location           Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId         String    @default("")
   title              String
   description        String?
   status             JobStatus @default(UNASSIGNED)
@@ -273,29 +338,33 @@ model Job {
 // Append-only history of side-task activity (created / updated / deleted).
 // Keeps a title snapshot so entries survive the task being deleted.
 model TaskLog {
-  id        String   @id @default(cuid())
-  jobId     String?
-  jobTitle  String
-  action    String
+  id         String   @id @default(cuid())
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
+  jobId      String?
+  jobTitle   String
+  action     String
   // Who performed the action (snapshotted display name), best-effort.
-  actorName String?
-  createdAt DateTime @default(now())
+  actorName  String?
+  createdAt  DateTime @default(now())
 
-  @@index([createdAt])
+  @@index([locationId, createdAt])
 }
 
 // Site-wide activity log (assignments, shifts, lunches, roles, tasks, etc.).
 // Retained ~2 weeks then purged when the Activity tab is loaded.
 model ActivityLog {
-  id        String   @id @default(cuid())
-  category  String
-  action    String
-  subjectId String?
-  actorId   String?
-  actorName String?
-  archived  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String    @default("")
+  category   String
+  action     String
+  subjectId  String?
+  actorId    String?
+  actorName  String?
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
-  @@index([createdAt])
+  @@index([locationId, createdAt])
   @@index([subjectId])
 }

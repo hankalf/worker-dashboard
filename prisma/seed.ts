@@ -10,6 +10,14 @@ async function main() {
   const password = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
   const passwordHash = await bcrypt.hash(password, 10);
 
+  // Ensure the default location exists (the migration creates it on existing
+  // databases; this covers a brand-new dev DB seeded before any board load).
+  const location = await prisma.location.upsert({
+    where: { slug: "default" },
+    update: {},
+    create: { id: "loc_default", name: "Main Warehouse", slug: "default" },
+  });
+
   // When SEED_ADMIN_PASSWORD is set we also reset an existing admin's password
   // and restore ADMIN access — this is the account-recovery path (set the env
   // var and redeploy to regain access if a password is lost).
@@ -23,6 +31,7 @@ async function main() {
       username,
       passwordHash,
       accessLevel: "ADMIN",
+      locationId: location.id,
     },
   });
 

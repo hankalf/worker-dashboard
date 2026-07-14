@@ -192,7 +192,7 @@ export async function GET() {
       { header: "Updated", key: "updated", width: 20 },
     ],
     shiftNotes.map((n) => ({
-      shift: SHIFT_LABEL[n.id] ?? n.id,
+      shift: SHIFT_LABEL[n.shift] ?? n.shift,
       message: n.message,
       updated: iso(n.updatedAt),
     }))
