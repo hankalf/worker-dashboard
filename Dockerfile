@@ -44,6 +44,7 @@ COPY --from=build /app/next.config.ts ./next.config.ts
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY --from=build /app/scripts ./scripts
 
 # Run as the unprivileged node user shipped in the base image.
 RUN chown -R node:node /app
@@ -53,5 +54,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Apply pending migrations, ensure an admin exists (idempotent seed), then serve.
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npm run start"]
+# Check required env first (clear message on misconfig), apply pending
+# migrations, ensure an admin exists (idempotent seed), then serve.
+CMD ["sh", "-c", "node scripts/preflight.mjs && npx prisma migrate deploy && npx prisma db seed && npm run start"]
