@@ -24,7 +24,11 @@ services:
       retries: 10
 
   app:
-    build: .
+    build:
+      context: .
+      # Named Dockerfile.selfhost (not Dockerfile) so cloud hosts like Railway
+      # don't auto-build from it — this file is for the mini PC / LAN path.
+      dockerfile: Dockerfile.selfhost
     restart: unless-stopped
     depends_on:
       db:
