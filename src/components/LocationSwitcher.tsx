@@ -44,6 +44,11 @@ export function LocationSwitcher({
         onChange={(e) => switchTo(e.target.value)}
         className="max-w-[10rem] rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 disabled:opacity-50"
       >
+        {activeId === null && (
+          <option value="" disabled>
+            Select dashboard…
+          </option>
+        )}
         {locations.map((loc) => (
           <option key={loc.id} value={loc.id}>
             {loc.name}

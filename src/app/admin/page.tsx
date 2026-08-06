@@ -21,8 +21,9 @@ export const dynamic = "force-dynamic";
 
 // Build a "Master Dashboard" card per location — name, slug and a live
 // headcount — each counted inside its own tenant scope.
-async function buildLocationCards(): Promise<LocationCard[]> {
-  const locations = await listLocations();
+async function buildLocationCards(
+  locations: { id: string; name: string; slug: string }[]
+): Promise<LocationCard[]> {
   return Promise.all(
     locations.map((loc) =>
       runWithLocation(loc.id, async () => {
@@ -46,15 +47,18 @@ export default async function AdminDashboardPage() {
   const staff = await requireStaff();
   if (!staff) redirect("/login");
 
-  // Super-admins land on the Master Dashboard: a list of every dashboard to
-  // choose from. Until one is picked this session, the tab shows only that list
-  // (no single location's board). Per-location staff skip this entirely — they
-  // only ever have their own location.
+  // A super-admin who spans more than one location lands on the Master
+  // Dashboard: a list of every dashboard to choose from. Until one is picked
+  // this session, the tab shows only that list (no single location's board).
+  // Single-location super-admins and per-location staff skip this entirely —
+  // they only ever have their own location.
+  const locations = staff.isSuperAdmin ? await listLocations() : [];
+  const multiLocation = locations.length > 1;
   const cookieStore = await cookies();
   const dashboardSelected =
     cookieStore.get(DASHBOARD_SELECTED_COOKIE)?.value === "1";
-  if (staff.isSuperAdmin && !dashboardSelected) {
-    const locationCards = await buildLocationCards();
+  if (staff.isSuperAdmin && multiLocation && !dashboardSelected) {
+    const locationCards = await buildLocationCards(locations);
     return <LocationPicker locations={locationCards} activeId={null} />;
   }
 
@@ -167,9 +171,10 @@ export default async function AdminDashboardPage() {
   const branding = await getBranding();
   const laborShare = await getActiveLaborShare(now);
 
-  // A super-admin viewing a selected dashboard sees a bar naming it, with a way
-  // back to the Master Dashboard list.
-  const selectedLocation = staff.isSuperAdmin ? await getActiveLocation() : null;
+  // A super-admin viewing a selected dashboard (and who has more than one) sees
+  // a bar naming it, with a way back to the Master Dashboard list.
+  const selectedLocation =
+    staff.isSuperAdmin && multiLocation ? await getActiveLocation() : null;
 
   return (
     <>

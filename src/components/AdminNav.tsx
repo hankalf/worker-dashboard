@@ -16,22 +16,30 @@ export function AdminNav({
   level,
   tabs,
   isSuperAdmin = false,
+  needsSelection = false,
 }: {
   level: AccessLevel;
   tabs: TabItem[];
   isSuperAdmin?: boolean;
+  needsSelection?: boolean;
 }) {
   const pathname = usePathname();
   const visible = tabs.filter((t) => atLeast(level, t.minAccess));
-  const topItems = visible.filter((t) => t.group === "top");
-  const setupItems = visible.filter((t) => t.group === "setup");
+  // Until a multi-location super-admin picks a dashboard this session, the only
+  // tab shown is the Master Dashboard (Admin Dashboard) — the picker itself.
+  // Every per-location tab appears once a dashboard is selected.
+  const topItems = needsSelection
+    ? visible.filter((t) => t.key === "dashboard")
+    : visible.filter((t) => t.group === "top");
+  const setupItems = needsSelection ? [] : visible.filter((t) => t.group === "setup");
   // Locations + Fleet are super-admin-only and live at the end of Setup.
-  const setupExtras = isSuperAdmin
-    ? [
-        { key: "locations", label: "Locations", href: "/admin/locations", description: "" },
-        { key: "fleet", label: "Screen Fleet", href: "/admin/fleet", description: "" },
-      ]
-    : [];
+  const setupExtras =
+    isSuperAdmin && !needsSelection
+      ? [
+          { key: "locations", label: "Locations", href: "/admin/locations", description: "" },
+          { key: "fleet", label: "Screen Fleet", href: "/admin/fleet", description: "" },
+        ]
+      : [];
   const allSetup = [...setupItems, ...setupExtras];
   const inSetup = allSetup.some((i) => isActive(pathname, i.href));
   const [open, setOpen] = useState(inSetup);
