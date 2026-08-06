@@ -8,6 +8,14 @@ import { prisma, getActiveLocationId, ACTIVE_LOCATION_COOKIE } from "@/lib/prism
 
 export { getActiveLocationId, ACTIVE_LOCATION_COOKIE };
 
+// A session-scoped marker (no maxAge, so it clears when the browser session
+// ends) that records whether a super-admin has explicitly picked a dashboard to
+// work in during this session. When unset, the Admin Dashboard tab shows the
+// "Master Dashboard" — the list of locations to choose from — before showing
+// any one location's board. Separate from ACTIVE_LOCATION_COOKIE, which is the
+// persistent tenant scope every other tab relies on.
+export const DASHBOARD_SELECTED_COOKIE = "wd_dashboard_selected";
+
 export type Location = {
   id: string;
   name: string;

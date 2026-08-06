@@ -1,9 +1,15 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma, getActiveLocationId, runWithLocation } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
-import { listLocations } from "@/lib/location";
+import {
+  listLocations,
+  getActiveLocation,
+  DASHBOARD_SELECTED_COOKIE,
+} from "@/lib/location";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { LocationPicker, type LocationCard } from "@/components/LocationPicker";
+import { DashboardSelectionBar } from "@/components/DashboardSelectionBar";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
@@ -13,9 +19,45 @@ import { getActiveLaborShare } from "@/lib/laborShareServer";
 
 export const dynamic = "force-dynamic";
 
+// Build a "Master Dashboard" card per location — name, slug and a live
+// headcount — each counted inside its own tenant scope.
+async function buildLocationCards(): Promise<LocationCard[]> {
+  const locations = await listLocations();
+  return Promise.all(
+    locations.map((loc) =>
+      runWithLocation(loc.id, async () => {
+        const roster = await prisma.employee.findMany({
+          where: { terminatedAt: null },
+          select: { attendance: true },
+        });
+        return {
+          id: loc.id,
+          name: loc.name,
+          slug: loc.slug,
+          employees: roster.length,
+          present: roster.filter((e) => e.attendance === "PRESENT").length,
+        };
+      })
+    )
+  );
+}
+
 export default async function AdminDashboardPage() {
   const staff = await requireStaff();
   if (!staff) redirect("/login");
+
+  // Super-admins land on the Master Dashboard: a list of every dashboard to
+  // choose from. Until one is picked this session, the tab shows only that list
+  // (no single location's board). Per-location staff skip this entirely — they
+  // only ever have their own location.
+  const cookieStore = await cookies();
+  const dashboardSelected =
+    cookieStore.get(DASHBOARD_SELECTED_COOKIE)?.value === "1";
+  if (staff.isSuperAdmin && !dashboardSelected) {
+    const locationCards = await buildLocationCards();
+    return <LocationPicker locations={locationCards} activeId={null} />;
+  }
+
   const now = new Date();
   const shiftBounds = await getShiftBounds();
 
@@ -125,39 +167,13 @@ export default async function AdminDashboardPage() {
   const branding = await getBranding();
   const laborShare = await getActiveLaborShare(now);
 
-  // Super-admins get a "Dashboards" picker at the top of the tab: every
-  // location as a card, with a live headcount, that switches the active
-  // location on click. Built by counting each location's roster in its own
-  // scope. Per-location admins/leads only ever have their one location, so the
-  // picker is skipped for them.
-  const activeLocationId = await getActiveLocationId();
-  let locationCards: LocationCard[] = [];
-  if (staff.isSuperAdmin) {
-    const locations = await listLocations();
-    locationCards = await Promise.all(
-      locations.map((loc) =>
-        runWithLocation(loc.id, async () => {
-          const roster = await prisma.employee.findMany({
-            where: { terminatedAt: null },
-            select: { attendance: true },
-          });
-          return {
-            id: loc.id,
-            name: loc.name,
-            slug: loc.slug,
-            employees: roster.length,
-            present: roster.filter((e) => e.attendance === "PRESENT").length,
-          };
-        })
-      )
-    );
-  }
+  // A super-admin viewing a selected dashboard sees a bar naming it, with a way
+  // back to the Master Dashboard list.
+  const selectedLocation = staff.isSuperAdmin ? await getActiveLocation() : null;
 
   return (
     <>
-      {staff.isSuperAdmin && (
-        <LocationPicker locations={locationCards} activeId={activeLocationId} />
-      )}
+      {selectedLocation && <DashboardSelectionBar name={selectedLocation.name} />}
       <AdminDashboard
         positions={positions}
         employees={employees}

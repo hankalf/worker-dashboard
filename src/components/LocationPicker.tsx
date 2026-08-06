@@ -18,9 +18,13 @@ export type LocationCard = {
 export function LocationPicker({
   locations,
   activeId,
+  title = "Master Dashboard",
+  subtitle = "Select a dashboard to manage — every tab applies to it.",
 }: {
   locations: LocationCard[];
   activeId: string | null;
+  title?: string;
+  subtitle?: string;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -44,11 +48,9 @@ export function LocationPicker({
 
   return (
     <section className="mb-6">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold text-white">Dashboards</h2>
-        <p className="text-xs text-zinc-500">
-          Pick a location to manage — every tab applies to it.
-        </p>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <p className="hidden text-xs text-zinc-500 sm:block">{subtitle}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {locations.map((loc) => {
