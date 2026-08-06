@@ -101,9 +101,10 @@ export type DockStatus = {
   tone: DockTone;
 };
 
-// Map a raw Opendock status to a friendly label + tone. Adjust the cases to the
-// real status values once confirmed (Opendock uses statuses like Scheduled,
-// Arrived, InProgress, Completed, Cancelled, NoShow).
+// Map a raw Opendock status to a friendly label + tone. Opendock's Neutron API
+// uses: Requested, Scheduled, Arrived, Completed, Cancelled, NoShow (some
+// warehouses also have an in-progress/loading state). Matched loosely so minor
+// spelling/casing differences still land on the right tone.
 function mapStatus(raw: string): { label: string; tone: DockTone } {
   const s = raw.toLowerCase().replace(/[\s_-]/g, "");
   if (s.includes("cancel") || s.includes("noshow")) return { label: raw, tone: "other" };
@@ -113,6 +114,7 @@ function mapStatus(raw: string): { label: string; tone: DockTone } {
     return { label: "In progress", tone: "active" };
   if (s.includes("arriv") || s.includes("checkedin"))
     return { label: "Arrived", tone: "arrived" };
+  if (s.includes("requested")) return { label: "Requested", tone: "scheduled" };
   if (s.includes("schedul") || s.includes("booked") || s.includes("pending"))
     return { label: "Scheduled", tone: "scheduled" };
   return { label: raw, tone: "other" };
@@ -154,8 +156,42 @@ function dockNameOf(appt: RawAppt): string | null {
   return appt.dockName ?? appt.dock?.name ?? (appt.dockId ? String(appt.dockId) : null);
 }
 
-// Log in and return a bearer token, or null. FINALIZE: confirm the login path
-// and which field carries the token for your Opendock account.
+// Pull the bearer token out of the Opendock login response. Opendock's Neutron
+// API returns it as `access_token`; the fallbacks cover other shapes.
+function tokenFrom(body: unknown): string | null {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const data = (b.data ?? {}) as Record<string, unknown>;
+  return (
+    (b.access_token as string) ??
+    (b.token as string) ??
+    (b.jwt as string) ??
+    (data.access_token as string) ??
+    (data.token as string) ??
+    null
+  );
+}
+
+// The appointments endpoint. Opendock's Neutron API is nestjs-crud, so we
+// filter with the `s` (search) JSON param and join the dock so each appointment
+// carries its door name. `limit` returns the paginated { data, total } shape.
+function appointmentsUrl(cfg: OpendockConfigFull): string {
+  const search = JSON.stringify({ warehouseId: cfg.warehouseId });
+  const params = new URLSearchParams({ s: search, limit: "100" });
+  params.append("join", "dock");
+  return `${cfg.baseUrl}/appointment?${params.toString()}`;
+}
+
+// Pull an array of appointments out of a nestjs-crud response, which is either a
+// bare array or a { data: [...] } page.
+function apptsFrom(body: unknown): RawAppt[] {
+  if (Array.isArray(body)) return body as RawAppt[];
+  const b = (body ?? {}) as Record<string, unknown>;
+  if (Array.isArray(b.data)) return b.data as RawAppt[];
+  if (Array.isArray(b.appointments)) return b.appointments as RawAppt[];
+  return [];
+}
+
+// Log in and return a bearer token, or null.
 async function login(cfg: OpendockConfigFull): Promise<string | null> {
   const res = await fetch(`${cfg.baseUrl}/auth/login`, {
     method: "POST",
@@ -164,25 +200,20 @@ async function login(cfg: OpendockConfigFull): Promise<string | null> {
   });
   if (!res.ok) return null;
   const body = await res.json().catch(() => ({}));
-  return body.token ?? body.jwt ?? body?.data?.token ?? null;
+  return tokenFrom(body);
 }
 
-// Fetch the warehouse's current appointments. FINALIZE: confirm the endpoint +
-// query params (warehouse filter, date window) against the real API.
+// Fetch the warehouse's appointments.
 async function fetchAppointments(
   cfg: OpendockConfigFull,
   token: string
 ): Promise<RawAppt[]> {
-  const url = `${cfg.baseUrl}/appointment?warehouseId=${encodeURIComponent(cfg.warehouseId)}`;
-  const res = await fetch(url, {
+  const res = await fetch(appointmentsUrl(cfg), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) return [];
   const body = await res.json().catch(() => null);
-  if (Array.isArray(body)) return body as RawAppt[];
-  if (Array.isArray(body?.data)) return body.data as RawAppt[];
-  if (Array.isArray(body?.appointments)) return body.appointments as RawAppt[];
-  return [];
+  return apptsFrom(body);
 }
 
 // ---- Cache: don't hit Opendock on every 15s board refresh ------------------
@@ -290,8 +321,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
     const text = await res.text();
     out.loginBody = trunc(text);
     try {
-      const j = JSON.parse(text);
-      token = j.token ?? j.jwt ?? j?.data?.token ?? null;
+      token = tokenFrom(JSON.parse(text));
     } catch {
       /* non-JSON body captured above */
     }
@@ -301,7 +331,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
   }
 
   if (token) {
-    out.apptUrl = `${cfg.baseUrl}/appointment?warehouseId=${encodeURIComponent(cfg.warehouseId)}`;
+    out.apptUrl = appointmentsUrl(cfg);
     try {
       const res = await fetch(out.apptUrl, {
         headers: { Authorization: `Bearer ${token}` },
@@ -310,18 +340,9 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
       const text = await res.text();
       out.apptBody = trunc(text);
       try {
-        const j = JSON.parse(text);
-        const arr = Array.isArray(j)
-          ? j
-          : Array.isArray(j?.data)
-            ? j.data
-            : Array.isArray(j?.appointments)
-              ? j.appointments
-              : null;
-        if (arr) {
-          out.count = arr.length;
-          out.sample = arr[0] ?? null;
-        }
+        const arr = apptsFrom(JSON.parse(text));
+        out.count = arr.length;
+        out.sample = arr[0] ?? null;
       } catch {
         /* non-JSON body captured above */
       }
