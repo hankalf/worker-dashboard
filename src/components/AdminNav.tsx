@@ -29,7 +29,7 @@ export function AdminNav({
   const setupExtras = isSuperAdmin
     ? [
         { key: "locations", label: "Locations", href: "/admin/locations", description: "" },
-        { key: "fleet", label: "Fleet", href: "/admin/fleet", description: "" },
+        { key: "fleet", label: "Screen Fleet", href: "/admin/fleet", description: "" },
       ]
     : [];
   const allSetup = [...setupItems, ...setupExtras];

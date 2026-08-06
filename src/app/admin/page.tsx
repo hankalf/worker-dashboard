@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
-import { prisma, getActiveLocationId } from "@/lib/prisma";
+import { prisma, getActiveLocationId, runWithLocation } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
+import { listLocations } from "@/lib/location";
 import { AdminDashboard } from "@/components/AdminDashboard";
+import { LocationPicker, type LocationCard } from "@/components/LocationPicker";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
@@ -12,7 +14,8 @@ import { getActiveLaborShare } from "@/lib/laborShareServer";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  if (!(await requireStaff())) redirect("/login");
+  const staff = await requireStaff();
+  if (!staff) redirect("/login");
   const now = new Date();
   const shiftBounds = await getShiftBounds();
 
@@ -122,16 +125,49 @@ export default async function AdminDashboardPage() {
   const branding = await getBranding();
   const laborShare = await getActiveLaborShare(now);
 
+  // Super-admins get a "Dashboards" picker at the top of the tab: every
+  // location as a card, with a live headcount, that switches the active
+  // location on click. Built by counting each location's roster in its own
+  // scope. Per-location admins/leads only ever have their one location, so the
+  // picker is skipped for them.
+  const activeLocationId = await getActiveLocationId();
+  let locationCards: LocationCard[] = [];
+  if (staff.isSuperAdmin) {
+    const locations = await listLocations();
+    locationCards = await Promise.all(
+      locations.map((loc) =>
+        runWithLocation(loc.id, async () => {
+          const roster = await prisma.employee.findMany({
+            where: { terminatedAt: null },
+            select: { attendance: true },
+          });
+          return {
+            id: loc.id,
+            name: loc.name,
+            slug: loc.slug,
+            employees: roster.length,
+            present: roster.filter((e) => e.attendance === "PRESENT").length,
+          };
+        })
+      )
+    );
+  }
+
   return (
-    <AdminDashboard
-      positions={positions}
-      employees={employees}
-      jobs={jobs}
-      capabilities={capabilities}
-      notices={active.map(toDto)}
-      branding={branding}
-      laborShare={laborShare}
-      shiftBounds={shiftBounds}
-    />
+    <>
+      {staff.isSuperAdmin && (
+        <LocationPicker locations={locationCards} activeId={activeLocationId} />
+      )}
+      <AdminDashboard
+        positions={positions}
+        employees={employees}
+        jobs={jobs}
+        capabilities={capabilities}
+        notices={active.map(toDto)}
+        branding={branding}
+        laborShare={laborShare}
+        shiftBounds={shiftBounds}
+      />
+    </>
   );
 }

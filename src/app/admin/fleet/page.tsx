@@ -112,7 +112,7 @@ export default function FleetPage() {
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-semibold text-white">Fleet</h2>
+      <h2 className="mb-1 text-lg font-semibold text-white">Screen Fleet</h2>
       <p className="mb-4 max-w-2xl text-sm text-zinc-400">
         Register each wall display and assign it a location. Point that screen&apos;s
         browser at its display URL and it shows that location&apos;s board,
