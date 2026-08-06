@@ -10,6 +10,7 @@ import {
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
+import { getEmployeeDockStatuses, normalizeName } from "@/lib/opendock";
 import { APP_VERSION } from "@/lib/version";
 
 // Fetch every prop the public board needs, scoped to the active location.
@@ -58,11 +59,19 @@ export async function fetchBoardProps() {
   const shiftBounds = await getShiftBounds();
   const laborShare = await getActiveLaborShare(now);
 
+  // Live dock statuses from Opendock (empty unless the integration is on),
+  // matched to each employee by the appointment tag that carries their name.
+  const dockStatuses = await getEmployeeDockStatuses();
+  const employeesWithDock = employees.map((e) => ({
+    ...e,
+    dockStatus: dockStatuses[normalizeName(e.name)] ?? null,
+  }));
+
   const { visible } = splitNotices(activeNotices);
 
   return {
     positions,
-    employees,
+    employees: employeesWithDock,
     jobs,
     isAdmin: !!session?.user,
     announcements: visible.map((n) => n.message),

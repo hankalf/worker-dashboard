@@ -20,10 +20,29 @@ import { priorityLabel, priorityBadgeClass } from "@/lib/priority";
 import { AutoScroll, ScrollSyncProvider } from "@/components/AutoScroll";
 import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 
+// A live dock status pulled from Opendock and matched to this employee (by an
+// appointment tag carrying their name). Null/absent when Opendock is off or the
+// employee has no matching appointment.
+export type DockStatus = {
+  label: string;
+  dock: string | null;
+  tone: "scheduled" | "arrived" | "active" | "done" | "other";
+};
+
 export type EmployeeWithRelations = Employee & {
   position: Position | null;
   roles: Role[];
   capabilities: { id: string; name: string }[];
+  dockStatus?: DockStatus | null;
+};
+
+// Pill colours for each dock-status tone (light + dark).
+const DOCK_TONE_CLASS: Record<DockStatus["tone"], string> = {
+  scheduled: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200",
+  arrived: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300",
+  active: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300",
+  done: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300",
+  other: "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300",
 };
 
 // Optional brand accent colors (hex) for the board subtree.
@@ -195,6 +214,14 @@ function MemberBody({
                 className="whitespace-nowrap rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-500/20 dark:text-teal-300"
               >
                 Lead
+              </span>
+            )}
+            {member.dockStatus && (
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[member.dockStatus.tone]}`}
+              >
+                🚛 {member.dockStatus.dock ? `Dock ${member.dockStatus.dock} · ` : ""}
+                {member.dockStatus.label}
               </span>
             )}
             {out && (

@@ -26,6 +26,7 @@ export const TABS: TabDef[] = [
   { key: "positions", label: "Positions", href: "/admin/positions", group: "setup", minAccess: "ADMIN" },
   { key: "roles", label: "Roles", href: "/admin/roles", group: "setup", minAccess: "ADMIN" },
   { key: "equipment", label: "Equipment", href: "/admin/equipment", group: "setup", minAccess: "ADMIN" },
+  { key: "integrations", label: "Integrations", href: "/admin/integrations", group: "setup", minAccess: "ADMIN" },
   { key: "activity", label: "Activity", href: "/admin/activity", group: "setup", minAccess: "ADMIN" },
 ];
 
