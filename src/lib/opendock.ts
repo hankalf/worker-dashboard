@@ -244,5 +244,94 @@ export async function testOpendock(): Promise<{ ok: true; appointments: number }
   return { ok: true, appointments: appts.length };
 }
 
+// A verbose diagnostic for the admin "Test connection" button: it captures the
+// raw HTTP status + response body at each step, so we can see the real API
+// shape (and fix endpoints together) even when assumptions are off. The app can
+// reach Opendock; the sandbox building this can't — so this is how we get a
+// real sample appointment.
+export type OpendockDiagnostic = {
+  loginUrl: string;
+  loginStatus: number | string;
+  loginBody: string;
+  tokenFound: boolean;
+  apptUrl: string | null;
+  apptStatus: number | string | null;
+  apptBody: string | null;
+  count: number | null;
+  sample: unknown | null;
+};
+
+export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
+  const cfg = await fullConfig();
+  if (!cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
+    throw new Error("Fill in base URL, email, password, and warehouse ID first.");
+  }
+  const trunc = (s: string, n = 2500) => (s.length > n ? s.slice(0, n) + "…(truncated)" : s);
+  const out: OpendockDiagnostic = {
+    loginUrl: `${cfg.baseUrl}/auth/login`,
+    loginStatus: "-",
+    loginBody: "",
+    tokenFound: false,
+    apptUrl: null,
+    apptStatus: null,
+    apptBody: null,
+    count: null,
+    sample: null,
+  };
+
+  let token: string | null = null;
+  try {
+    const res = await fetch(out.loginUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: cfg.email, password: cfg.password }),
+    });
+    out.loginStatus = res.status;
+    const text = await res.text();
+    out.loginBody = trunc(text);
+    try {
+      const j = JSON.parse(text);
+      token = j.token ?? j.jwt ?? j?.data?.token ?? null;
+    } catch {
+      /* non-JSON body captured above */
+    }
+    out.tokenFound = !!token;
+  } catch (e) {
+    out.loginBody = `request failed: ${(e as Error).message}`;
+  }
+
+  if (token) {
+    out.apptUrl = `${cfg.baseUrl}/appointment?warehouseId=${encodeURIComponent(cfg.warehouseId)}`;
+    try {
+      const res = await fetch(out.apptUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      out.apptStatus = res.status;
+      const text = await res.text();
+      out.apptBody = trunc(text);
+      try {
+        const j = JSON.parse(text);
+        const arr = Array.isArray(j)
+          ? j
+          : Array.isArray(j?.data)
+            ? j.data
+            : Array.isArray(j?.appointments)
+              ? j.appointments
+              : null;
+        if (arr) {
+          out.count = arr.length;
+          out.sample = arr[0] ?? null;
+        }
+      } catch {
+        /* non-JSON body captured above */
+      }
+    } catch (e) {
+      out.apptBody = `request failed: ${(e as Error).message}`;
+    }
+  }
+
+  return out;
+}
+
 // The normaliser, exported so the board can look up a status by employee name.
 export const normalizeName = norm;

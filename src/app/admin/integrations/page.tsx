@@ -11,6 +11,18 @@ type Config = {
   hasPassword: boolean;
 };
 
+type Diagnostic = {
+  loginUrl: string;
+  loginStatus: number | string;
+  loginBody: string;
+  tokenFound: boolean;
+  apptUrl: string | null;
+  apptStatus: number | string | null;
+  apptBody: string | null;
+  count: number | null;
+  sample: unknown | null;
+};
+
 const inputClass =
   "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500";
 
@@ -22,6 +34,8 @@ export default function IntegrationsPage() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [diag, setDiag] = useState<Diagnostic | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch("/api/integrations/opendock")
@@ -54,6 +68,8 @@ export default function IntegrationsPage() {
   const test = async () => {
     setTesting(true);
     setTestMsg(null);
+    setDiag(null);
+    setCopied(false);
     // Save first so the test uses the current field values.
     await fetch("/api/integrations/opendock", {
       method: "PUT",
@@ -63,7 +79,19 @@ export default function IntegrationsPage() {
     const res = await fetch("/api/integrations/opendock/test", { method: "POST" });
     const body = await res.json().catch(() => ({}));
     setTesting(false);
-    setTestMsg({ ok: res.ok, text: body.message ?? body.error ?? "Failed" });
+    setTestMsg({ ok: !!body.ok, text: body.message ?? body.error ?? "Failed" });
+    setDiag(body.diagnostic ?? null);
+  };
+
+  const diagText = diag ? JSON.stringify(diag, null, 2) : "";
+  const copyDiag = async () => {
+    try {
+      await navigator.clipboard.writeText(diagText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard may be blocked — the box is selectable as a fallback */
+    }
   };
 
   if (!guarded) return <p className="text-sm text-zinc-500">Checking access…</p>;
@@ -158,6 +186,40 @@ export default function IntegrationsPage() {
             </span>
           )}
         </div>
+
+        {diag && (
+          <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-zinc-400">
+                Connection details. If the badge statuses aren&apos;t showing yet,
+                copy this and paste it back so the field mapping can be finalized.
+              </p>
+              <button
+                onClick={copyDiag}
+                className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <dl className="mb-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+              <dt className="text-zinc-500">Login</dt>
+              <dd className="text-zinc-300">
+                {String(diag.loginStatus)} · token {diag.tokenFound ? "found ✓" : "missing ✗"}
+              </dd>
+              <dt className="text-zinc-500">Appointments</dt>
+              <dd className="text-zinc-300">
+                {diag.apptStatus === null ? "—" : String(diag.apptStatus)}
+                {diag.count !== null ? ` · ${diag.count} found` : ""}
+              </dd>
+            </dl>
+            <textarea
+              readOnly
+              value={diagText}
+              onFocus={(e) => e.currentTarget.select()}
+              className="h-64 w-full resize-y rounded border border-zinc-800 bg-black px-2 py-1.5 font-mono text-[11px] leading-relaxed text-zinc-300"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
