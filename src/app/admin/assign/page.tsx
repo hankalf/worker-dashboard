@@ -752,6 +752,61 @@ export default function AssignPage() {
     }
   };
 
+  // Fill understaffed positions from the unassigned crew who hold what each
+  // position requires. Previews first so the admin sees who moves where before
+  // anything is written.
+  const suggestAssignments = async () => {
+    const res = await fetch("/api/employees/suggest-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apply: false }),
+    });
+    if (!res.ok) {
+      alert("Could not work out assignments. Please try again.");
+      return;
+    }
+    const { suggestions, unfilled } = await res.json();
+
+    if (suggestions.length === 0) {
+      alert(
+        unfilled.length > 0
+          ? `No one available is qualified for the open positions:\n\n` +
+              unfilled
+                .map((u: { positionTitle: string; short: number }) => `${u.positionTitle} — ${u.short} short`)
+                .join("\n")
+          : "Every position is at its target headcount for this shift."
+      );
+      return;
+    }
+
+    const lines = suggestions
+      .map((x: { employeeName: string; positionTitle: string }) => `${x.employeeName} → ${x.positionTitle}`)
+      .join("\n");
+    const stillShort =
+      unfilled.length > 0
+        ? `\n\nStill short after this:\n` +
+          unfilled
+            .map((u: { positionTitle: string; short: number }) => `${u.positionTitle} — ${u.short}`)
+            .join("\n")
+        : "";
+    if (!confirm(`Assign these people?\n\n${lines}${stillShort}`)) return;
+
+    const applied = await fetch("/api/employees/suggest-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apply: true }),
+    });
+    if (!applied.ok) {
+      alert("Could not apply the assignments. Please try again.");
+      return;
+    }
+    const emps = await fetch("/api/employees");
+    if (emps.ok) {
+      const all: Employee[] = await emps.json();
+      setEmployees(all.filter((e) => e.accessLevel !== "ADMIN"));
+    }
+  };
+
   // Auto-stagger lunches: one atomic server call that spaces each position's
   // present crew across their own shift, so a position always keeps cover.
   const staggerLunches = async () => {
@@ -1028,6 +1083,12 @@ export default function AssignPage() {
                 className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-green-500 hover:text-green-400"
               >
                 Mark all Present
+              </button>
+              <button
+                onClick={suggestAssignments}
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-blue-500 hover:text-blue-400"
+              >
+                Fill open positions
               </button>
               <button
                 onClick={staggerLunches}
