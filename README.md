@@ -8,6 +8,15 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
 - **CSV import** — bulk-add employees from a CSV file (Admin Panel > Employees), with a downloadable sample showing the format. Unknown positions and roles are created automatically.
 - **Stack** — Next.js (App Router, TypeScript), Prisma + PostgreSQL, Auth.js (NextAuth v5) with username/password credentials.
 
+## Documentation
+
+- **[docs/SOP.md](docs/SOP.md)** — the standard operating procedure: how to run the
+  board day to day, every admin tab, the screen fleet, and the Opendock
+  integration. Written for supervisors and admins, not developers.
+- **[docs/SOP-video-script.md](docs/SOP-video-script.md)** — the recorded
+  walkthrough (`docs/worker-dashboard-sop.webm`), its chapter list, and how to
+  re-record it after UI changes.
+
 ## Local development
 
 1. Install dependencies:
