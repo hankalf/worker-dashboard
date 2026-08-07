@@ -65,6 +65,15 @@ const REJECTED_PILL =
 const LATE_ROW =
   "border-l-amber-500 bg-amber-400/20 dark:border-l-amber-400 dark:bg-amber-500/20";
 
+// What the row colours mean. Each swatch reuses the row's own classes, so the
+// legend can't drift from the treatment it documents. Status colours aren't
+// listed — the filter chips above already carry those.
+const LEGEND: { label: string; className: string }[] = [
+  { label: "Rejected", className: REJECTED_ROW },
+  { label: "Late / overdue", className: LATE_ROW },
+  { label: "Completed", className: TONE_ROW.done },
+];
+
 const timeFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: APP_TZ,
   hour: "numeric",
@@ -233,9 +242,25 @@ export function DockScheduleView({
             </button>
           );
         })}
-        <span className="ml-auto text-sm text-zinc-500 dark:text-zinc-500">
-          {visible.length} of {schedule.entries.length} shown
-        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {LEGEND.map((l) => (
+              <span
+                key={l.label}
+                className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400"
+              >
+                <span
+                  aria-hidden
+                  className={`inline-block h-4 w-6 rounded-sm border-l-4 ${l.className}`}
+                />
+                {l.label}
+              </span>
+            ))}
+          </div>
+          <span className="text-sm text-zinc-500 dark:text-zinc-500">
+            {visible.length} of {schedule.entries.length} shown
+          </span>
+        </div>
       </div>
 
       {/* `zoom` (not transform: scale) so the table reflows within the panel
