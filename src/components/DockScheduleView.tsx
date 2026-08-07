@@ -284,6 +284,7 @@ export function DockScheduleView({
                   <th className="px-3 py-2 font-medium">Load type</th>
                   <th className="px-3 py-2 font-medium">Dir</th>
                   <th className="px-3 py-2 font-medium">PO / Ref #</th>
+                  <th className="px-3 py-2 font-medium">Tags</th>
                   <th className="px-3 py-2 text-right font-medium">On time</th>
                   <th className="px-3 py-2 text-right font-medium">Dwell</th>
                   <th className="px-3 py-2 text-right font-medium">Processing</th>
@@ -342,21 +343,23 @@ export function DockScheduleView({
                       <td className="whitespace-nowrap px-3 py-3 text-zinc-600 dark:text-zinc-300">
                         {e.direction ?? "—"}
                       </td>
+                      <td className="whitespace-nowrap px-3 py-3 font-mono text-base text-zinc-700 dark:text-zinc-300">
+                        {e.poNumber ?? "—"}
+                      </td>
                       <td className="px-3 py-3">
-                        <div className="font-mono text-base text-zinc-700 dark:text-zinc-300">
-                          {e.poNumber ?? "—"}
-                        </div>
-                        {e.tags.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
+                        {e.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
                             {e.tags.map((t, i) => (
                               <span
                                 key={`${e.id}-tag-${i}`}
-                                className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                                className="whitespace-nowrap rounded bg-zinc-200 px-1.5 py-0.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                               >
                                 {t}
                               </span>
                             ))}
                           </div>
+                        ) : (
+                          <span className="text-zinc-500">—</span>
                         )}
                       </td>
                       <td
