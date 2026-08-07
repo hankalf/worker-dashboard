@@ -50,6 +50,19 @@ export default async function AdminLayout({
   const needsSelection =
     isSuperAdmin && locations.length > 1 && !dashboardSelected;
 
+  // Header title. A multi-location super-admin sees "Master Dashboard" until a
+  // dashboard is picked, then the selected dashboard's own name — so the banner
+  // always names what you're actually working in. (The per-location
+  // `dashboardName` setting is the board's public title, which is often the same
+  // for every location, so it can't carry the selection on its own.) Everyone
+  // else keeps the configured dashboard name.
+  const multiLocation = isSuperAdmin && locations.length > 1;
+  const headerTitle = needsSelection
+    ? "Master Dashboard"
+    : multiLocation && activeLocation
+      ? activeLocation.name
+      : dashboardName;
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
       <header
@@ -68,7 +81,7 @@ export default async function AdminLayout({
               className="h-8 w-auto max-w-[8rem] object-contain"
             />
           )}
-          {dashboardName}
+          {headerTitle}
           <span className="ml-2 font-normal text-zinc-400">Admin</span>
           <span className="rounded-full bg-blue-600/20 px-2 py-0.5 text-xs font-semibold text-blue-300">
             {buildVersion}
