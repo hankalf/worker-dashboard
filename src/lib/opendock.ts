@@ -123,19 +123,29 @@ function mapStatus(raw: string): { label: string; tone: DockTone } {
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 // ---- Opendock API client --------------------------------------------------
-// Minimal shapes we read off an appointment. Kept loose so small field-name
-// differences don't crash parsing.
+// Shapes confirmed against a live Neutron response. An appointment carries a
+// `dockId` (not a warehouseId) and free-text `tags`; the dock record is what
+// ties a door back to a warehouse.
 type RawAppt = {
+  id?: string;
   status?: string;
   dockId?: string;
-  dockName?: string;
-  dock?: { name?: string } | null;
+  start?: string;
+  end?: string;
   tags?: unknown; // string[] | { name?: string; value?: string }[]
   [k: string]: unknown;
 };
 
-// Pull the employee name(s) off an appointment's tags. Handles tags as plain
-// strings or as objects with a name/value — returns every candidate string.
+type RawDock = {
+  id?: string;
+  name?: string;
+  doorNumber?: string;
+  warehouseId?: string;
+  [k: string]: unknown;
+};
+
+// Every free-text tag on an appointment. Handles plain strings or objects with
+// a name/value.
 function tagStrings(appt: RawAppt): string[] {
   const t = appt.tags;
   if (!Array.isArray(t)) return [];
@@ -152,8 +162,30 @@ function tagStrings(appt: RawAppt): string[] {
     .filter(Boolean);
 }
 
-function dockNameOf(appt: RawAppt): string | null {
-  return appt.dockName ?? appt.dock?.name ?? (appt.dockId ? String(appt.dockId) : null);
+// Warehouse staff tag appointments with the assigned door, e.g. "DOOR: 23".
+// That's the live door the truck is actually at, so it beats the dock record's
+// configured door number.
+const DOOR_TAG = /^\s*door\s*[:#-]?\s*(.+?)\s*$/i;
+
+function doorFromTags(appt: RawAppt): string | null {
+  for (const tag of tagStrings(appt)) {
+    const m = DOOR_TAG.exec(tag);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
+
+// Tags that are really door labels aren't employee names — skip them when
+// matching badges.
+function nameTags(appt: RawAppt): string[] {
+  return tagStrings(appt).filter((t) => !DOOR_TAG.test(t));
+}
+
+function dockLabel(appt: RawAppt, docks: Map<string, RawDock>): string | null {
+  const fromTag = doorFromTags(appt);
+  if (fromTag) return fromTag;
+  const dock = appt.dockId ? docks.get(String(appt.dockId)) : undefined;
+  return dock?.doorNumber ?? dock?.name ?? null;
 }
 
 // Pull the bearer token out of the Opendock login response. Opendock's Neutron
@@ -171,15 +203,12 @@ function tokenFrom(body: unknown): string | null {
   );
 }
 
-// The appointments endpoint. Opendock's Neutron API is nestjs-crud, so we
-// filter with the `s` (search) JSON param and join the dock so each appointment
-// carries its door name. `limit` returns the paginated { data, total } shape.
-function appointmentsUrl(cfg: OpendockConfigFull): string {
-  const search = JSON.stringify({ warehouseId: cfg.warehouseId });
-  const params = new URLSearchParams({ s: search, limit: "100" });
-  params.append("join", "dock");
-  return `${cfg.baseUrl}/appointment?${params.toString()}`;
-}
+// NOTE ON SCOPING: an appointment has no warehouseId — passing `?warehouseId=`
+// is silently ignored (it returns the whole org), and a crud `s` filter on it
+// 400s as a non-existent attribute. The warehouse link lives on the DOCK, so we
+// resolve the warehouse's docks first and scope appointments to those dock IDs.
+// With four warehouses on this org, skipping that would leak other sites' docks
+// onto the board.
 
 // Pull an array of appointments out of a nestjs-crud response, which is either a
 // bare array or a { data: [...] } page.
@@ -203,17 +232,70 @@ async function login(cfg: OpendockConfigFull): Promise<string | null> {
   return tokenFrom(body);
 }
 
-// Fetch the warehouse's appointments.
-async function fetchAppointments(
+async function getJson(url: string, token: string): Promise<unknown | null> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+// The warehouse's docks, keyed by dock id. Filtered client-side on
+// dock.warehouseId, which is the field that actually carries the link.
+async function fetchDocks(
   cfg: OpendockConfigFull,
   token: string
+): Promise<Map<string, RawDock>> {
+  const body = await getJson(`${cfg.baseUrl}/dock?limit=500`, token);
+  const rows = apptsFrom(body) as RawDock[];
+  const map = new Map<string, RawDock>();
+  for (const d of rows) {
+    if (d.id && d.warehouseId === cfg.warehouseId) map.set(String(d.id), d);
+  }
+  return map;
+}
+
+// Appointments for the given docks, within a window around now. Tries the
+// nestjs-crud `s` filter on real attributes (dockId/start) so the API does the
+// work; falls back to an unfiltered page if that's rejected. Either way the
+// result is filtered locally, so a silently-ignored filter can't leak another
+// warehouse's appointments onto the board.
+async function fetchAppointments(
+  cfg: OpendockConfigFull,
+  token: string,
+  dockIds: string[],
+  now: Date
 ): Promise<RawAppt[]> {
-  const res = await fetch(appointmentsUrl(cfg), {
-    headers: { Authorization: `Bearer ${token}` },
+  if (dockIds.length === 0) return [];
+  const from = new Date(now.getTime() - 12 * 3600_000).toISOString();
+  const to = new Date(now.getTime() + 12 * 3600_000).toISOString();
+
+  const filtered = new URLSearchParams({
+    s: JSON.stringify({
+      dockId: { $in: dockIds },
+      start: { $gte: from, $lte: to },
+    }),
+    limit: "500",
   });
-  if (!res.ok) return [];
-  const body = await res.json().catch(() => null);
-  return apptsFrom(body);
+
+  let rows = apptsFrom(
+    await getJson(`${cfg.baseUrl}/appointment?${filtered}`, token)
+  );
+  if (rows.length === 0) {
+    // Either the filter was rejected or genuinely matched nothing — retry
+    // unfiltered and narrow locally.
+    rows = apptsFrom(await getJson(`${cfg.baseUrl}/appointment?limit=500`, token));
+  }
+
+  const allowed = new Set(dockIds);
+  const fromMs = Date.parse(from);
+  const toMs = Date.parse(to);
+  return rows.filter((a) => {
+    if (!a.dockId || !allowed.has(String(a.dockId))) return false;
+    const startMs = a.start ? Date.parse(String(a.start)) : NaN;
+    return Number.isNaN(startMs) || (startMs >= fromMs && startMs <= toMs);
+  });
 }
 
 // ---- Cache: don't hit Opendock on every 15s board refresh ------------------
@@ -233,22 +315,37 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
   const byName: Record<string, DockStatus> = {};
   try {
     const cfg = await fullConfig();
-    if (!cfg.enabled || !cfg.baseUrl || !cfg.email || !cfg.password) {
+    if (!cfg.enabled || !cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
       cache.set(locationId, { at: Date.now(), byName });
       return byName;
     }
     const token = await login(cfg);
     if (!token) throw new Error("Opendock login failed");
-    const appts = await fetchAppointments(cfg, token);
+    const now = new Date();
+    const docks = await fetchDocks(cfg, token);
+    const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
+
+    // When one employee is tagged on several appointments, show the one that
+    // matters now: in-progress beats arrived beats scheduled beats finished.
+    const rank: Record<DockTone, number> = {
+      active: 4,
+      arrived: 3,
+      scheduled: 2,
+      done: 1,
+      other: 0,
+    };
+    const best: Record<string, { status: DockStatus; rank: number }> = {};
     for (const appt of appts) {
       if (!appt.status) continue;
       const { label, tone } = mapStatus(String(appt.status));
-      const dock = dockNameOf(appt);
-      for (const tag of tagStrings(appt)) {
-        // Last write wins → the most recent matching appointment shows.
-        byName[norm(tag)] = { label, dock, tone };
+      const status: DockStatus = { label, dock: dockLabel(appt, docks), tone };
+      for (const tag of nameTags(appt)) {
+        const key = norm(tag);
+        const prev = best[key];
+        if (!prev || rank[tone] > prev.rank) best[key] = { status, rank: rank[tone] };
       }
     }
+    for (const [key, v] of Object.entries(best)) byName[key] = v.status;
   } catch (e) {
     console.error("[opendock] status sync failed:", (e as Error).message);
   }
@@ -278,6 +375,18 @@ export type ProbeResult = {
   body: string; // truncated + token-redacted
 };
 
+// What the live badge sync actually resolves, run end-to-end. This is the part
+// that answers "why are no pills showing?" — most often because the
+// appointments carry no employee-name tags to match against.
+export type PipelineCheck = {
+  docksInWarehouse: number;
+  appointmentsInWindow: number;
+  doorTags: string[]; // distinct "DOOR: 23"-style tags
+  nameTags: string[]; // distinct other tags — the employee-name candidates
+  employees: number;
+  matchedEmployees: string[];
+};
+
 export type OpendockDiagnostic = {
   loginUrl: string;
   loginStatus: number | string;
@@ -288,6 +397,7 @@ export type OpendockDiagnostic = {
   bestUrl: string | null;
   count: number | null;
   sample: unknown | null;
+  pipeline: PipelineCheck | null;
 };
 
 const trunc = (s: string, n = 1800) =>
@@ -424,6 +534,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
     bestUrl: null,
     count: null,
     sample: null,
+    pipeline: null,
   };
 
   let token: string | null = null;
@@ -461,6 +572,40 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
     out.bestUrl = win.result.url;
     out.count = win.items.length;
     out.sample = win.items[0];
+  }
+
+  // Run the real sync end-to-end and report what it resolved.
+  if (cfg.warehouseId) {
+    try {
+      const now = new Date();
+      const docks = await fetchDocks(cfg, token);
+      const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
+      const doorTags = new Set<string>();
+      const nameCandidates = new Set<string>();
+      for (const a of appts) {
+        for (const t of tagStrings(a)) {
+          (DOOR_TAG.test(t) ? doorTags : nameCandidates).add(t);
+        }
+      }
+      const roster = await prisma.employee.findMany({
+        where: { terminatedAt: null },
+        select: { name: true },
+      });
+      const normalizedTags = new Set([...nameCandidates].map(norm));
+      const matched = roster
+        .filter((e) => normalizedTags.has(norm(e.name)))
+        .map((e) => e.name);
+      out.pipeline = {
+        docksInWarehouse: docks.size,
+        appointmentsInWindow: appts.length,
+        doorTags: [...doorTags].slice(0, 25),
+        nameTags: [...nameCandidates].slice(0, 25),
+        employees: roster.length,
+        matchedEmployees: matched.slice(0, 25),
+      };
+    } catch {
+      /* diagnostic extra — never fail the whole test over it */
+    }
   }
 
   return out;

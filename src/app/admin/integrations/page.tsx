@@ -30,6 +30,14 @@ type Diagnostic = {
   bestUrl: string | null;
   count: number | null;
   sample: unknown | null;
+  pipeline: {
+    docksInWarehouse: number;
+    appointmentsInWindow: number;
+    doorTags: string[];
+    nameTags: string[];
+    employees: number;
+    matchedEmployees: string[];
+  } | null;
 };
 
 const inputClass =
@@ -222,6 +230,49 @@ export default function IntegrationsPage() {
                 </>
               )}
             </dl>
+
+            {diag.pipeline && (
+              <div className="mb-3 rounded border border-zinc-800 bg-zinc-900 p-2 text-xs">
+                <div className="mb-1 font-medium text-zinc-300">Badge sync</div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  <dt className="text-zinc-500">Docks in warehouse</dt>
+                  <dd className="text-zinc-300">{diag.pipeline.docksInWarehouse}</dd>
+                  <dt className="text-zinc-500">Appointments (±12h)</dt>
+                  <dd className="text-zinc-300">{diag.pipeline.appointmentsInWindow}</dd>
+                  <dt className="text-zinc-500">Employees matched</dt>
+                  <dd
+                    className={
+                      diag.pipeline.matchedEmployees.length
+                        ? "text-green-400"
+                        : "text-amber-400"
+                    }
+                  >
+                    {diag.pipeline.matchedEmployees.length} of {diag.pipeline.employees}
+                    {diag.pipeline.matchedEmployees.length > 0 &&
+                      ` — ${diag.pipeline.matchedEmployees.join(", ")}`}
+                  </dd>
+                  <dt className="text-zinc-500">Name-ish tags</dt>
+                  <dd className="text-zinc-300">
+                    {diag.pipeline.nameTags.length
+                      ? diag.pipeline.nameTags.join(", ")
+                      : "none found"}
+                  </dd>
+                  <dt className="text-zinc-500">Door tags</dt>
+                  <dd className="text-zinc-300">
+                    {diag.pipeline.doorTags.length
+                      ? diag.pipeline.doorTags.join(", ")
+                      : "none found"}
+                  </dd>
+                </dl>
+                {diag.pipeline.nameTags.length === 0 && (
+                  <p className="mt-2 text-amber-400">
+                    No employee-name tags found on these appointments — badges
+                    can&apos;t match until appointments are tagged with employee
+                    names.
+                  </p>
+                )}
+              </div>
+            )}
 
             {diag.probes.length > 0 && (
               <ul className="mb-2 flex flex-col gap-1">
