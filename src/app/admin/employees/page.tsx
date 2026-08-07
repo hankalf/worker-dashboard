@@ -271,6 +271,8 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [showTerminated, setShowTerminated] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -414,6 +416,13 @@ export default function EmployeesPage() {
     setHireDate(employee.hireDate ?? "");
     setBirthMonth(employee.birthDate ? employee.birthDate.slice(5, 7) : "");
     setBirthDay(employee.birthDate ? employee.birthDate.slice(8, 10) : "");
+    // The form lives at the top of a long list, so clicking Edit far down the
+    // page otherwise looks like nothing happened. Bring it into view and put
+    // the cursor in the first field.
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      nameRef.current?.focus({ preventScroll: true });
+    });
   };
 
   const openHistory = async (employee: Employee) => {
@@ -530,6 +539,7 @@ export default function EmployeesPage() {
       </div>
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="mb-6 flex flex-col gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-4"
       >
@@ -541,6 +551,7 @@ export default function EmployeesPage() {
         <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-3">
         <input
+          ref={nameRef}
           placeholder="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
