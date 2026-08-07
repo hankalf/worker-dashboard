@@ -34,6 +34,9 @@ export async function PUT(req: Request) {
       Number.isFinite(Number(body.windowHours)) && body.windowHours !== ""
         ? Number(body.windowHours)
         : undefined,
+    personRoles:
+      typeof body.personRoles === "string" ? body.personRoles : undefined,
+    aliases: typeof body.aliases === "string" ? body.aliases : undefined,
   });
   clearOpendockCache();
   await logActivity("Integration", "Updated Opendock settings");

@@ -9,6 +9,8 @@ type Config = {
   email: string;
   warehouseId: string;
   windowHours: number;
+  personRoles: string;
+  aliases: string;
   hasPassword: boolean;
 };
 
@@ -197,6 +199,34 @@ export default function IntegrationsPage() {
             <span className="mt-1 block text-[11px] text-zinc-500">
               Only appointments starting within this many hours show on badges.
               Raise it if crews tag loads well ahead of the shift.
+            </span>
+          </label>
+          <label className="text-xs text-zinc-400">
+            Person tag roles
+            <input
+              className={inputClass}
+              placeholder="receiver, loader"
+              value={cfg.personRoles}
+              onChange={(e) => update({ personRoles: e.target.value })}
+            />
+            <span className="mt-1 block text-[11px] text-zinc-500">
+              Only tags with these prefixes name a person — e.g.{" "}
+              <span className="text-zinc-300">RECEIVER: DENNIS R.</span> Every
+              other tag is ignored.
+            </span>
+          </label>
+          <label className="text-xs text-zinc-400">
+            Name overrides
+            <textarea
+              rows={4}
+              className={`${inputClass} font-mono`}
+              placeholder={"JB = Jose Barrera\nJOSUE = Josue Aguilar Madrigal"}
+              value={cfg.aliases}
+              onChange={(e) => update({ aliases: e.target.value })}
+            />
+            <span className="mt-1 block text-[11px] text-zinc-500">
+              One per line, <span className="text-zinc-300">TAG = Employee</span>
+              . Use for nicknames, initials, and first names two people share.
             </span>
           </label>
         </div>

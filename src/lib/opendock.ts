@@ -20,11 +20,16 @@ const KEY = {
   password: "opendock.password",
   warehouseId: "opendock.warehouseId",
   windowHours: "opendock.windowHours",
+  personRoles: "opendock.personRoles",
+  aliases: "opendock.aliases",
 } as const;
 
 // How far either side of now an appointment can sit and still show on a badge.
 // Crews often tag the next shift's loads, so this needs headroom.
 const DEFAULT_WINDOW_HOURS = 24;
+
+// Tag roles that name a person, e.g. "RECEIVER: DENNIS R.".
+const DEFAULT_PERSON_ROLES = "receiver, loader";
 
 export type OpendockConfig = {
   enabled: boolean;
@@ -32,6 +37,8 @@ export type OpendockConfig = {
   email: string;
   warehouseId: string;
   windowHours: number;
+  personRoles: string;
+  aliases: string;
 };
 
 // The full config including the secret — server-only, never sent to the client.
@@ -55,7 +62,31 @@ async function fullConfig(): Promise<OpendockConfigFull> {
     warehouseId: m[KEY.warehouseId] ?? "",
     password: m[KEY.password] ?? "",
     windowHours: Number(m[KEY.windowHours]) || DEFAULT_WINDOW_HOURS,
+    personRoles: m[KEY.personRoles] ?? DEFAULT_PERSON_ROLES,
+    aliases: m[KEY.aliases] ?? "",
   };
+}
+
+// "receiver, loader" -> ["receiver", "loader"]
+export function parsePersonRoles(raw: string): string[] {
+  return raw
+    .split(/[,\n]/)
+    .map((s) => s.trim().toLowerCase().replace(/:$/, ""))
+    .filter(Boolean);
+}
+
+// Manual tag-to-employee overrides, one per line: "JB = Jose Barrera".
+// For nicknames, initials, and names two people share.
+export function parseAliases(raw: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of raw.split(/\n/)) {
+    const i = line.indexOf("=");
+    if (i === -1) continue;
+    const from = line.slice(0, i).trim().toLowerCase();
+    const to = line.slice(i + 1).trim();
+    if (from && to) map.set(from, to);
+  }
+  return map;
 }
 
 // Public config for the admin UI — omits the password, adds hasPassword.
@@ -69,6 +100,8 @@ export async function getOpendockConfig(): Promise<
     email: c.email,
     warehouseId: c.warehouseId,
     windowHours: c.windowHours,
+    personRoles: c.personRoles,
+    aliases: c.aliases,
     hasPassword: !!c.password,
   };
 }
@@ -82,6 +115,8 @@ export async function setOpendockConfig(input: {
   warehouseId?: string;
   password?: string;
   windowHours?: number;
+  personRoles?: string;
+  aliases?: string;
 }): Promise<void> {
   const locationId = await getActiveLocationId();
   if (!locationId) return;
@@ -100,6 +135,8 @@ export async function setOpendockConfig(input: {
     const h = Math.min(Math.max(Math.round(input.windowHours) || 0, 1), 168);
     await set(KEY.windowHours, String(h));
   }
+  if (input.personRoles !== undefined) await set(KEY.personRoles, input.personRoles);
+  if (input.aliases !== undefined) await set(KEY.aliases, input.aliases);
   if (input.password) await set(KEY.password, input.password);
 }
 
@@ -199,20 +236,8 @@ function parseTag(tag: string): ParsedTag {
 // Role prefixes that label a door rather than a person.
 const DOOR_ROLE = /^(door|dock|bay)$/i;
 
-// Tags boards use for paperwork, not people: "PID: 9566", "ASN", "PR287531",
-// "COSTCO ASN", "Arrived with Reefer OFF". Skipping these keeps the admin
-// diagnostic readable — the roster check already stops them from matching.
-const REF_ROLE = /^(pid|po|pos?|ref|asn|bol|seal|temp|trailer|container|load|lot)$/i;
-const REF_VALUE = /^[a-z]{0,3}[\d-]{3,}$/i; // PR287531, PI009583, 9566
-
 function isDoorTag(t: ParsedTag) {
   return !!t.role && DOOR_ROLE.test(t.role);
-}
-
-function isReferenceTag(t: ParsedTag) {
-  if (t.role && REF_ROLE.test(t.role)) return true;
-  if (!t.role && REF_VALUE.test(t.value)) return true;
-  return false;
 }
 
 function parsedTags(appt: RawAppt): ParsedTag[] {
@@ -225,9 +250,16 @@ function doorFromTags(appt: RawAppt): string | null {
   return parsedTags(appt).find(isDoorTag)?.value ?? null;
 }
 
-// Tags that could name a person — everything that isn't a door or a reference.
-function personTags(appt: RawAppt): ParsedTag[] {
-  return parsedTags(appt).filter((t) => !isDoorTag(t) && !isReferenceTag(t));
+// Only tags carrying a configured person role name a person. Boards use tags
+// for plenty of other things — "ASN", "Pending Reschedule", "PICK IN PROGRESS",
+// "Once Upon a Farm", "PID: 9514" — and an allow-list of roles is far more
+// reliable than trying to enumerate all the noise.
+function isPersonRole(role: string | null, roles: string[]): boolean {
+  return !!role && roles.includes(role.trim().toLowerCase());
+}
+
+function personTags(appt: RawAppt, roles: string[]): ParsedTag[] {
+  return parsedTags(appt).filter((t) => isPersonRole(t.role, roles));
 }
 
 // ---- Matching a tag value to an employee -----------------------------------
@@ -254,7 +286,15 @@ const canon = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-type NameEntry = { name: string; first: string; last: string | null };
+// `rest` is every token after the first, so a last initial can match either
+// surname of a two-surname name ("Josue Aguilar Madrigal" answers to "JOSUE A."
+// and "JOSUE M.").
+type NameEntry = {
+  name: string;
+  first: string;
+  last: string | null;
+  rest: string[];
+};
 
 export type NameIndex = {
   full: Map<string, string>;
@@ -273,6 +313,7 @@ export function buildNameIndex(names: string[]): NameIndex {
       name,
       first: parts[0],
       last: parts.length > 1 ? parts[parts.length - 1] : null,
+      rest: parts.slice(1),
     });
   }
   return { full, entries };
@@ -295,10 +336,23 @@ function pick(entries: NameEntry[], pred: (e: NameEntry) => boolean): MatchResul
   return null; // no hits — let the caller try the next strategy
 }
 
-export function matchEmployee(value: string, idx: NameIndex): MatchResult {
+export function matchEmployee(
+  value: string,
+  idx: NameIndex,
+  aliases?: Map<string, string>
+): MatchResult {
   const miss: MatchResult = { name: null, reason: "no-match", candidates: [] };
-  const c = canon(value);
+  let c = canon(value);
   if (!c) return miss;
+
+  // A manual alias wins outright — it's the admin's explicit answer for
+  // nicknames ("JB"), initials, and names two people share.
+  const alias = aliases?.get(c) ?? aliases?.get(value.trim().toLowerCase());
+  if (alias) {
+    const target = idx.full.get(canon(alias));
+    if (target) return { name: target, reason: null };
+    c = canon(alias); // fall through and resolve the alias like a normal tag
+  }
 
   const exact = idx.full.get(c);
   if (exact) return { name: exact, reason: null };
@@ -309,17 +363,22 @@ export function matchEmployee(value: string, idx: NameIndex): MatchResult {
   const isInitial = tokens.length > 1 && tail.length === 1;
 
   // "dennis r" — first name plus a last initial. The most common tag form.
+  // The initial may match any surname, so "JOSUE A." finds Josue Aguilar
+  // Madrigal as well as Josue Alvarez.
   if (isInitial) {
     const hit = pick(
       idx.entries,
-      (e) => e.first === first && !!e.last && e.last.startsWith(tail)
+      (e) => e.first === first && e.rest.some((p) => p.startsWith(tail))
     );
     if (hit) return hit;
   }
 
-  // "dennis rodriguez" — first and last, tolerating a middle name.
+  // "dennis rodriguez" — first plus any surname, tolerating middle names.
   if (tokens.length > 1 && !isInitial) {
-    const hit = pick(idx.entries, (e) => e.first === first && e.last === tail);
+    const hit = pick(
+      idx.entries,
+      (e) => e.first === first && e.rest.includes(tail)
+    );
     if (hit) return hit;
   }
 
@@ -465,36 +524,61 @@ async function fetchDocks(
 // work; falls back to an unfiltered page if that's rejected. Either way the
 // result is filtered locally, so a silently-ignored filter can't leak another
 // warehouse's appointments onto the board.
+const PAGE_LIMIT = 500;
+
+// Appointments for the given docks within [from, to]. The date range goes into
+// the query — `start` and `dockId` are both real attributes, so the API can do
+// the filtering. That matters: without it a busy warehouse fills the 500-row
+// page with far-future bookings and the current shift never comes back.
 async function fetchAppointments(
   cfg: OpendockConfigFull,
   token: string,
-  dockIds: string[]
+  dockIds: string[],
+  from: Date,
+  to: Date
 ): Promise<RawAppt[]> {
   if (dockIds.length === 0) return [];
+  const url = (s: object) =>
+    `${cfg.baseUrl}/appointment?` +
+    new URLSearchParams({ s: JSON.stringify(s), limit: String(PAGE_LIMIT) });
 
-  const filtered = new URLSearchParams({
-    s: JSON.stringify({ dockId: { $in: dockIds } }),
-    limit: "500",
-  });
+  const ranged = {
+    dockId: { $in: dockIds },
+    start: { $gte: from.toISOString(), $lte: to.toISOString() },
+  };
 
-  let rows = apptsFrom(
-    await getJson(`${cfg.baseUrl}/appointment?${filtered}`, token)
-  );
+  let rows = apptsFrom(await getJson(url(ranged), token));
   if (rows.length === 0) {
-    // Either the filter was rejected or genuinely matched nothing — retry
-    // unfiltered and narrow locally.
-    rows = apptsFrom(await getJson(`${cfg.baseUrl}/appointment?limit=500`, token));
+    // The ranged filter was rejected or matched nothing — widen, then fall all
+    // the way back to an unfiltered page.
+    rows = apptsFrom(await getJson(url({ dockId: { $in: dockIds } }), token));
+  }
+  if (rows.length === 0) {
+    rows = apptsFrom(
+      await getJson(`${cfg.baseUrl}/appointment?limit=${PAGE_LIMIT}`, token)
+    );
   }
 
+  // Re-apply both constraints locally, so a filter the API ignored can never
+  // widen the scope.
   const allowed = new Set(dockIds);
-  return rows.filter((a) => !!a.dockId && allowed.has(String(a.dockId)));
+  return rows.filter(
+    (a) => !!a.dockId && allowed.has(String(a.dockId)) && within(a, from, to)
+  );
 }
 
-// Is this appointment near enough to now to belong on a badge?
-function inWindow(a: RawAppt, now: Date, hours: number): boolean {
+function within(a: RawAppt, from: Date, to: Date): boolean {
   const startMs = a.start ? Date.parse(String(a.start)) : NaN;
   if (Number.isNaN(startMs)) return true; // undated — don't hide it
-  return Math.abs(startMs - now.getTime()) <= hours * 3600_000;
+  return startMs >= from.getTime() && startMs <= to.getTime();
+}
+
+// The badge window: `hours` either side of now.
+function windowRange(now: Date, hours: number): [Date, Date] {
+  return [
+    new Date(now.getTime() - hours * 3600_000),
+    new Date(now.getTime() + hours * 3600_000),
+  ];
 }
 
 // ---- Cache: don't hit Opendock on every 15s board refresh ------------------
@@ -521,15 +605,16 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
     const token = await login(cfg);
     if (!token) throw new Error("Opendock login failed");
     const now = new Date();
+    const [from, to] = windowRange(now, cfg.windowHours);
     const docks = await fetchDocks(cfg, token);
-    const appts = (await fetchAppointments(cfg, token, [...docks.keys()])).filter(
-      (a) => inWindow(a, now, cfg.windowHours)
-    );
+    const appts = await fetchAppointments(cfg, token, [...docks.keys()], from, to);
     const roster = await prisma.employee.findMany({
       where: { terminatedAt: null },
       select: { name: true },
     });
     const index = buildNameIndex(roster.map((e) => e.name));
+    const roles = parsePersonRoles(cfg.personRoles);
+    const aliases = parseAliases(cfg.aliases);
 
     // When one employee is tagged on several appointments, show the one that
     // matters now: in-progress beats arrived beats scheduled beats finished.
@@ -538,8 +623,8 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
       if (!appt.status) continue;
       const { label, tone } = mapStatus(String(appt.status));
       const dock = dockLabel(appt, docks);
-      for (const tag of personTags(appt)) {
-        const employee = resolveEmployee(tag.value, index);
+      for (const tag of personTags(appt, roles)) {
+        const employee = matchEmployee(tag.value, index, aliases).name;
         if (!employee) continue;
         const key = norm(employee);
         const prev = best[key];
@@ -789,20 +874,27 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
     try {
       const now = new Date();
       const docks = await fetchDocks(cfg, token);
-      const all = await fetchAppointments(cfg, token, [...docks.keys()]);
-      const appts = all.filter((a) => inWindow(a, now, cfg.windowHours));
+      const dockIds = [...docks.keys()];
+      const [from, to] = windowRange(now, cfg.windowHours);
+      const appts = await fetchAppointments(cfg, token, dockIds, from, to);
+      // A wider sweep, so we can say whether the tags you expect are simply
+      // sitting outside the badge window.
+      const [wideFrom, wideTo] = windowRange(now, 24 * 7);
+      const wide = await fetchAppointments(cfg, token, dockIds, wideFrom, wideTo);
+
       const roster = await prisma.employee.findMany({
         where: { terminatedAt: null },
         select: { name: true },
       });
       const index = buildNameIndex(roster.map((e) => e.name));
+      const roles = parsePersonRoles(cfg.personRoles);
+      const aliases = parseAliases(cfg.aliases);
 
-      // Person tags sitting on appointments the window excludes. If the tags
-      // you expect show up here, the window is simply too narrow.
+      const inWindowIds = new Set(appts.map((a) => a.id));
       const outside = new Set<string>();
-      for (const a of all) {
-        if (inWindow(a, now, cfg.windowHours)) continue;
-        for (const t of personTags(a)) {
+      for (const a of wide) {
+        if (inWindowIds.has(a.id)) continue;
+        for (const t of personTags(a, roles)) {
           outside.add(t.role ? `${t.role}: ${t.value}` : t.value);
         }
       }
@@ -817,12 +909,12 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
             doorTags.add(t.value);
             continue;
           }
-          if (isReferenceTag(t)) {
+          if (!isPersonRole(t.role, roles)) {
             ignored++;
             continue;
           }
           const shown = t.role ? `${t.role}: ${t.value}` : t.value;
-          const res = matchEmployee(t.value, index);
+          const res = matchEmployee(t.value, index, aliases);
           if (res.name) {
             matched.add(`${shown} → ${res.name}`);
           } else if (res.reason === "ambiguous") {
@@ -846,7 +938,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
         employees: roster.length,
         matchedEmployees: [...matched].slice(0, 40),
         windowHours: cfg.windowHours,
-        appointmentsTotal: all.length,
+        appointmentsTotal: wide.length,
         taggedOutsideWindow: [...outside].slice(0, 25),
       };
     } catch {
