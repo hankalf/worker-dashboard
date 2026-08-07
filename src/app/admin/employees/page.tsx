@@ -474,7 +474,16 @@ export default function EmployeesPage() {
       <h2 className="mb-4 text-lg font-semibold text-white">Employees</h2>
 
       <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <h3 className="mb-1 text-sm font-medium text-white">Import from CSV</h3>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-white">Import from CSV</h3>
+          <a
+            href="/api/employees/export"
+            download
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
+          >
+            Export all employees
+          </a>
+        </div>
         <p className="mb-3 text-sm text-zinc-400">
           Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
           <code className="text-zinc-300">position</code>,{" "}
@@ -495,6 +504,9 @@ export default function EmployeesPage() {
           >
             Download the sample CSV
           </a>
+          . Export writes these same columns (minus{" "}
+          <code className="text-zinc-300">password</code>, which is only stored
+          hashed), so an exported file can be edited and imported back.
         </p>
         <input
           ref={fileInputRef}
