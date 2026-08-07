@@ -85,6 +85,18 @@ export const SHIFT_LABEL: Record<ShiftKey, string> = {
   THIRD: "3rd Shift",
 };
 
+// A shift's window as minute-of-day plus its length. THIRD wraps past midnight,
+// so `start + length` can exceed 1440 — callers should take hours modulo 24.
+export function shiftWindow(
+  shift: ShiftKey,
+  bounds: ShiftBounds = DEFAULT_SHIFT_BOUNDS
+): { start: number; length: number } {
+  const start = startMin(shift, bounds);
+  const end = endMin(shift, bounds);
+  const length = end > start ? end - start : end + 24 * 60 - start;
+  return { start, length };
+}
+
 // The displayed time range for a shift, e.g. "6:00 AM – 2:00 PM".
 export function shiftRange(
   shift: ShiftKey,

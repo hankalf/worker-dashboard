@@ -752,12 +752,12 @@ export default function AssignPage() {
     }
   };
 
-  // Auto-stagger lunches: one atomic server call spaces each position's present
-  // crew 30 min apart from a shift-appropriate base, so a position stays covered.
+  // Auto-stagger lunches: one atomic server call that spaces each position's
+  // present crew across their own shift, so a position always keeps cover.
   const staggerLunches = async () => {
     if (
       !confirm(
-        "Auto-stagger lunches for everyone present? Each position's crew is spaced 30 min apart. This overwrites existing lunch times."
+        "Auto-stagger lunches for everyone present? Each position's crew is spread across their shift, 30 min apart (closer together if a large crew needs it), so only one person per position is out at a time. This overwrites existing lunch times."
       )
     )
       return;
