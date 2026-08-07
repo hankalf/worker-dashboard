@@ -10,6 +10,7 @@ import {
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { LocationPicker, type LocationCard } from "@/components/LocationPicker";
 import { DashboardSelectionBar } from "@/components/DashboardSelectionBar";
+import { ScreenHealthBanner } from "@/components/ScreenHealthBanner";
 import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
@@ -59,7 +60,12 @@ export default async function AdminDashboardPage() {
     cookieStore.get(DASHBOARD_SELECTED_COOKIE)?.value === "1";
   if (staff.isSuperAdmin && multiLocation && !dashboardSelected) {
     const locationCards = await buildLocationCards(locations);
-    return <LocationPicker locations={locationCards} activeId={null} />;
+    return (
+      <>
+        <ScreenHealthBanner />
+        <LocationPicker locations={locationCards} activeId={null} />
+      </>
+    );
   }
 
   const now = new Date();
@@ -179,6 +185,7 @@ export default async function AdminDashboardPage() {
   return (
     <>
       {selectedLocation && <DashboardSelectionBar name={selectedLocation.name} />}
+      {staff.isSuperAdmin && <ScreenHealthBanner />}
       <AdminDashboard
         positions={positions}
         employees={employees}
