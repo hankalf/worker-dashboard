@@ -761,9 +761,13 @@ export function clearOpendockCache(): void {
 
 // ---- Today's dock schedule (the wall-display view) -------------------------
 
-// Column sources are fixed by the warehouse's mapping:
-//   scheduled   appointment.start
-//   completed   appointment.end
+// Column sources:
+//   scheduled   appointment.start          the booked slot
+//   arrived     statusTimeline.Arrived     when the truck actually showed up
+//   completed   statusTimeline.Completed   when it actually finished
+//   on time     arrived vs scheduled (negative = early)
+//   dwell       arrived -> completed (or now, while still on site)
+//   processing  arrived -> statusTimeline.InProgress
 //   status      appointment.status
 //   door        the "DOOR: n" tag only — never the dock record
 //   PO #        appointment.refNumber
@@ -771,14 +775,21 @@ export function clearOpendockCache(): void {
 //   tags        the appointment's loader/receiver tags
 export type ScheduleEntry = {
   id: string;
-  scheduledAt: string | null; // appointment.start
-  completedAt: string | null; // appointment.end
+  scheduledAt: string | null;
+  arrivedAt: string | null;
+  completedAt: string | null;
   status: string; // raw Opendock status, e.g. "Arrived"
   label: string; // friendly label
   tone: DockTone;
   door: string | null; // from the "DOOR: 23" tag, blank when untagged
   poNumber: string | null; // appointment.refNumber
+  loadType: string | null;
   direction: string | null; // Inbound / Outbound, from the load type
+  // Signed: negative when the truck beat its slot, positive when it ran late.
+  onTimeMs: number | null;
+  dwellMs: number | null;
+  dwellOpen: boolean; // still counting up
+  processingMs: number | null;
   tags: string[]; // loader/receiver tags (the door tag has its own column)
 };
 
@@ -795,6 +806,24 @@ type RawLoadType = {
   name?: string;
   direction?: string;
   [k: string]: unknown;
+};
+
+// A timestamp off the appointment's status timeline, e.g. when it Arrived.
+// These are the moments things actually happened, as opposed to appointment
+// .start/.end which are the booked slot.
+function timelineAt(appt: RawAppt, key: string): string | null {
+  const t = appt.statusTimeline;
+  if (!t || typeof t !== "object") return null;
+  const v = (t as Record<string, unknown>)[key];
+  return typeof v === "string" && v ? v : null;
+}
+
+const msBetween = (from: string | null, to: string | null): number | null => {
+  if (!from || !to) return null;
+  const a = Date.parse(from);
+  const b = Date.parse(to);
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+  return b - a;
 };
 
 // Load types for the org, keyed by id. Carries the load's name and its
@@ -869,18 +898,30 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
         const raw = String(appt.status ?? "");
         const { label, tone } = mapStatus(raw);
         const lt = appt.loadTypeId ? loadTypes.get(String(appt.loadTypeId)) : undefined;
+        const arrivedAt = timelineAt(appt, "Arrived");
+        const completedAt = timelineAt(appt, "Completed");
 
         return {
           id: String(appt.id ?? `${appt.dockId}-${appt.start}`),
           scheduledAt: appt.start ? String(appt.start) : null,
-          completedAt: appt.end ? String(appt.end) : null,
+          arrivedAt,
+          completedAt,
+          // Still on site → count up to now; finished → freeze at completion.
+          dwellMs: msBetween(arrivedAt, completedAt ?? now.toISOString()),
+          dwellOpen: !!arrivedAt && !completedAt,
+          processingMs: msBetween(arrivedAt, timelineAt(appt, "InProgress")),
           status: raw,
           label,
           tone,
           door: doorFromTags(appt),
           poNumber:
             typeof appt.refNumber === "string" && appt.refNumber ? appt.refNumber : null,
+          loadType: typeof lt?.name === "string" ? lt.name : null,
           direction: directionOf(lt),
+          onTimeMs:
+            appt.start && arrivedAt
+              ? Date.parse(arrivedAt) - Date.parse(String(appt.start))
+              : null,
           // The door tag has its own column, so don't repeat it here.
           tags: parsedTags(appt)
             .filter((t) => !isDoorTag(t))
