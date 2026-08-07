@@ -218,15 +218,6 @@ function MemberBody({
                 Lead
               </span>
             )}
-            {member.dockStatus && (
-              <span
-                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[member.dockStatus.tone]}`}
-              >
-                🚛 {member.dockStatus.role ? `${member.dockStatus.role} · ` : ""}
-                {member.dockStatus.dock ? `Door ${member.dockStatus.dock} · ` : ""}
-                {member.dockStatus.label}
-              </span>
-            )}
             {out && (
               <span
                 className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -270,6 +261,20 @@ function MemberBody({
               </span>
             )}
           </div>
+          {/* Opendock assignment — its own line directly under the name, so it
+              reads consistently on every card instead of wrapping around
+              whichever other badges happen to be present. */}
+          {member.dockStatus && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[member.dockStatus.tone]}`}
+              >
+                🚛 {member.dockStatus.role ? `${member.dockStatus.role} · ` : ""}
+                {member.dockStatus.dock ? `Door ${member.dockStatus.dock} · ` : ""}
+                {member.dockStatus.label}
+              </span>
+            </div>
+          )}
           {/* Position (hidden on the public board — grouped by position there) */}
           {!hidePosition && (
             <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
