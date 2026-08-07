@@ -832,7 +832,14 @@ export type DockSchedule = {
   entries: ScheduleEntry[];
   error: string | null;
   fontScale: number; // percent, applied to the panel like browser zoom
+  // When Opendock was last reached successfully, so a display can show its own
+  // staleness rather than silently presenting old data as current.
+  syncedAt: string | null;
 };
+
+// Last good sync per location, kept across cache misses so a failed refresh can
+// still say when the data it's showing came from.
+const lastSync = new Map<string, string>();
 
 type RawLoadType = {
   id?: string;
@@ -909,6 +916,7 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
     entries: [],
     error,
     fontScale,
+    syncedAt: lastSync.get(locationId) ?? null,
   });
 
   let value: DockSchedule;
@@ -971,10 +979,21 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
           group(a.tone) - group(b.tone) ||
           (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "")
       );
-      value = { enabled: true, date, entries, error: null, fontScale: cfg.fontScale };
+      const syncedAt = now.toISOString();
+      lastSync.set(locationId, syncedAt);
+      value = {
+        enabled: true,
+        date,
+        entries,
+        error: null,
+        fontScale: cfg.fontScale,
+        syncedAt,
+      };
     }
   } catch (e) {
     console.error("[opendock] schedule fetch failed:", (e as Error).message);
+    // Keep the panel marked as configured so the failure is reported rather
+    // than looking like the integration is simply off.
     value = { ...empty((e as Error).message), enabled: true };
   }
 

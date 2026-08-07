@@ -130,6 +130,23 @@ function onTime(
   };
 }
 
+// "3m ago" / "just now". Amber past the threshold so a display shows when the
+// data behind it has gone stale instead of presenting it as current.
+const STALE_AFTER_MS = 10 * 60_000;
+
+function syncAge(
+  syncedAt: string | null,
+  now: Date | null
+): { text: string; stale: boolean } | null {
+  if (!syncedAt || !now) return null;
+  const ms = now.getTime() - Date.parse(syncedAt);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.floor(ms / 60_000);
+  const text =
+    mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
+  return { text, stale: ms > STALE_AFTER_MS };
+}
+
 function parseHidden(raw: string | null): Set<Tone> {
   if (!raw) return new Set();
   const wanted = raw.split(",").map((s) => s.trim().toLowerCase());
@@ -180,6 +197,7 @@ export function DockScheduleView({
   }, [schedule.entries]);
 
   const visible = schedule.entries.filter((e) => !hidden.has(e.tone as Tone));
+  const sync = syncAge(schedule.syncedAt, now);
 
   return (
     <div
@@ -257,6 +275,24 @@ export function DockScheduleView({
               </span>
             ))}
           </div>
+          {sync && (
+            <span
+              title={`Opendock last reached ${sync.text}`}
+              className={`flex items-center gap-1.5 text-sm ${
+                sync.stale
+                  ? "font-semibold text-amber-700 dark:text-amber-300"
+                  : "text-zinc-500 dark:text-zinc-500"
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`inline-block h-2 w-2 rounded-full ${
+                  sync.stale ? "bg-amber-500" : "bg-green-500"
+                }`}
+              />
+              {sync.stale ? `Stale — synced ${sync.text}` : `Synced ${sync.text}`}
+            </span>
+          )}
           <span className="text-sm text-zinc-500 dark:text-zinc-500">
             {visible.length} of {schedule.entries.length} shown
           </span>
