@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
+import { easternDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ const SHIFT_LABEL: Record<string, string> = {
 // can be edited and imported straight back. `password` is deliberately absent —
 // only bcrypt hashes are stored and they are never exported; re-importing an
 // admin row needs a fresh password.
+// `terminated_at` is export-only — the import ignores columns it doesn't know,
+// so a re-imported terminated employee comes back active.
 const HEADER = [
   "name",
   "position",
@@ -27,15 +30,16 @@ const HEADER = [
   "shift",
   "hire_date",
   "birth_date",
+  "terminated_at",
 ];
 
-// Admin: download every active employee for the current location as CSV.
+// Admin: download every employee for the current location as CSV, active and
+// terminated alike. Active are listed first, each group alphabetically.
 export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const employees = await prisma.employee.findMany({
-    where: { terminatedAt: null },
     include: {
       position: true,
       roles: { orderBy: { name: "asc" } },
@@ -44,7 +48,14 @@ export async function GET() {
     orderBy: { name: "asc" },
   });
 
-  const rows = employees.map((e) => [
+  // Sorted here rather than in the query so "active first" doesn't depend on
+  // how the database orders NULLs.
+  const ordered = [
+    ...employees.filter((e) => !e.terminatedAt),
+    ...employees.filter((e) => e.terminatedAt),
+  ];
+
+  const rows = ordered.map((e) => [
     e.name,
     e.position?.title ?? "",
     // Semicolon-separated, matching the import's format for multi-value cells.
@@ -55,6 +66,9 @@ export async function GET() {
     e.shift ? (SHIFT_LABEL[e.shift] ?? "") : "",
     e.hireDate ?? "",
     e.birthDate ?? "",
+    // Warehouse-local date, so a late-evening termination doesn't read as the
+    // next day the way a raw UTC timestamp would.
+    e.terminatedAt ? easternDateKey(e.terminatedAt) : "",
   ]);
 
   const csv = [HEADER, ...rows]

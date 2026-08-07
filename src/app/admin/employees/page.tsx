@@ -506,7 +506,8 @@ export default function EmployeesPage() {
           </a>
           . Export writes these same columns (minus{" "}
           <code className="text-zinc-300">password</code>, which is only stored
-          hashed), so an exported file can be edited and imported back.
+          hashed) plus <code className="text-zinc-300">terminated_at</code>, and
+          covers current and terminated employees.
         </p>
         <input
           ref={fileInputRef}
