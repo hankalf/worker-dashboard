@@ -27,6 +27,7 @@ export type DockStatus = {
   label: string;
   dock: string | null;
   tone: "scheduled" | "arrived" | "active" | "done" | "other";
+  role?: string | null; // the tag's role, e.g. "Receiver" / "Loader"
 };
 
 export type EmployeeWithRelations = Employee & {
@@ -220,7 +221,8 @@ function MemberBody({
               <span
                 className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[member.dockStatus.tone]}`}
               >
-                🚛 {member.dockStatus.dock ? `Dock ${member.dockStatus.dock} · ` : ""}
+                🚛 {member.dockStatus.role ? `${member.dockStatus.role} · ` : ""}
+                {member.dockStatus.dock ? `Door ${member.dockStatus.dock} · ` : ""}
                 {member.dockStatus.label}
               </span>
             )}

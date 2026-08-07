@@ -99,6 +99,7 @@ export type DockStatus = {
   label: string; // display label, e.g. "Arrived"
   dock: string | null; // dock door name/number if known
   tone: DockTone;
+  role: string | null; // the tag's role prefix, e.g. "Receiver" / "Loader"
 };
 
 // Map a raw Opendock status to a friendly label + tone. Opendock's Neutron API
@@ -121,6 +122,15 @@ function mapStatus(raw: string): { label: string; tone: DockTone } {
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+// Which status wins when someone is tagged on more than one appointment.
+const TONE_RANK: Record<DockTone, number> = {
+  active: 4,
+  arrived: 3,
+  scheduled: 2,
+  done: 1,
+  other: 0,
+};
 
 // ---- Opendock API client --------------------------------------------------
 // Shapes confirmed against a live Neutron response. An appointment carries a
@@ -162,23 +172,82 @@ function tagStrings(appt: RawAppt): string[] {
     .filter(Boolean);
 }
 
-// Warehouse staff tag appointments with the assigned door, e.g. "DOOR: 23".
-// That's the live door the truck is actually at, so it beats the dock record's
-// configured door number.
-const DOOR_TAG = /^\s*door\s*[:#-]?\s*(.+?)\s*$/i;
+// Tags are "<role>: <value>" — warehouse staff write "Receiver: Dennis",
+// "Loader: Dennis" for the people on a load, and "DOOR: 23" for the door. A tag
+// with no colon is treated as a bare value.
+export type ParsedTag = { role: string | null; value: string };
 
-function doorFromTags(appt: RawAppt): string | null {
-  for (const tag of tagStrings(appt)) {
-    const m = DOOR_TAG.exec(tag);
-    if (m?.[1]) return m[1];
-  }
-  return null;
+function parseTag(tag: string): ParsedTag {
+  const i = tag.indexOf(":");
+  if (i === -1) return { role: null, value: tag.trim() };
+  return { role: tag.slice(0, i).trim() || null, value: tag.slice(i + 1).trim() };
 }
 
-// Tags that are really door labels aren't employee names — skip them when
-// matching badges.
-function nameTags(appt: RawAppt): string[] {
-  return tagStrings(appt).filter((t) => !DOOR_TAG.test(t));
+// Role prefixes that label a door rather than a person.
+const DOOR_ROLE = /^(door|dock|bay)$/i;
+
+const isDoorTag = (t: ParsedTag) => !!t.role && DOOR_ROLE.test(t.role);
+
+function parsedTags(appt: RawAppt): ParsedTag[] {
+  return tagStrings(appt).map(parseTag).filter((t) => t.value);
+}
+
+// The live door the truck is actually at, which beats the dock record's
+// configured door number.
+function doorFromTags(appt: RawAppt): string | null {
+  return parsedTags(appt).find(isDoorTag)?.value ?? null;
+}
+
+// Everything that isn't a door tag is a candidate person.
+function personTags(appt: RawAppt): ParsedTag[] {
+  return parsedTags(appt).filter((t) => !isDoorTag(t));
+}
+
+// ---- Matching a tag value to an employee -----------------------------------
+// Tags often carry only a first name ("Receiver: Dennis") while the roster has
+// full names ("Dennis Kowalski"). Resolution order: exact full name, then a
+// unique first-name match, then a unique last-name match. Ambiguous matches
+// (two Dennises) resolve to nothing rather than risk showing one person's dock
+// status on someone else's badge.
+export type NameIndex = {
+  full: Map<string, string>;
+  first: Map<string, string[]>;
+  last: Map<string, string[]>;
+};
+
+export function buildNameIndex(names: string[]): NameIndex {
+  const full = new Map<string, string>();
+  const first = new Map<string, string[]>();
+  const last = new Map<string, string[]>();
+  const push = (m: Map<string, string[]>, k: string, v: string) => {
+    if (!k) return;
+    const arr = m.get(k);
+    if (arr) arr.push(v);
+    else m.set(k, [v]);
+  };
+  for (const name of names) {
+    const n = norm(name);
+    if (!n) continue;
+    full.set(n, name);
+    const parts = n.split(" ");
+    push(first, parts[0], name);
+    if (parts.length > 1) push(last, parts[parts.length - 1], name);
+  }
+  return { full, first, last };
+}
+
+export function resolveEmployee(value: string, idx: NameIndex): string | null {
+  const v = norm(value);
+  if (!v) return null;
+  const exact = idx.full.get(v);
+  if (exact) return exact;
+  if (v.includes(" ")) return null; // a full-looking name that isn't on the roster
+  const byFirst = idx.first.get(v);
+  if (byFirst?.length === 1) return byFirst[0];
+  if (byFirst && byFirst.length > 1) return null; // ambiguous — don't guess
+  const byLast = idx.last.get(v);
+  if (byLast?.length === 1) return byLast[0];
+  return null;
 }
 
 function dockLabel(appt: RawAppt, docks: Map<string, RawDock>): string | null {
@@ -324,25 +393,30 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
     const now = new Date();
     const docks = await fetchDocks(cfg, token);
     const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
+    const roster = await prisma.employee.findMany({
+      where: { terminatedAt: null },
+      select: { name: true },
+    });
+    const index = buildNameIndex(roster.map((e) => e.name));
 
     // When one employee is tagged on several appointments, show the one that
     // matters now: in-progress beats arrived beats scheduled beats finished.
-    const rank: Record<DockTone, number> = {
-      active: 4,
-      arrived: 3,
-      scheduled: 2,
-      done: 1,
-      other: 0,
-    };
     const best: Record<string, { status: DockStatus; rank: number }> = {};
     for (const appt of appts) {
       if (!appt.status) continue;
       const { label, tone } = mapStatus(String(appt.status));
-      const status: DockStatus = { label, dock: dockLabel(appt, docks), tone };
-      for (const tag of nameTags(appt)) {
-        const key = norm(tag);
+      const dock = dockLabel(appt, docks);
+      for (const tag of personTags(appt)) {
+        const employee = resolveEmployee(tag.value, index);
+        if (!employee) continue;
+        const key = norm(employee);
         const prev = best[key];
-        if (!prev || rank[tone] > prev.rank) best[key] = { status, rank: rank[tone] };
+        if (!prev || TONE_RANK[tone] > prev.rank) {
+          best[key] = {
+            status: { label, dock, tone, role: tag.role },
+            rank: TONE_RANK[tone],
+          };
+        }
       }
     }
     for (const [key, v] of Object.entries(best)) byName[key] = v.status;
@@ -382,9 +456,9 @@ export type PipelineCheck = {
   docksInWarehouse: number;
   appointmentsInWindow: number;
   doorTags: string[]; // distinct "DOOR: 23"-style tags
-  nameTags: string[]; // distinct other tags — the employee-name candidates
+  unmatchedTags: string[]; // person tags with no employee on the roster
   employees: number;
-  matchedEmployees: string[];
+  matchedEmployees: string[]; // "Receiver: Dennis → Dennis Kowalski"
 };
 
 export type OpendockDiagnostic = {
@@ -580,28 +654,34 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
       const now = new Date();
       const docks = await fetchDocks(cfg, token);
       const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
-      const doorTags = new Set<string>();
-      const nameCandidates = new Set<string>();
-      for (const a of appts) {
-        for (const t of tagStrings(a)) {
-          (DOOR_TAG.test(t) ? doorTags : nameCandidates).add(t);
-        }
-      }
       const roster = await prisma.employee.findMany({
         where: { terminatedAt: null },
         select: { name: true },
       });
-      const normalizedTags = new Set([...nameCandidates].map(norm));
-      const matched = roster
-        .filter((e) => normalizedTags.has(norm(e.name)))
-        .map((e) => e.name);
+      const index = buildNameIndex(roster.map((e) => e.name));
+
+      const doorTags = new Set<string>();
+      const matched = new Set<string>();
+      const unmatched = new Set<string>();
+      for (const a of appts) {
+        for (const t of parsedTags(a)) {
+          if (isDoorTag(t)) {
+            doorTags.add(t.value);
+            continue;
+          }
+          const employee = resolveEmployee(t.value, index);
+          const shown = t.role ? `${t.role}: ${t.value}` : t.value;
+          if (employee) matched.add(`${shown} → ${employee}`);
+          else unmatched.add(shown);
+        }
+      }
       out.pipeline = {
         docksInWarehouse: docks.size,
         appointmentsInWindow: appts.length,
         doorTags: [...doorTags].slice(0, 25),
-        nameTags: [...nameCandidates].slice(0, 25),
+        unmatchedTags: [...unmatched].slice(0, 25),
         employees: roster.length,
-        matchedEmployees: matched.slice(0, 25),
+        matchedEmployees: [...matched].slice(0, 25),
       };
     } catch {
       /* diagnostic extra — never fail the whole test over it */

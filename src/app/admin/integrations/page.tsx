@@ -34,7 +34,7 @@ type Diagnostic = {
     docksInWarehouse: number;
     appointmentsInWindow: number;
     doorTags: string[];
-    nameTags: string[];
+    unmatchedTags: string[];
     employees: number;
     matchedEmployees: string[];
   } | null;
@@ -239,7 +239,7 @@ export default function IntegrationsPage() {
                   <dd className="text-zinc-300">{diag.pipeline.docksInWarehouse}</dd>
                   <dt className="text-zinc-500">Appointments (±12h)</dt>
                   <dd className="text-zinc-300">{diag.pipeline.appointmentsInWindow}</dd>
-                  <dt className="text-zinc-500">Employees matched</dt>
+                  <dt className="text-zinc-500">Matched to employees</dt>
                   <dd
                     className={
                       diag.pipeline.matchedEmployees.length
@@ -247,15 +247,21 @@ export default function IntegrationsPage() {
                         : "text-amber-400"
                     }
                   >
-                    {diag.pipeline.matchedEmployees.length} of {diag.pipeline.employees}
-                    {diag.pipeline.matchedEmployees.length > 0 &&
-                      ` — ${diag.pipeline.matchedEmployees.join(", ")}`}
+                    {diag.pipeline.matchedEmployees.length
+                      ? diag.pipeline.matchedEmployees.join(" · ")
+                      : "none"}
                   </dd>
-                  <dt className="text-zinc-500">Name-ish tags</dt>
-                  <dd className="text-zinc-300">
-                    {diag.pipeline.nameTags.length
-                      ? diag.pipeline.nameTags.join(", ")
-                      : "none found"}
+                  <dt className="text-zinc-500">Unmatched tags</dt>
+                  <dd
+                    className={
+                      diag.pipeline.unmatchedTags.length
+                        ? "text-amber-400"
+                        : "text-zinc-300"
+                    }
+                  >
+                    {diag.pipeline.unmatchedTags.length
+                      ? diag.pipeline.unmatchedTags.join(" · ")
+                      : "none"}
                   </dd>
                   <dt className="text-zinc-500">Door tags</dt>
                   <dd className="text-zinc-300">
@@ -264,11 +270,11 @@ export default function IntegrationsPage() {
                       : "none found"}
                   </dd>
                 </dl>
-                {diag.pipeline.nameTags.length === 0 && (
+                {diag.pipeline.unmatchedTags.length > 0 && (
                   <p className="mt-2 text-amber-400">
-                    No employee-name tags found on these appointments — badges
-                    can&apos;t match until appointments are tagged with employee
-                    names.
+                    Unmatched tags didn&apos;t line up with anyone on the roster.
+                    A first name matches only when exactly one employee has it —
+                    if two people share it, tag the full name in Opendock.
                   </p>
                 )}
               </div>
