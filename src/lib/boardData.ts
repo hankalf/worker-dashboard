@@ -10,7 +10,11 @@ import {
 } from "@/lib/settings";
 import { applyDueSchedules } from "@/lib/scheduleServer";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
-import { getEmployeeDockStatuses, normalizeName } from "@/lib/opendock";
+import {
+  getEmployeeDockStatuses,
+  getDockSchedule,
+  normalizeName,
+} from "@/lib/opendock";
 import { APP_VERSION } from "@/lib/version";
 
 // Fetch every prop the public board needs, scoped to the active location.
@@ -67,6 +71,9 @@ export async function fetchBoardProps() {
     dockStatus: dockStatuses[normalizeName(e.name)] ?? null,
   }));
 
+  // Today's dock schedule, only when the board is set to rotate through it.
+  const dockSchedule = rotation.dock ? await getDockSchedule(now) : null;
+
   const { visible } = splitNotices(activeNotices);
 
   return {
@@ -80,6 +87,8 @@ export async function fetchBoardProps() {
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
+    dockSchedule,
+    dockHidden: rotation.dockHidden,
     scrollSpeed,
     branding,
     laborShare,

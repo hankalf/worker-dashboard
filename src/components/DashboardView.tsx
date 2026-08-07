@@ -6,6 +6,8 @@ import type { Position } from "@/generated/prisma/client";
 import type { Branding } from "@/lib/settings";
 import type { ShiftBounds } from "@/lib/shift";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DockScheduleView } from "@/components/DockScheduleView";
+import type { DockSchedule } from "@/lib/opendock";
 import { APP_TZ } from "@/lib/time";
 import {
   DashboardSections,
@@ -27,6 +29,8 @@ export function DashboardView({
   rotatingUrl = "",
   rotationSeconds = 30,
   rotatingEnabled = false,
+  dockSchedule = null,
+  dockHidden = "",
   scrollSpeed = 4,
   branding,
   laborShare = [],
@@ -46,27 +50,35 @@ export function DashboardView({
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
+  dockSchedule?: DockSchedule | null;
+  dockHidden?: string;
   scrollSpeed?: number;
   shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
   useAutoRefresh();
 
-  // Rotating display: alternate the body between the board and an external URL
-  // (the header with the clock/date stays put). Off unless enabled + a URL set.
-  const rotating = rotatingEnabled && !!rotatingUrl;
-  const [showingUrl, setShowingUrl] = useState(false);
+  // Rotating display: cycle the body through the board, the Opendock dock
+  // schedule, and an external URL (the header with the clock/date stays put).
+  // Each panel is independent, so any combination can be enabled.
+  const panels: ("board" | "dock" | "url")[] = ["board"];
+  if (dockSchedule) panels.push("dock");
+  if (rotatingEnabled && rotatingUrl) panels.push("url");
+  const rotating = panels.length > 1;
+
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!rotating) {
-      setShowingUrl(false);
-      return;
-    }
+    if (!rotating) return;
     const id = setInterval(
-      () => setShowingUrl((s) => !s),
+      () => setTick((t) => t + 1),
       Math.max(5, rotationSeconds) * 1000
     );
     return () => clearInterval(id);
   }, [rotating, rotationSeconds]);
+
+  // Wrapped at render rather than in state, so a soft refresh that adds or
+  // removes a panel can never leave the index out of range.
+  const panel = panels[tick % panels.length] ?? "board";
 
   return (
     // On lg+ screens the board locks to the viewport height (no page scroll —
@@ -143,11 +155,18 @@ export function DashboardView({
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col px-6 py-4 lg:overflow-hidden">
-        {rotating && showingUrl ? (
+        {panel === "url" ? (
           <iframe
             src={rotatingUrl}
             title="Rotating display"
             className="min-h-0 w-full flex-1 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800"
+          />
+        ) : panel === "dock" && dockSchedule ? (
+          <DockScheduleView
+            schedule={dockSchedule}
+            title={title}
+            initialHidden={dockHidden}
+            embedded
           />
         ) : (
           <DashboardSections

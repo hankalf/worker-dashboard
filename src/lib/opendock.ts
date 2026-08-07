@@ -1,4 +1,5 @@
 import { prisma, getActiveLocationId } from "@/lib/prisma";
+import { easternDateKey, easternInputToUtcISO } from "@/lib/time";
 
 // ---------------------------------------------------------------------------
 // Opendock integration (per-location). Config lives in LocationSetting under
@@ -142,8 +143,16 @@ export async function setOpendockConfig(input: {
 
 // ---- Status model shown on the badge --------------------------------------
 
-// Colour tone for the pill; mapped from Opendock's raw status.
-export type DockTone = "scheduled" | "arrived" | "active" | "done" | "other";
+// Colour tone for the pill; mapped from Opendock's raw status. "requested" is
+// kept distinct from "scheduled" (it's pre-approval) so a display can hide one
+// without the other.
+export type DockTone =
+  | "requested"
+  | "scheduled"
+  | "arrived"
+  | "active"
+  | "done"
+  | "other";
 
 export type DockStatus = {
   label: string; // display label, e.g. "Arrived"
@@ -165,7 +174,7 @@ function mapStatus(raw: string): { label: string; tone: DockTone } {
     return { label: "In progress", tone: "active" };
   if (s.includes("arriv") || s.includes("checkedin"))
     return { label: "Arrived", tone: "arrived" };
-  if (s.includes("requested")) return { label: "Requested", tone: "scheduled" };
+  if (s.includes("requested")) return { label: "Requested", tone: "requested" };
   if (s.includes("schedul") || s.includes("booked") || s.includes("pending"))
     return { label: "Scheduled", tone: "scheduled" };
   return { label: raw, tone: "other" };
@@ -175,9 +184,10 @@ const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 // Which status wins when someone is tagged on more than one appointment.
 const TONE_RANK: Record<DockTone, number> = {
-  active: 4,
-  arrived: 3,
-  scheduled: 2,
+  active: 5,
+  arrived: 4,
+  scheduled: 3,
+  requested: 2,
   done: 1,
   other: 0,
 };
@@ -648,6 +658,126 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
 // or a manual test).
 export function clearOpendockCache(): void {
   cache.clear();
+  scheduleCache.clear();
+}
+
+// ---- Today's dock schedule (the wall-display view) -------------------------
+
+export type SchedulePerson = {
+  role: string; // "RECEIVER" / "LOADER"
+  name: string; // matched employee, or the raw tag when unmatched
+  matched: boolean;
+};
+
+export type ScheduleEntry = {
+  id: string;
+  door: string | null;
+  start: string | null; // ISO
+  end: string | null;
+  status: string; // raw Opendock status, e.g. "Arrived"
+  label: string; // friendly label
+  tone: DockTone;
+  refNumber: string | null;
+  customer: string | null;
+  people: SchedulePerson[];
+};
+
+export type DockSchedule = {
+  enabled: boolean;
+  date: string; // Eastern "YYYY-MM-DD"
+  entries: ScheduleEntry[];
+  error: string | null;
+};
+
+// A named custom field's value, e.g. the customer on the load.
+function customField(appt: RawAppt, match: RegExp): string | null {
+  const fields = appt.customFields;
+  if (!Array.isArray(fields)) return null;
+  for (const f of fields as { label?: string; name?: string; value?: unknown }[]) {
+    const key = `${f.label ?? ""} ${f.name ?? ""}`;
+    if (match.test(key) && typeof f.value === "string" && f.value.trim()) {
+      return f.value.trim();
+    }
+  }
+  return null;
+}
+
+type ScheduleCacheEntry = { at: number; value: DockSchedule };
+const scheduleCache = new Map<string, ScheduleCacheEntry>();
+
+// Every appointment on the active location's docks for the given Eastern day,
+// oldest first. Safe by construction: any failure returns an empty schedule
+// with an error message rather than throwing at the screen.
+export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
+  const locationId = (await getActiveLocationId()) ?? "default";
+  const date = easternDateKey(now);
+  const key = `${locationId}:${date}`;
+  const hit = scheduleCache.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+
+  const empty = (error: string | null): DockSchedule => ({
+    enabled: false,
+    date,
+    entries: [],
+    error,
+  });
+
+  let value: DockSchedule;
+  try {
+    const cfg = await fullConfig();
+    if (!cfg.enabled || !cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
+      value = empty(null); // simply not configured — the view says so
+    } else {
+      const token = await login(cfg);
+      if (!token) throw new Error("Opendock login failed");
+      const from = new Date(easternInputToUtcISO(`${date}T00:00`));
+      const to = new Date(easternInputToUtcISO(`${date}T23:59`));
+      const docks = await fetchDocks(cfg, token);
+      const appts = await fetchAppointments(cfg, token, [...docks.keys()], from, to);
+
+      const roster = await prisma.employee.findMany({
+        where: { terminatedAt: null },
+        select: { name: true },
+      });
+      const index = buildNameIndex(roster.map((e) => e.name));
+      const roles = parsePersonRoles(cfg.personRoles);
+      const aliases = parseAliases(cfg.aliases);
+
+      const entries: ScheduleEntry[] = appts.map((appt) => {
+        const raw = String(appt.status ?? "");
+        const { label, tone } = mapStatus(raw);
+        return {
+          id: String(appt.id ?? crypto.randomUUID()),
+          door: dockLabel(appt, docks),
+          start: appt.start ? String(appt.start) : null,
+          end: appt.end ? String(appt.end) : null,
+          status: raw,
+          label,
+          tone,
+          refNumber:
+            typeof appt.refNumber === "string" && appt.refNumber ? appt.refNumber : null,
+          customer: customField(appt, /customer/i),
+          people: personTags(appt, roles).map((t) => {
+            const hit = matchEmployee(t.value, index, aliases).name;
+            return {
+              role: (t.role ?? "").toUpperCase(),
+              name: hit ?? t.value,
+              matched: !!hit,
+            };
+          }),
+        };
+      });
+
+      entries.sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""));
+      value = { enabled: true, date, entries, error: null };
+    }
+  } catch (e) {
+    console.error("[opendock] schedule fetch failed:", (e as Error).message);
+    value = { ...empty((e as Error).message), enabled: true };
+  }
+
+  scheduleCache.set(key, { at: Date.now(), value });
+  return value;
 }
 
 // ---- Admin "Test connection" diagnostic ------------------------------------

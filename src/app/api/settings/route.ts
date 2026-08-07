@@ -32,6 +32,8 @@ export async function GET() {
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
+    rotatingDock: rotation.dock,
+    rotatingDockHidden: rotation.dockHidden,
     scrollSpeed,
     branding,
     shiftBounds,
@@ -60,6 +62,18 @@ export async function PATCH(req: Request) {
   }
   if (body.rotatingEnabled !== undefined) {
     await setSetting("rotatingEnabled", body.rotatingEnabled ? "true" : "false");
+  }
+  if (body.rotatingDock !== undefined) {
+    await setSetting("rotatingDock", body.rotatingDock ? "true" : "false");
+  }
+  if (body.rotatingDockHidden !== undefined) {
+    // Store only known tone keys, comma-separated.
+    const allowed = ["active", "arrived", "scheduled", "requested", "done", "other"];
+    const tones = String(body.rotatingDockHidden)
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => allowed.includes(s));
+    await setSetting("rotatingDockHidden", tones.join(","));
   }
   if (body.scrollSpeed !== undefined) {
     const speed = Math.max(1, Math.min(10, Math.round(Number(body.scrollSpeed) || 4)));
@@ -131,6 +145,8 @@ export async function PATCH(req: Request) {
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
+    rotatingDock: rotation.dock,
+    rotatingDockHidden: rotation.dockHidden,
     scrollSpeed,
     branding,
     shiftBounds,

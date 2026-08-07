@@ -421,6 +421,8 @@ function RotatingDashboard() {
   const [url, setUrl] = useState("");
   const [seconds, setSeconds] = useState(30);
   const [enabled, setEnabled] = useState(false);
+  const [dock, setDock] = useState(false);
+  const [dockHidden, setDockHidden] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -432,10 +434,22 @@ function RotatingDashboard() {
         setUrl(d.rotatingUrl ?? "");
         setSeconds(d.rotationSeconds ?? 30);
         setEnabled(!!d.rotatingEnabled);
+        setDock(!!d.rotatingDock);
+        setDockHidden(
+          String(d.rotatingDockHidden ?? "other,requested")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        );
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const toggleHidden = (tone: string) =>
+    setDockHidden((prev) =>
+      prev.includes(tone) ? prev.filter((t) => t !== tone) : [...prev, tone]
+    );
 
   const save = async () => {
     const res = await fetch("/api/settings", {
@@ -445,6 +459,8 @@ function RotatingDashboard() {
         rotatingUrl: url,
         rotationSeconds: seconds,
         rotatingEnabled: enabled,
+        rotatingDock: dock,
+        rotatingDockHidden: dockHidden.join(","),
       }),
     });
     if (res.ok) {
@@ -492,6 +508,51 @@ function RotatingDashboard() {
           />
           Enable rotating display on the dashboard
         </label>
+
+        <div className="rounded-md border border-zinc-800 bg-zinc-900 p-3">
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={dock}
+              onChange={(e) => setDock(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Rotate through today&apos;s Opendock dock schedule
+          </label>
+          <p className="mt-1 text-xs text-zinc-500">
+            Adds a dock schedule panel to the rotation — doors, times, status and
+            the crew tagged on each load. Needs Opendock connected on the
+            Integrations tab.
+          </p>
+          {dock && (
+            <div className="mt-3">
+              <div className="mb-1 text-xs text-zinc-400">Hide these statuses</div>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  ["active", "In progress"],
+                  ["arrived", "Arrived"],
+                  ["scheduled", "Scheduled"],
+                  ["requested", "Requested"],
+                  ["done", "Completed"],
+                  ["other", "Cancelled / other"],
+                ].map(([tone, label]) => (
+                  <label
+                    key={tone}
+                    className="flex items-center gap-1.5 text-xs text-zinc-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={dockHidden.includes(tone)}
+                      onChange={() => toggleHidden(tone)}
+                      className="h-3.5 w-3.5"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={save}

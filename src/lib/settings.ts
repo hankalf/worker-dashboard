@@ -153,7 +153,18 @@ export async function getBranding(): Promise<Branding> {
 
 // Rotating-dashboard config: the public board can rotate between its own
 // content and an external URL (shown in an iframe) on a timer.
-export type RotationConfig = { url: string; seconds: number; enabled: boolean };
+export type RotationConfig = {
+  url: string;
+  seconds: number;
+  enabled: boolean;
+  // Rotate the board with the Opendock dock schedule as well. Independent of
+  // the external URL — either, both, or neither can be on.
+  dock: boolean;
+  // Statuses the dock panel hides by default, as tone keys ("other,requested").
+  dockHidden: string;
+};
+
+const DEFAULT_DOCK_HIDDEN = "other,requested";
 
 export async function getRotationConfig(): Promise<RotationConfig> {
   try {
@@ -161,13 +172,23 @@ export async function getRotationConfig(): Promise<RotationConfig> {
       "rotatingUrl",
       "rotationSeconds",
       "rotatingEnabled",
+      "rotatingDock",
+      "rotatingDockHidden",
     ]);
     return {
       url: m.rotatingUrl ?? "",
       seconds: Number(m.rotationSeconds) || 30,
       enabled: m.rotatingEnabled === "true",
+      dock: m.rotatingDock === "true",
+      dockHidden: m.rotatingDockHidden ?? DEFAULT_DOCK_HIDDEN,
     };
   } catch {
-    return { url: "", seconds: 30, enabled: false };
+    return {
+      url: "",
+      seconds: 30,
+      enabled: false,
+      dock: false,
+      dockHidden: DEFAULT_DOCK_HIDDEN,
+    };
   }
 }

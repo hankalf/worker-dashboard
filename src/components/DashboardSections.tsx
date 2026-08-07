@@ -26,7 +26,7 @@ import { ShiftHandoffBanner } from "@/components/ShiftHandoffBanner";
 export type DockStatus = {
   label: string;
   dock: string | null;
-  tone: "scheduled" | "arrived" | "active" | "done" | "other";
+  tone: "requested" | "scheduled" | "arrived" | "active" | "done" | "other";
   role?: string | null; // the tag's role, e.g. "Receiver" / "Loader"
 };
 
@@ -39,6 +39,7 @@ export type EmployeeWithRelations = Employee & {
 
 // Pill colours for each dock-status tone (light + dark).
 const DOCK_TONE_CLASS: Record<DockStatus["tone"], string> = {
+  requested: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
   scheduled: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200",
   arrived: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300",
   active: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300",
