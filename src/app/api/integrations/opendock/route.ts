@@ -30,6 +30,10 @@ export async function PUT(req: Request) {
     warehouseId:
       typeof body.warehouseId === "string" ? body.warehouseId : undefined,
     password: typeof body.password === "string" ? body.password : undefined,
+    windowHours:
+      Number.isFinite(Number(body.windowHours)) && body.windowHours !== ""
+        ? Number(body.windowHours)
+        : undefined,
   });
   clearOpendockCache();
   await logActivity("Integration", "Updated Opendock settings");

@@ -19,13 +19,19 @@ const KEY = {
   email: "opendock.email",
   password: "opendock.password",
   warehouseId: "opendock.warehouseId",
+  windowHours: "opendock.windowHours",
 } as const;
+
+// How far either side of now an appointment can sit and still show on a badge.
+// Crews often tag the next shift's loads, so this needs headroom.
+const DEFAULT_WINDOW_HOURS = 24;
 
 export type OpendockConfig = {
   enabled: boolean;
   baseUrl: string;
   email: string;
   warehouseId: string;
+  windowHours: number;
 };
 
 // The full config including the secret — server-only, never sent to the client.
@@ -48,6 +54,7 @@ async function fullConfig(): Promise<OpendockConfigFull> {
     email: m[KEY.email] ?? "",
     warehouseId: m[KEY.warehouseId] ?? "",
     password: m[KEY.password] ?? "",
+    windowHours: Number(m[KEY.windowHours]) || DEFAULT_WINDOW_HOURS,
   };
 }
 
@@ -61,6 +68,7 @@ export async function getOpendockConfig(): Promise<
     baseUrl: c.baseUrl,
     email: c.email,
     warehouseId: c.warehouseId,
+    windowHours: c.windowHours,
     hasPassword: !!c.password,
   };
 }
@@ -73,6 +81,7 @@ export async function setOpendockConfig(input: {
   email?: string;
   warehouseId?: string;
   password?: string;
+  windowHours?: number;
 }): Promise<void> {
   const locationId = await getActiveLocationId();
   if (!locationId) return;
@@ -87,6 +96,10 @@ export async function setOpendockConfig(input: {
   if (input.baseUrl !== undefined) await set(KEY.baseUrl, input.baseUrl.trim());
   if (input.email !== undefined) await set(KEY.email, input.email.trim());
   if (input.warehouseId !== undefined) await set(KEY.warehouseId, input.warehouseId.trim());
+  if (input.windowHours !== undefined) {
+    const h = Math.min(Math.max(Math.round(input.windowHours) || 0, 1), 168);
+    await set(KEY.windowHours, String(h));
+  }
   if (input.password) await set(KEY.password, input.password);
 }
 
@@ -331,6 +344,47 @@ export function resolveEmployee(value: string, idx: NameIndex): string | null {
   return nameOf(matchEmployee(value, idx));
 }
 
+// Levenshtein distance, for "did you mean" hints on unmatched tags.
+function editDistance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(
+        prev[j] + 1,
+        prev[j - 1] + 1,
+        diag + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+// Roster names whose first name is a near miss for the tag — a mistyped or
+// nickname'd tag ("JIMMY" vs "James Lopez") shows up as a suggestion instead of
+// a dead end.
+export function nearestNames(value: string, roster: string[], max = 2): string[] {
+  const first = canon(value).split(" ")[0];
+  if (first.length < 3) return [];
+  const scored: { name: string; d: number }[] = [];
+  for (const name of roster) {
+    const cand = canon(name).split(" ")[0];
+    const d = editDistance(first, cand);
+    // Allow more slack for longer names, and treat a prefix as very close.
+    const limit = first.length <= 4 ? 1 : 2;
+    if (d <= limit || cand.startsWith(first) || first.startsWith(cand)) {
+      scored.push({ name, d });
+    }
+  }
+  return scored
+    .sort((x, y) => x.d - y.d)
+    .slice(0, max)
+    .map((s) => s.name);
+}
+
 function dockLabel(appt: RawAppt, docks: Map<string, RawDock>): string | null {
   const fromTag = doorFromTags(appt);
   if (fromTag) return fromTag;
@@ -414,18 +468,12 @@ async function fetchDocks(
 async function fetchAppointments(
   cfg: OpendockConfigFull,
   token: string,
-  dockIds: string[],
-  now: Date
+  dockIds: string[]
 ): Promise<RawAppt[]> {
   if (dockIds.length === 0) return [];
-  const from = new Date(now.getTime() - 12 * 3600_000).toISOString();
-  const to = new Date(now.getTime() + 12 * 3600_000).toISOString();
 
   const filtered = new URLSearchParams({
-    s: JSON.stringify({
-      dockId: { $in: dockIds },
-      start: { $gte: from, $lte: to },
-    }),
+    s: JSON.stringify({ dockId: { $in: dockIds } }),
     limit: "500",
   });
 
@@ -439,13 +487,14 @@ async function fetchAppointments(
   }
 
   const allowed = new Set(dockIds);
-  const fromMs = Date.parse(from);
-  const toMs = Date.parse(to);
-  return rows.filter((a) => {
-    if (!a.dockId || !allowed.has(String(a.dockId))) return false;
-    const startMs = a.start ? Date.parse(String(a.start)) : NaN;
-    return Number.isNaN(startMs) || (startMs >= fromMs && startMs <= toMs);
-  });
+  return rows.filter((a) => !!a.dockId && allowed.has(String(a.dockId)));
+}
+
+// Is this appointment near enough to now to belong on a badge?
+function inWindow(a: RawAppt, now: Date, hours: number): boolean {
+  const startMs = a.start ? Date.parse(String(a.start)) : NaN;
+  if (Number.isNaN(startMs)) return true; // undated — don't hide it
+  return Math.abs(startMs - now.getTime()) <= hours * 3600_000;
 }
 
 // ---- Cache: don't hit Opendock on every 15s board refresh ------------------
@@ -473,7 +522,9 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
     if (!token) throw new Error("Opendock login failed");
     const now = new Date();
     const docks = await fetchDocks(cfg, token);
-    const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
+    const appts = (await fetchAppointments(cfg, token, [...docks.keys()])).filter(
+      (a) => inWindow(a, now, cfg.windowHours)
+    );
     const roster = await prisma.employee.findMany({
       where: { terminatedAt: null },
       select: { name: true },
@@ -541,6 +592,9 @@ export type PipelineCheck = {
   ignoredTags: number; // reference/paperwork tags skipped outright
   employees: number;
   matchedEmployees: string[]; // "RECEIVER: DENNIS R. → Dennis Rodriguez"
+  windowHours: number;
+  appointmentsTotal: number; // for this warehouse, any date
+  taggedOutsideWindow: string[]; // person tags on appointments outside the window
 };
 
 export type OpendockDiagnostic = {
@@ -735,12 +789,23 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
     try {
       const now = new Date();
       const docks = await fetchDocks(cfg, token);
-      const appts = await fetchAppointments(cfg, token, [...docks.keys()], now);
+      const all = await fetchAppointments(cfg, token, [...docks.keys()]);
+      const appts = all.filter((a) => inWindow(a, now, cfg.windowHours));
       const roster = await prisma.employee.findMany({
         where: { terminatedAt: null },
         select: { name: true },
       });
       const index = buildNameIndex(roster.map((e) => e.name));
+
+      // Person tags sitting on appointments the window excludes. If the tags
+      // you expect show up here, the window is simply too narrow.
+      const outside = new Set<string>();
+      for (const a of all) {
+        if (inWindow(a, now, cfg.windowHours)) continue;
+        for (const t of personTags(a)) {
+          outside.add(t.role ? `${t.role}: ${t.value}` : t.value);
+        }
+      }
 
       const doorTags = new Set<string>();
       const matched = new Set<string>();
@@ -760,10 +825,13 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
           const res = matchEmployee(t.value, index);
           if (res.name) {
             matched.add(`${shown} → ${res.name}`);
+          } else if (res.reason === "ambiguous") {
+            unmatched.add(`${shown} — ambiguous (${res.candidates.join(", ")})`);
           } else {
+            const near = nearestNames(t.value, roster.map((e) => e.name));
             unmatched.add(
-              res.reason === "ambiguous"
-                ? `${shown} — ambiguous (${res.candidates.join(", ")})`
+              near.length
+                ? `${shown} — no match (did you mean ${near.join(" / ")}?)`
                 : `${shown} — nobody on the roster`
             );
           }
@@ -777,6 +845,9 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
         ignoredTags: ignored,
         employees: roster.length,
         matchedEmployees: [...matched].slice(0, 40),
+        windowHours: cfg.windowHours,
+        appointmentsTotal: all.length,
+        taggedOutsideWindow: [...outside].slice(0, 25),
       };
     } catch {
       /* diagnostic extra — never fail the whole test over it */

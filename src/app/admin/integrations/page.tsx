@@ -8,6 +8,7 @@ type Config = {
   baseUrl: string;
   email: string;
   warehouseId: string;
+  windowHours: number;
   hasPassword: boolean;
 };
 
@@ -38,6 +39,9 @@ type Diagnostic = {
     ignoredTags: number;
     employees: number;
     matchedEmployees: string[];
+    windowHours: number;
+    appointmentsTotal: number;
+    taggedOutsideWindow: string[];
   } | null;
 };
 
@@ -180,6 +184,21 @@ export default function IntegrationsPage() {
               onChange={(e) => update({ warehouseId: e.target.value })}
             />
           </label>
+          <label className="text-xs text-zinc-400">
+            Time window (hours either side of now)
+            <input
+              type="number"
+              min={1}
+              max={168}
+              className={inputClass}
+              value={cfg.windowHours}
+              onChange={(e) => update({ windowHours: Number(e.target.value) })}
+            />
+            <span className="mt-1 block text-[11px] text-zinc-500">
+              Only appointments starting within this many hours show on badges.
+              Raise it if crews tag loads well ahead of the shift.
+            </span>
+          </label>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -238,8 +257,12 @@ export default function IntegrationsPage() {
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                   <dt className="text-zinc-500">Docks in warehouse</dt>
                   <dd className="text-zinc-300">{diag.pipeline.docksInWarehouse}</dd>
-                  <dt className="text-zinc-500">Appointments (±12h)</dt>
-                  <dd className="text-zinc-300">{diag.pipeline.appointmentsInWindow}</dd>
+                  <dt className="text-zinc-500">Appointments</dt>
+                  <dd className="text-zinc-300">
+                    {diag.pipeline.appointmentsInWindow} in window (±
+                    {diag.pipeline.windowHours}h) of {diag.pipeline.appointmentsTotal}{" "}
+                    total
+                  </dd>
                   <dt className="text-zinc-500">Matched</dt>
                   <dd
                     className={
@@ -286,7 +309,22 @@ export default function IntegrationsPage() {
                   <dd className="text-zinc-300">
                     {diag.pipeline.ignoredTags} skipped (PID / ASN / PO numbers)
                   </dd>
+                  {diag.pipeline.taggedOutsideWindow.length > 0 && (
+                    <>
+                      <dt className="text-zinc-500">Outside window</dt>
+                      <dd className="text-amber-400">
+                        {diag.pipeline.taggedOutsideWindow.join(" · ")}
+                      </dd>
+                    </>
+                  )}
                 </dl>
+                {diag.pipeline.taggedOutsideWindow.length > 0 && (
+                  <p className="mb-2 text-amber-400">
+                    These name tags are on appointments outside the ±
+                    {diag.pipeline.windowHours}h window, so they don&apos;t reach
+                    the badges. Raise the time window above to include them.
+                  </p>
+                )}
                 {diag.pipeline.unmatchedTags.length > 0 && (
                   <p className="mt-2 text-amber-400">
                     &ldquo;nobody on the roster&rdquo; means no employee has that
