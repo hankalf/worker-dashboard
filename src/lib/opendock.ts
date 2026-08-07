@@ -262,50 +262,166 @@ export function clearOpendockCache(): void {
   cache.clear();
 }
 
-// Log in + fetch once, for the admin "Test connection" button. Returns a small
-// summary or throws with a message.
-export async function testOpendock(): Promise<{ ok: true; appointments: number }> {
-  const cfg = await fullConfig();
-  if (!cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
-    throw new Error("Fill in base URL, email, password, and warehouse ID first.");
-  }
-  const token = await login(cfg);
-  if (!token) throw new Error("Login failed — check the base URL, email and password.");
-  const appts = await fetchAppointments(cfg, token);
-  return { ok: true, appointments: appts.length };
-}
+// ---- Admin "Test connection" diagnostic ------------------------------------
+// Opendock's exact API shape can't be verified from the build environment
+// (outbound access to it is blocked there), so rather than guessing a single
+// endpoint we probe a handful of candidates with the real token and report what
+// each one returns. One click tells us which path works and what an appointment
+// actually looks like.
 
-// A verbose diagnostic for the admin "Test connection" button: it captures the
-// raw HTTP status + response body at each step, so we can see the real API
-// shape (and fix endpoints together) even when assumptions are off. The app can
-// reach Opendock; the sandbox building this can't — so this is how we get a
-// real sample appointment.
+export type ProbeResult = {
+  label: string;
+  url: string;
+  status: number | string;
+  ok: boolean;
+  count: number | null; // rows parsed, when the body was a list
+  body: string; // truncated + token-redacted
+};
+
 export type OpendockDiagnostic = {
   loginUrl: string;
   loginStatus: number | string;
   loginBody: string;
   tokenFound: boolean;
-  apptUrl: string | null;
-  apptStatus: number | string | null;
-  apptBody: string | null;
+  tokenClaims: Record<string, unknown> | null;
+  probes: ProbeResult[];
+  bestUrl: string | null;
   count: number | null;
   sample: unknown | null;
 };
 
+const trunc = (s: string, n = 1800) =>
+  s.length > n ? s.slice(0, n) + "...(truncated)" : s;
+
+// Never echo a bearer token back into the UI — these get copied into chat.
+const redact = (s: string) =>
+  s.replace(
+    /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g,
+    "[token redacted]"
+  );
+
+const clean = (s: string) => trunc(redact(s));
+
+// Decode the JWT payload (no verification — just to surface role/org, which is
+// the usual reason a valid login still can't read appointments).
+function decodeClaims(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const json = Buffer.from(
+      part.replace(/-/g, "+").replace(/_/g, "/"),
+      "base64"
+    ).toString("utf8");
+    const c = JSON.parse(json) as Record<string, unknown>;
+    return {
+      email: c.email,
+      role: c.role,
+      orgId: c.orgId,
+      companyId: c.companyId,
+      expiresAt:
+        typeof c.exp === "number"
+          ? new Date(c.exp * 1000).toISOString()
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function runProbe(
+  label: string,
+  url: string,
+  token: string
+): Promise<{ result: ProbeResult; items: RawAppt[] }> {
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await res.text();
+    let items: RawAppt[] = [];
+    try {
+      items = apptsFrom(JSON.parse(text));
+    } catch {
+      /* non-JSON body is reported as-is */
+    }
+    return {
+      result: {
+        label,
+        url,
+        status: res.status,
+        ok: res.ok,
+        count: items.length || null,
+        body: clean(text),
+      },
+      items,
+    };
+  } catch (e) {
+    return {
+      result: {
+        label,
+        url,
+        status: "error",
+        ok: false,
+        count: null,
+        body: `request failed: ${(e as Error).message}`,
+      },
+      items: [],
+    };
+  }
+}
+
+// Candidate endpoints, most-likely first. `s` / `join` / `limit` are the
+// nestjs-crud conventions Opendock's Neutron API uses.
+function probeTargets(cfg: OpendockConfigFull): { label: string; url: string }[] {
+  const b = cfg.baseUrl;
+  const w = cfg.warehouseId;
+  const scoped: { label: string; url: string }[] = w
+    ? [
+        {
+          label: "appointment (crud filter + dock join)",
+          url:
+            `${b}/appointment?` +
+            new URLSearchParams({
+              s: JSON.stringify({ warehouseId: w }),
+              limit: "5",
+            }).toString() +
+            "&join=dock",
+        },
+        {
+          label: "appointment (plain warehouseId param)",
+          url: `${b}/appointment?warehouseId=${encodeURIComponent(w)}&limit=5`,
+        },
+        {
+          label: "warehouse (does the ID resolve?)",
+          url: `${b}/warehouse/${encodeURIComponent(w)}`,
+        },
+      ]
+    : [];
+  return [
+    ...scoped,
+    { label: "appointment (no filter)", url: `${b}/appointment?limit=5` },
+    { label: "appointments (plural)", url: `${b}/appointments?limit=5` },
+    { label: "dock (list doors)", url: `${b}/dock?limit=5` },
+    { label: "warehouse (list mine)", url: `${b}/warehouse?limit=5` },
+    { label: "who am I", url: `${b}/user/me` },
+  ];
+}
+
 export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
   const cfg = await fullConfig();
-  if (!cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
-    throw new Error("Fill in base URL, email, password, and warehouse ID first.");
+  if (!cfg.baseUrl || !cfg.email || !cfg.password) {
+    throw new Error("Fill in the base URL, email and password first.");
   }
-  const trunc = (s: string, n = 2500) => (s.length > n ? s.slice(0, n) + "…(truncated)" : s);
+
   const out: OpendockDiagnostic = {
     loginUrl: `${cfg.baseUrl}/auth/login`,
     loginStatus: "-",
     loginBody: "",
     tokenFound: false,
-    apptUrl: null,
-    apptStatus: null,
-    apptBody: null,
+    tokenClaims: null,
+    probes: [],
+    bestUrl: null,
     count: null,
     sample: null,
   };
@@ -316,39 +432,35 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: cfg.email, password: cfg.password }),
+      signal: AbortSignal.timeout(15_000),
     });
     out.loginStatus = res.status;
     const text = await res.text();
-    out.loginBody = trunc(text);
+    out.loginBody = clean(text);
     try {
       token = tokenFrom(JSON.parse(text));
     } catch {
       /* non-JSON body captured above */
     }
     out.tokenFound = !!token;
+    if (token) out.tokenClaims = decodeClaims(token);
   } catch (e) {
     out.loginBody = `request failed: ${(e as Error).message}`;
   }
 
-  if (token) {
-    out.apptUrl = appointmentsUrl(cfg);
-    try {
-      const res = await fetch(out.apptUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      out.apptStatus = res.status;
-      const text = await res.text();
-      out.apptBody = trunc(text);
-      try {
-        const arr = apptsFrom(JSON.parse(text));
-        out.count = arr.length;
-        out.sample = arr[0] ?? null;
-      } catch {
-        /* non-JSON body captured above */
-      }
-    } catch (e) {
-      out.apptBody = `request failed: ${(e as Error).message}`;
-    }
+  if (!token) return out;
+
+  const results = await Promise.all(
+    probeTargets(cfg).map((t) => runProbe(t.label, t.url, token))
+  );
+  out.probes = results.map((r) => r.result);
+
+  // The winner: the first probe that came back OK with at least one row.
+  const win = results.find((r) => r.result.ok && r.items.length > 0);
+  if (win) {
+    out.bestUrl = win.result.url;
+    out.count = win.items.length;
+    out.sample = win.items[0];
   }
 
   return out;

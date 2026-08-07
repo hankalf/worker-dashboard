@@ -11,16 +11,15 @@ export async function POST() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const diagnostic = await diagnoseOpendock();
-    const ok =
-      diagnostic.tokenFound &&
-      diagnostic.apptStatus !== null &&
-      Number(diagnostic.apptStatus) >= 200 &&
-      Number(diagnostic.apptStatus) < 300;
+    const ok = diagnostic.tokenFound && !!diagnostic.bestUrl;
+    const reachable = diagnostic.probes.filter((p) => p.ok).length;
     const message = ok
-      ? `Connected — found ${diagnostic.count ?? 0} appointment(s).`
+      ? `Connected — found ${diagnostic.count ?? 0} record(s).`
       : !diagnostic.tokenFound
         ? "Login did not return a token — see details below."
-        : "Fetched, but the appointments call needs a look — see details below.";
+        : reachable > 0
+          ? `Logged in and ${reachable} endpoint(s) responded, but none returned records — see details below.`
+          : "Logged in, but no endpoint returned data — see details below.";
     return NextResponse.json({ ok, message, diagnostic });
   } catch (e) {
     return NextResponse.json(

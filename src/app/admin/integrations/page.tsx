@@ -11,14 +11,23 @@ type Config = {
   hasPassword: boolean;
 };
 
+type Probe = {
+  label: string;
+  url: string;
+  status: number | string;
+  ok: boolean;
+  count: number | null;
+  body: string;
+};
+
 type Diagnostic = {
   loginUrl: string;
   loginStatus: number | string;
   loginBody: string;
   tokenFound: boolean;
-  apptUrl: string | null;
-  apptStatus: number | string | null;
-  apptBody: string | null;
+  tokenClaims: Record<string, unknown> | null;
+  probes: Probe[];
+  bestUrl: string | null;
   count: number | null;
   sample: unknown | null;
 };
@@ -206,12 +215,34 @@ export default function IntegrationsPage() {
               <dd className="text-zinc-300">
                 {String(diag.loginStatus)} · token {diag.tokenFound ? "found ✓" : "missing ✗"}
               </dd>
-              <dt className="text-zinc-500">Appointments</dt>
-              <dd className="text-zinc-300">
-                {diag.apptStatus === null ? "—" : String(diag.apptStatus)}
-                {diag.count !== null ? ` · ${diag.count} found` : ""}
-              </dd>
+              {diag.tokenClaims?.role !== undefined && (
+                <>
+                  <dt className="text-zinc-500">Account role</dt>
+                  <dd className="text-zinc-300">{String(diag.tokenClaims.role)}</dd>
+                </>
+              )}
             </dl>
+
+            {diag.probes.length > 0 && (
+              <ul className="mb-2 flex flex-col gap-1">
+                {diag.probes.map((p) => (
+                  <li
+                    key={p.url}
+                    className="flex items-baseline justify-between gap-2 text-xs"
+                  >
+                    <span className="min-w-0 truncate text-zinc-400">{p.label}</span>
+                    <span
+                      className={`shrink-0 font-mono ${
+                        p.ok ? "text-green-400" : "text-red-400"
+                      }`}
+                    >
+                      {String(p.status)}
+                      {p.count ? ` · ${p.count} rows` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <textarea
               readOnly
               value={diagText}
