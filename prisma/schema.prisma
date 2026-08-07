@@ -63,6 +63,7 @@ model Location {
   noticeLogs           NoticeLog[]
   shiftNotes           ShiftNote[]
   headcountSnapshots   HeadcountSnapshot[]
+  attendanceHistory    AttendanceHistory[]
   workHistory          WorkHistory[]
   lunchHistory         LunchHistory[]
   laborShares          LaborShare[]
@@ -276,6 +277,26 @@ model HeadcountSnapshot {
 // Which position each employee worked on which day (Eastern date). Name/title
 // are snapshotted so history survives renames. Included in the log export and
 // auto-purged after ~2 weeks; the Employee/Position records themselves are kept.
+// One row per employee per day recording how they were marked. HeadcountSnapshot
+// only keeps totals, so without this there's no way to ask who is absent often.
+// Name and shift are snapshotted so history reads correctly after later edits.
+model AttendanceHistory {
+  id           String   @id @default(cuid())
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId   String   @default("")
+  date         String
+  employeeId   String
+  employeeName String
+  shift        String?
+  // PRESENT | ABSENT | CALLED_OUT | PTO
+  status       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date, employeeId])
+  @@index([locationId, date])
+}
+
 model WorkHistory {
   id            String   @id @default(cuid())
   location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)

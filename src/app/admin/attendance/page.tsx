@@ -17,6 +17,16 @@ function formatDate(date: string) {
   });
 }
 
+// Absences over the trailing window, and how coverage varies by weekday.
+const PATTERN_DAYS = 30;
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const ABSENT_STATUSES = new Set(["ABSENT", "CALLED_OUT", "PTO"]);
+const STATUS_LABEL: Record<string, string> = {
+  ABSENT: "Absent",
+  CALLED_OUT: "Called out",
+  PTO: "PTO",
+};
+
 export default async function AttendanceHistoryPage() {
   // Supervisor+ — leads and below are sent to the admin dashboard.
   if (!(await requireSupervisor())) redirect("/admin");
@@ -59,6 +69,58 @@ export default async function AttendanceHistoryPage() {
   const plotH = H - padT - padB;
   const groupW = plotW / Math.max(chartDates.length, 1);
   const barW = groupW / 4;
+
+  // --- Patterns -----------------------------------------------------------
+  // Coverage by weekday, from the same snapshots as the chart above.
+  const weekdayTotals = WEEKDAYS.map(() => ({ present: 0, total: 0, days: 0 }));
+  for (const [date, shifts] of byDate) {
+    const dow = new Date(date + "T12:00:00Z").getUTCDay();
+    const present = Object.values(shifts).reduce((n, v) => n + v.present, 0);
+    const total = Object.values(shifts).reduce((n, v) => n + v.total, 0);
+    if (total === 0) continue;
+    weekdayTotals[dow].present += present;
+    weekdayTotals[dow].total += total;
+    weekdayTotals[dow].days += 1;
+  }
+  const weekdayRates = weekdayTotals
+    .map((w, i) => ({
+      day: WEEKDAYS[i],
+      days: w.days,
+      rate: w.total > 0 ? Math.round((w.present / w.total) * 100) : null,
+    }))
+    .filter((w) => w.days > 0);
+
+  // Who is out most often, from the per-employee daily record.
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - PATTERN_DAYS);
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const attendance = await prisma.attendanceHistory.findMany({
+    where: { date: { gte: cutoffKey } },
+    select: { employeeId: true, employeeName: true, status: true, date: true },
+  });
+
+  const perPerson = new Map<
+    string,
+    { name: string; days: number; out: number; breakdown: Record<string, number> }
+  >();
+  for (const row of attendance) {
+    const cur =
+      perPerson.get(row.employeeId) ??
+      { name: row.employeeName, days: 0, out: 0, breakdown: {} };
+    cur.name = row.employeeName;
+    cur.days += 1;
+    if (ABSENT_STATUSES.has(row.status)) {
+      cur.out += 1;
+      cur.breakdown[row.status] = (cur.breakdown[row.status] ?? 0) + 1;
+    }
+    perPerson.set(row.employeeId, cur);
+  }
+  const absences = [...perPerson.entries()]
+    .map(([id, v]) => ({ id, ...v }))
+    .filter((p) => p.out > 0)
+    .sort((a, b) => b.out - a.out || a.name.localeCompare(b.name))
+    .slice(0, 12);
+  const trackedDays = new Set(attendance.map((a) => a.date)).size;
 
   return (
     <div>
@@ -174,6 +236,74 @@ export default async function AttendanceHistoryPage() {
         </div>
         </>
       )}
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <h3 className="text-sm font-medium text-white">Coverage by weekday</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Share of the on-shift roster that showed up, averaged over every
+            recorded day.
+          </p>
+          {weekdayRates.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">Not enough history yet.</p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2">
+              {weekdayRates.map((w) => (
+                <li key={w.day} className="flex items-center gap-3 text-sm">
+                  <span className="w-10 shrink-0 text-zinc-400">{w.day}</span>
+                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
+                    <span
+                      className={`block h-full ${
+                        (w.rate ?? 0) < 80 ? "bg-red-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${w.rate ?? 0}%` }}
+                    />
+                  </span>
+                  <span className="w-16 shrink-0 text-right tabular-nums text-zinc-300">
+                    {w.rate}%
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-xs text-zinc-600">
+                    {w.days}d
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <h3 className="text-sm font-medium text-white">
+            Most days out — last {PATTERN_DAYS} days
+          </h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Absent, called out or PTO, per person.
+            {trackedDays > 0 ? ` ${trackedDays} day(s) recorded.` : ""}
+          </p>
+          {absences.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">
+              {trackedDays === 0
+                ? "No per-employee history recorded yet — this fills in from today."
+                : "Nobody has missed a day in this window."}
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2">
+              {absences.map((p) => (
+                <li key={p.id} className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate text-zinc-200">{p.name}</span>
+                  <span className="shrink-0 text-xs text-zinc-500">
+                    {Object.entries(p.breakdown)
+                      .map(([k, n]) => `${STATUS_LABEL[k] ?? k} ${n}`)
+                      .join(" · ")}
+                  </span>
+                  <span className="w-20 shrink-0 text-right tabular-nums text-zinc-300">
+                    {p.out} / {p.days}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

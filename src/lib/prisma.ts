@@ -20,6 +20,7 @@ const TENANT_MODELS = new Set([
   "NoticeLog",
   "ShiftNote",
   "HeadcountSnapshot",
+  "AttendanceHistory",
   "WorkHistory",
   "LunchHistory",
   "LaborShare",

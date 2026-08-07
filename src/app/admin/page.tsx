@@ -15,6 +15,7 @@ import { currentShift } from "@/lib/shift";
 import { easternDateKey } from "@/lib/time";
 import { recordWorkHistory, purgeOldWorkHistory } from "@/lib/workHistory";
 import { recordLunchHistory, purgeOldLunchHistory } from "@/lib/lunchHistory";
+import { recordAttendance, purgeOldAttendance } from "@/lib/attendanceHistory";
 import { getBranding, getShiftBounds } from "@/lib/settings";
 import { getActiveLaborShare } from "@/lib/laborShareServer";
 
@@ -139,6 +140,19 @@ export default async function AdminDashboardPage() {
           )
       );
       await purgeOldWorkHistory();
+
+      // Everyone on this shift, however they're marked — the absences are the
+      // point, so this can't be filtered to those present.
+      await recordAttendance(
+        now,
+        roster.map((e) => ({
+          id: e.id,
+          name: e.name,
+          shift: e.shift,
+          status: e.attendance,
+        }))
+      );
+      await purgeOldAttendance();
 
       // Log today's scheduled lunches (present + has a lunch), then prune old.
       await recordLunchHistory(
