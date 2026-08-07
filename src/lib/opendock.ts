@@ -301,6 +301,14 @@ function doorFromTags(appt: RawAppt): string | null {
   return parsedTags(appt).find(isDoorTag)?.value ?? null;
 }
 
+// A load the warehouse turned away. Matched loosely so "REJECTED",
+// "Rejected - temp", and "LOAD REJECTED" all count, on either side of the colon.
+const REJECTED_TAG = /reject/i;
+
+function isRejectedTag(t: ParsedTag) {
+  return REJECTED_TAG.test(t.role ?? "") || REJECTED_TAG.test(t.value);
+}
+
 // Only tags carrying a configured person role name a person. Boards use tags
 // for plenty of other things — "ASN", "Pending Reschedule", "PICK IN PROGRESS",
 // "Once Upon a Farm", "PID: 9514" — and an allow-list of roles is far more
@@ -790,7 +798,9 @@ export type ScheduleEntry = {
   dwellMs: number | null;
   dwellOpen: boolean; // still counting up
   processingMs: number | null;
-  tags: string[]; // loader/receiver tags (the door tag has its own column)
+  // A REJECTED tag on the appointment — the row is flagged red on the board.
+  rejected: boolean;
+  tags: string[]; // other tags (door and rejected have their own treatment)
 };
 
 export type DockSchedule = {
@@ -922,9 +932,10 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
             appt.start && arrivedAt
               ? Date.parse(arrivedAt) - Date.parse(String(appt.start))
               : null,
-          // The door tag has its own column, so don't repeat it here.
+          rejected: parsedTags(appt).some(isRejectedTag),
+          // Door and rejected are shown on their own, so don't repeat them here.
           tags: parsedTags(appt)
-            .filter((t) => !isDoorTag(t))
+            .filter((t) => !isDoorTag(t) && !isRejectedTag(t))
             .map((t) => (t.role ? `${t.role}: ${t.value}` : t.value)),
         };
       });

@@ -53,6 +53,18 @@ const TONE_PILL: Record<Tone, string> = {
   other: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
 };
 
+// A rejected load overrides the status tone entirely — red row, red rail, no
+// dimming even when it is also completed or cancelled, so it stays obvious.
+const REJECTED_ROW =
+  "border-l-red-600 bg-red-500/15 dark:border-l-red-500 dark:bg-red-500/20";
+const REJECTED_PILL =
+  "bg-red-600 text-white dark:bg-red-600 dark:text-white";
+
+// Late or overdue: amber, sitting between the normal status tones and the red
+// of a rejected load.
+const LATE_ROW =
+  "border-l-amber-500 bg-amber-400/20 dark:border-l-amber-400 dark:bg-amber-500/20";
+
 const timeFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: APP_TZ,
   hour: "numeric",
@@ -70,9 +82,30 @@ function duration(ms: number | null): string {
   return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
 }
 
-// Arrival against the booked slot. Anything at or before the slot counts as on
-// time; after it reads as how late the truck was.
-function onTime(ms: number | null): { text: string; className: string } {
+// How long an appointment has been waiting past its slot with no truck yet.
+// Null once it has arrived, or for cancelled/completed rows where "overdue"
+// would be meaningless.
+function overdueMs(
+  e: { scheduledAt: string | null; arrivedAt: string | null; tone: string },
+  now: Date | null
+): number | null {
+  if (e.arrivedAt || !e.scheduledAt || !now) return null;
+  if (e.tone === "other" || e.tone === "done") return null;
+  const late = now.getTime() - Date.parse(e.scheduledAt);
+  return late > 0 ? late : null;
+}
+
+// Arrival against the booked slot. At or before the slot is on time; after it
+// reads as how late the truck was. A no-show past its slot reads as overdue.
+function onTime(
+  ms: number | null,
+  overdue: number | null
+): { text: string; className: string } {
+  if (overdue !== null)
+    return {
+      text: `Overdue ${duration(overdue)}`,
+      className: "font-semibold text-amber-700 dark:text-amber-300",
+    };
   if (ms === null) return { text: "—", className: "text-zinc-500" };
   if (ms <= 0)
     return {
@@ -258,11 +291,23 @@ export function DockScheduleView({
               </thead>
               <tbody>
                 {visible.map((e) => {
-                  const punctual = onTime(e.onTimeMs);
+                  const overdue = overdueMs(e, now);
+                  const punctual = onTime(e.onTimeMs, overdue);
+                  // Late on arrival, or still missing after its slot. Cancelled
+                  // rows are excluded — a cancelled load is not "late".
+                  const late =
+                    e.tone !== "other" &&
+                    (overdue !== null || (e.onTimeMs !== null && e.onTimeMs > 0));
                   return (
                     <tr
                       key={e.id}
-                      className={`border-l-4 align-top text-lg ${TONE_ROW[e.tone as Tone]}`}
+                      className={`border-l-4 align-top text-lg ${
+                        e.rejected
+                          ? REJECTED_ROW
+                          : late
+                            ? LATE_ROW
+                            : TONE_ROW[e.tone as Tone]
+                      }`}
                     >
                       <td className="whitespace-nowrap px-3 py-3 font-semibold tabular-nums text-zinc-800 dark:text-zinc-200">
                         {clock(e.scheduledAt)}
@@ -271,13 +316,22 @@ export function DockScheduleView({
                         {clock(e.arrivedAt)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
-                        <span
-                          className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                            TONE_PILL[e.tone as Tone]
-                          }`}
-                        >
-                          {e.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {e.rejected && (
+                            <span
+                              className={`rounded-full px-3 py-1 text-sm font-bold uppercase tracking-wide ${REJECTED_PILL}`}
+                            >
+                              Rejected
+                            </span>
+                          )}
+                          <span
+                            className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                              TONE_PILL[e.tone as Tone]
+                            }`}
+                          >
+                            {e.label}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-center text-2xl font-bold leading-none text-zinc-900 dark:text-white">
                         {e.door ?? "—"}
