@@ -200,7 +200,13 @@ export type DockStatus = {
   dock: string | null; // dock door name/number if known
   tone: DockTone;
   role: string | null; // the tag's role prefix, e.g. "Receiver" / "Loader"
+  // ISO instant after which the badge should disappear. Set for finished loads
+  // so a completed door doesn't sit on someone's card for the rest of the day.
+  expiresAt: string | null;
 };
+
+// How long a completed appointment keeps showing on an employee's badge.
+const COMPLETED_LINGER_MS = 15 * 60_000;
 
 // Map a raw Opendock status to a friendly label + tone. Opendock's Neutron API
 // uses: Requested, Scheduled, Arrived, Completed, Cancelled, NoShow (some
@@ -736,6 +742,23 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
       if (!appt.status) continue;
       const { label, tone } = mapStatus(String(appt.status));
       const dock = dockLabel(appt);
+
+      // A finished load lingers on the badge for a quarter hour, then drops
+      // off. Timed from the completion stamp, falling back to the slot's end
+      // when Opendock didn't record one; with neither, it stays until the
+      // appointment leaves the window rather than vanishing unpredictably.
+      let expiresAt: string | null = null;
+      if (tone === "done") {
+        const finished =
+          timelineAt(appt, "Completed") ?? (appt.end ? String(appt.end) : null);
+        const finishedMs = finished ? Date.parse(finished) : NaN;
+        if (!Number.isNaN(finishedMs)) {
+          const expiry = finishedMs + COMPLETED_LINGER_MS;
+          if (expiry <= now.getTime()) continue; // already lapsed
+          expiresAt = new Date(expiry).toISOString();
+        }
+      }
+
       for (const tag of personTags(appt, roles)) {
         const employee = matchEmployee(tag.value, index, aliases).name;
         if (!employee) continue;
@@ -743,7 +766,7 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
         const prev = best[key];
         if (!prev || TONE_RANK[tone] > prev.rank) {
           best[key] = {
-            status: { label, dock, tone, role: tag.role },
+            status: { label, dock, tone, role: tag.role, expiresAt },
             rank: TONE_RANK[tone],
           };
         }

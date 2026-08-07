@@ -28,6 +28,10 @@ export type DockStatus = {
   dock: string | null;
   tone: "requested" | "scheduled" | "arrived" | "active" | "done" | "other";
   role?: string | null; // the tag's role, e.g. "Receiver" / "Loader"
+  // Set on finished loads: the pill disappears after this instant. Checked
+  // against the live clock rather than the fetch, so it goes at the right
+  // minute instead of whenever the next Opendock poll lands.
+  expiresAt?: string | null;
 };
 
 export type EmployeeWithRelations = Employee & {
@@ -184,6 +188,7 @@ function MemberBody({
   stayingOver = false,
   covering = false,
   today = null,
+  now = null,
   hidePosition = false,
   hideLunch = false,
   badgeColor,
@@ -192,6 +197,7 @@ function MemberBody({
   stayingOver?: boolean;
   covering?: boolean;
   today?: string | null;
+  now?: Date | null;
   badgeColor?: string;
   // Public board groups by position already, so the per-card position line is
   // redundant there — hide it and show only roles.
@@ -203,6 +209,16 @@ function MemberBody({
   const anniv = today ? anniversaryYearsThisMonth(member.hireDate, today) : null;
   const birthday = today ? isBirthday(member.birthDate, today) : false;
   const out = member.attendance !== "PRESENT";
+  // A finished load stops showing once its linger window is up.
+  const dock =
+    member.dockStatus &&
+    !(
+      member.dockStatus.expiresAt &&
+      now &&
+      now.getTime() > Date.parse(member.dockStatus.expiresAt)
+    )
+      ? member.dockStatus
+      : null;
   return (
     <div className={out ? "opacity-60" : undefined}>
       <div className="flex items-start justify-between gap-2">
@@ -264,14 +280,14 @@ function MemberBody({
           {/* Opendock assignment — its own line directly under the name, so it
               reads consistently on every card instead of wrapping around
               whichever other badges happen to be present. */}
-          {member.dockStatus && (
+          {dock && (
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <span
-                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[member.dockStatus.tone]}`}
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${DOCK_TONE_CLASS[dock.tone]}`}
               >
-                🚛 {member.dockStatus.role ? `${member.dockStatus.role} · ` : ""}
-                {member.dockStatus.dock ? `Door ${member.dockStatus.dock} · ` : ""}
-                {member.dockStatus.label}
+                🚛 {dock.role ? `${dock.role} · ` : ""}
+                {dock.dock ? `Door ${dock.dock} · ` : ""}
+                {dock.label}
               </span>
             </div>
           )}
@@ -819,7 +835,7 @@ export function DashboardSections({
                               : "border-zinc-400 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
                         </li>
                       ))}
                       {column.labor.map((l) => (
@@ -865,7 +881,7 @@ export function DashboardSections({
                     : "border-zinc-400 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
               </div>
             ))}
           </div>
