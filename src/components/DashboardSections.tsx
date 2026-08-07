@@ -191,6 +191,7 @@ function MemberBody({
   now = null,
   hidePosition = false,
   hideLunch = false,
+  hideRoles = false,
   badgeColor,
 }: {
   member: EmployeeWithRelations;
@@ -200,11 +201,13 @@ function MemberBody({
   now?: Date | null;
   badgeColor?: string;
   // Public board groups by position already, so the per-card position line is
-  // redundant there — hide it and show only roles.
+  // redundant there.
   hidePosition?: boolean;
   // Public board shows lunch times in the Lunch Schedule list instead, so the
   // per-card lunch badge is hidden there (kept on the admin panel).
   hideLunch?: boolean;
+  // Roles are for the admin panel; the wall board keeps cards to who's where.
+  hideRoles?: boolean;
 }) {
   const anniv = today ? anniversaryYearsThisMonth(member.hireDate, today) : null;
   const birthday = today ? isBirthday(member.birthDate, today) : false;
@@ -298,7 +301,7 @@ function MemberBody({
             </div>
           )}
           {/* Roles (capabilities) — bold list */}
-          {member.capabilities.length > 0 && (
+          {!hideRoles && member.capabilities.length > 0 && (
             <div className="mt-1 text-xs font-bold text-zinc-700 dark:text-zinc-200">
               {member.capabilities.map((c) => c.name).join(" · ")}
             </div>
@@ -835,7 +838,7 @@ export function DashboardSections({
                               : "border-zinc-400 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
-                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
+                          <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} hideRoles={!showCoverage} badgeColor={brand?.badge} />
                         </li>
                       ))}
                       {column.labor.map((l) => (
@@ -881,7 +884,7 @@ export function DashboardSections({
                     : "border-zinc-400 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
+                <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} now={now} hidePosition={!showCoverage} hideLunch={!showCoverage} hideRoles={!showCoverage} badgeColor={brand?.badge} />
               </div>
             ))}
           </div>
