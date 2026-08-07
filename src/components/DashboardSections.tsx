@@ -352,6 +352,7 @@ export function DashboardSections({
   scrollSpeed = 4,
   hideEmptyPositions = false,
   showHandoff = false,
+  shiftNotes,
   brand,
   laborShare = [],
   fill = false,
@@ -374,6 +375,8 @@ export function DashboardSections({
   // Public board only: render the shift-handoff banner next to the notices
   // (the admin mirror edits handoff notes on the Assign tab instead).
   showHandoff?: boolean;
+  // Handoff notes resolved server-side, in the board's own location.
+  shiftNotes?: Record<string, string>;
   // Optional brand accent colors (notices, handoff, badges).
   brand?: Brand;
   // Temporary borrowed workers to show for the active shift.
@@ -523,6 +526,7 @@ export function DashboardSections({
           {showHandoff && (
             <div className="min-w-[300px] flex-1 empty:hidden">
               <ShiftHandoffBanner
+                notes={shiftNotes}
                 handoffColor={brand?.handoff}
                 shiftBounds={shiftBounds}
               />

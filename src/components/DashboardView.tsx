@@ -29,6 +29,7 @@ export function DashboardView({
   rotatingUrl = "",
   rotationSeconds = 30,
   rotatingEnabled = false,
+  shiftNotes,
   dockSchedule = null,
   dockHidden = "",
   scrollSpeed = 4,
@@ -50,6 +51,7 @@ export function DashboardView({
   rotatingUrl?: string;
   rotationSeconds?: number;
   rotatingEnabled?: boolean;
+  shiftNotes?: Record<string, string>;
   dockSchedule?: DockSchedule | null;
   dockHidden?: string;
   scrollSpeed?: number;
@@ -168,6 +170,7 @@ export function DashboardView({
             announcements={announcements}
             showPositions
             showHandoff
+            shiftNotes={shiftNotes}
             autoScroll
             scrollSpeed={scrollSpeed}
             hideEmptyPositions

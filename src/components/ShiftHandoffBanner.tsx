@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   currentShift,
   SHIFTS,
@@ -9,8 +8,6 @@ import {
   type ShiftBounds,
 } from "@/lib/shift";
 import { useNow } from "@/components/DashboardSections";
-
-type ShiftNote = { id: string; message: string };
 
 // The shift a crew hands off FROM: the previous one on the clock.
 const PREV_SHIFT: Record<ShiftKey, ShiftKey> = {
@@ -22,33 +19,22 @@ const PREV_SHIFT: Record<ShiftKey, ShiftKey> = {
 // The main-dashboard handoff banner. Shows the OUTGOING crew's note to the
 // working shift (1st sees 3rd's note, 2nd sees 1st's, 3rd sees 2nd's) —
 // switching 5 minutes before the next shift starts so the incoming crew sees
-// their handoff as they arrive. Polls every 60s so an edited note appears
-// without a full page reload.
+// their handoff as they arrive.
+//
+// Notes arrive as a prop from the server render rather than being fetched here.
+// A browser fetch resolves the location from the session or cookie, which a wall
+// display has neither of, so screens were all showing the default warehouse's
+// note. The board soft-refreshes every 15s, so edits still appear promptly.
 export function ShiftHandoffBanner({
+  notes = {},
   handoffColor,
   shiftBounds = DEFAULT_SHIFT_BOUNDS,
 }: {
+  notes?: Record<string, string>;
   handoffColor?: string;
   shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
-  const [notes, setNotes] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data: ShiftNote[] = await (
-          await fetch("/api/shift-notes")
-        ).json();
-        setNotes(Object.fromEntries(data.map((n) => [n.id, n.message])));
-      } catch {
-        // ignore — keep the last good copy
-      }
-    };
-    load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   if (!now) return null;
   // Which shift is (about to be) working — flips 5 minutes before it begins.

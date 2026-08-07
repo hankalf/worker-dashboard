@@ -57,6 +57,14 @@ export async function fetchBoardProps() {
       getDashboardName(),
     ]);
 
+  // Handoff notes must come from the server render, not a browser fetch: a wall
+  // display has no session or cookie, so an API call from the page would resolve
+  // to the default location and show the wrong warehouse's note. Here we're
+  // already inside the screen's pinned location.
+  const shiftNotes = Object.fromEntries(
+    (await prisma.shiftNote.findMany()).map((n) => [n.shift, n.message])
+  );
+
   const rotation = await getRotationConfig();
   const scrollSpeed = await getScrollSpeed();
   const branding = await getBranding();
@@ -84,6 +92,7 @@ export async function fetchBoardProps() {
     announcements: visible.map((n) => n.message),
     renderedAt: now.toISOString(),
     title: dashboardName,
+    shiftNotes,
     rotatingUrl: rotation.url,
     rotationSeconds: rotation.seconds,
     rotatingEnabled: rotation.enabled,
