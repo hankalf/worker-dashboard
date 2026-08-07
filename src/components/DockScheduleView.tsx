@@ -40,7 +40,7 @@ const TONE_ROW: Record<Tone, string> = {
   arrived: "border-l-amber-500 bg-amber-500/10",
   scheduled: "border-l-zinc-400 dark:border-l-zinc-500",
   requested: "border-l-zinc-300 dark:border-l-zinc-700",
-  done: "border-l-green-500 bg-green-500/5 opacity-70",
+  done: "border-l-green-600 bg-green-500/15 dark:border-l-green-500 dark:bg-green-500/20",
   other: "border-l-zinc-300 opacity-50 dark:border-l-zinc-700",
 };
 
@@ -302,9 +302,12 @@ export function DockScheduleView({
                   const overdue = overdueMs(e, now);
                   const punctual = onTime(e.onTimeMs, overdue);
                   // Late on arrival, or still missing after its slot. Cancelled
-                  // rows are excluded — a cancelled load is not "late".
+                  // rows are excluded — a cancelled load is not "late" — and so
+                  // are completed ones, which show green: the load is done, and
+                  // the On time column still records how late it ran.
                   const late =
                     e.tone !== "other" &&
+                    e.tone !== "done" &&
                     (overdue !== null || (e.onTimeMs !== null && e.onTimeMs > 0));
                   return (
                     <tr
