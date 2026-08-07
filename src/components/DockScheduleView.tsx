@@ -61,14 +61,6 @@ const timeFmt = new Intl.DateTimeFormat("en-US", {
 const clock = (iso: string | null): string =>
   iso ? timeFmt.format(new Date(iso)) : "—";
 
-// "1h 24m" / "42m" / "—". Kept compact so the column stays narrow.
-function duration(ms: number | null): string {
-  if (ms === null || ms < 0) return "—";
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
-}
-
 function parseHidden(raw: string | null): Set<Tone> {
   if (!raw) return new Set();
   const wanted = raw.split(",").map((s) => s.trim().toLowerCase());
@@ -211,14 +203,12 @@ export function DockScheduleView({
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
                   <th className="px-3 py-2 font-medium">Scheduled</th>
-                  <th className="px-3 py-2 font-medium">Arrived</th>
+                  <th className="px-3 py-2 font-medium">Completed</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 text-center font-medium">Door</th>
                   <th className="px-3 py-2 font-medium">PO #</th>
-                  <th className="px-3 py-2 font-medium">Load type</th>
                   <th className="px-3 py-2 font-medium">Direction</th>
-                  <th className="px-3 py-2 text-right font-medium">Dwell</th>
-                  <th className="px-3 py-2 text-right font-medium">Processing</th>
+                  <th className="px-3 py-2 font-medium">Tags</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,7 +221,7 @@ export function DockScheduleView({
                       {clock(e.scheduledAt)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 tabular-nums text-zinc-600 dark:text-zinc-300">
-                      {clock(e.arrivedAt)}
+                      {clock(e.completedAt)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3">
                       <span
@@ -248,34 +238,24 @@ export function DockScheduleView({
                     <td className="whitespace-nowrap px-3 py-3 font-mono text-base text-zinc-600 dark:text-zinc-300">
                       {e.poNumber ?? "—"}
                     </td>
-                    <td className="min-w-0 px-3 py-3 text-zinc-800 dark:text-zinc-200">
-                      <div>{e.loadType ?? "—"}</div>
-                      {e.tags.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
+                    <td className="whitespace-nowrap px-3 py-3 text-zinc-600 dark:text-zinc-300">
+                      {e.direction ?? "—"}
+                    </td>
+                    <td className="px-3 py-3">
+                      {e.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
                           {e.tags.map((t, i) => (
                             <span
                               key={`${e.id}-tag-${i}`}
-                              className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                              className="rounded bg-zinc-200 px-1.5 py-0.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                             >
                               {t}
                             </span>
                           ))}
                         </div>
+                      ) : (
+                        <span className="text-zinc-500">—</span>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-zinc-600 dark:text-zinc-300">
-                      {e.direction ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">
-                      {duration(e.dwellMs)}
-                      {e.dwellOpen && e.dwellMs !== null && (
-                        <span className="ml-1 text-amber-400" title="Still on site">
-                          ●
-                        </span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">
-                      {duration(e.processingMs)}
                     </td>
                   </tr>
                 ))}

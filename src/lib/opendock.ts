@@ -495,11 +495,12 @@ export function nearestNames(value: string, roster: string[], max = 2): string[]
     .map((s) => s.name);
 }
 
-function dockLabel(appt: RawAppt, docks: Map<string, RawDock>): string | null {
-  const fromTag = doorFromTags(appt);
-  if (fromTag) return fromTag;
-  const dock = appt.dockId ? docks.get(String(appt.dockId)) : undefined;
-  return dock?.doorNumber ?? dock?.name ?? null;
+// The door is whatever the "DOOR: n" tag says, and nothing else. The dock
+// record's own name/doorNumber describes the bay's configuration ("Inbound Raw
+// Material #A" / "A# 1007"), not where this truck was actually sent, so falling
+// back to it put the wrong value on the board.
+function dockLabel(appt: RawAppt): string | null {
+  return doorFromTags(appt);
 }
 
 // Pull the bearer token out of the Opendock login response. Opendock's Neutron
@@ -726,7 +727,7 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
     for (const appt of appts) {
       if (!appt.status) continue;
       const { label, tone } = mapStatus(String(appt.status));
-      const dock = dockLabel(appt, docks);
+      const dock = dockLabel(appt);
       for (const tag of personTags(appt, roles)) {
         const employee = matchEmployee(tag.value, index, aliases).name;
         if (!employee) continue;
@@ -760,23 +761,25 @@ export function clearOpendockCache(): void {
 
 // ---- Today's dock schedule (the wall-display view) -------------------------
 
+// Column sources are fixed by the warehouse's mapping:
+//   scheduled   appointment.start
+//   completed   appointment.end
+//   status      appointment.status
+//   door        the "DOOR: n" tag only — never the dock record
+//   PO #        appointment.refNumber
+//   direction   loadType.direction
+//   tags        the appointment's loader/receiver tags
 export type ScheduleEntry = {
   id: string;
-  scheduledAt: string | null; // the booked slot (appointment.start)
-  arrivedAt: string | null; // statusTimeline.Arrived
+  scheduledAt: string | null; // appointment.start
+  completedAt: string | null; // appointment.end
   status: string; // raw Opendock status, e.g. "Arrived"
   label: string; // friendly label
   tone: DockTone;
-  door: string | null; // from the "DOOR: 23" tag, else the dock's door number
-  poNumber: string | null; // refNumber
-  loadType: string | null;
+  door: string | null; // from the "DOOR: 23" tag, blank when untagged
+  poNumber: string | null; // appointment.refNumber
   direction: string | null; // Inbound / Outbound, from the load type
-  // Time on site: arrival until completion, or until now if still here.
-  dwellMs: number | null;
-  dwellOpen: boolean; // true while still counting up
-  // Arrival until work started (statusTimeline.InProgress).
-  processingMs: number | null;
-  tags: string[]; // every tag except the one used for the Door column
+  tags: string[]; // loader/receiver tags (the door tag has its own column)
 };
 
 export type DockSchedule = {
@@ -823,21 +826,6 @@ function directionOf(lt: RawLoadType | undefined): string | null {
   return raw ? raw : null;
 }
 
-// A timestamp off the appointment's status timeline, e.g. when it Arrived.
-function timelineAt(appt: RawAppt, key: string): string | null {
-  const t = appt.statusTimeline;
-  if (!t || typeof t !== "object") return null;
-  const v = (t as Record<string, unknown>)[key];
-  return typeof v === "string" && v ? v : null;
-}
-
-const msBetween = (from: string | null, to: string | null): number | null => {
-  if (!from || !to) return null;
-  const a = Date.parse(from);
-  const b = Date.parse(to);
-  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
-  return b - a;
-};
 
 type ScheduleCacheEntry = { at: number; value: DockSchedule };
 const scheduleCache = new Map<string, ScheduleCacheEntry>();
@@ -877,32 +865,22 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
         fetchLoadTypes(cfg, token),
       ]);
 
-      const nowIso = now.toISOString();
       const entries: ScheduleEntry[] = appts.map((appt) => {
         const raw = String(appt.status ?? "");
         const { label, tone } = mapStatus(raw);
         const lt = appt.loadTypeId ? loadTypes.get(String(appt.loadTypeId)) : undefined;
-        const arrivedAt = timelineAt(appt, "Arrived");
-        const completedAt = timelineAt(appt, "Completed");
-        const inProgressAt = timelineAt(appt, "InProgress");
-        const door = dockLabel(appt, docks);
 
         return {
           id: String(appt.id ?? `${appt.dockId}-${appt.start}`),
           scheduledAt: appt.start ? String(appt.start) : null,
-          arrivedAt,
+          completedAt: appt.end ? String(appt.end) : null,
           status: raw,
           label,
           tone,
-          door,
+          door: doorFromTags(appt),
           poNumber:
             typeof appt.refNumber === "string" && appt.refNumber ? appt.refNumber : null,
-          loadType: typeof lt?.name === "string" ? lt.name : null,
           direction: directionOf(lt),
-          // Still on site → count up to now; finished → freeze at completion.
-          dwellMs: msBetween(arrivedAt, completedAt ?? nowIso),
-          dwellOpen: !!arrivedAt && !completedAt,
-          processingMs: msBetween(arrivedAt, inProgressAt),
           // The door tag has its own column, so don't repeat it here.
           tags: parsedTags(appt)
             .filter((t) => !isDoorTag(t))
@@ -1140,7 +1118,7 @@ function describeSources(
     }
   }
 
-  put("→ door currently shown", dockLabel(appt, docks));
+  put("→ door currently shown", dockLabel(appt));
   return out;
 }
 
