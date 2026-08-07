@@ -186,7 +186,21 @@ function parseTag(tag: string): ParsedTag {
 // Role prefixes that label a door rather than a person.
 const DOOR_ROLE = /^(door|dock|bay)$/i;
 
-const isDoorTag = (t: ParsedTag) => !!t.role && DOOR_ROLE.test(t.role);
+// Tags boards use for paperwork, not people: "PID: 9566", "ASN", "PR287531",
+// "COSTCO ASN", "Arrived with Reefer OFF". Skipping these keeps the admin
+// diagnostic readable — the roster check already stops them from matching.
+const REF_ROLE = /^(pid|po|pos?|ref|asn|bol|seal|temp|trailer|container|load|lot)$/i;
+const REF_VALUE = /^[a-z]{0,3}[\d-]{3,}$/i; // PR287531, PI009583, 9566
+
+function isDoorTag(t: ParsedTag) {
+  return !!t.role && DOOR_ROLE.test(t.role);
+}
+
+function isReferenceTag(t: ParsedTag) {
+  if (t.role && REF_ROLE.test(t.role)) return true;
+  if (!t.role && REF_VALUE.test(t.value)) return true;
+  return false;
+}
 
 function parsedTags(appt: RawAppt): ParsedTag[] {
   return tagStrings(appt).map(parseTag).filter((t) => t.value);
@@ -198,56 +212,123 @@ function doorFromTags(appt: RawAppt): string | null {
   return parsedTags(appt).find(isDoorTag)?.value ?? null;
 }
 
-// Everything that isn't a door tag is a candidate person.
+// Tags that could name a person — everything that isn't a door or a reference.
 function personTags(appt: RawAppt): ParsedTag[] {
-  return parsedTags(appt).filter((t) => !isDoorTag(t));
+  return parsedTags(appt).filter((t) => !isDoorTag(t) && !isReferenceTag(t));
 }
 
 // ---- Matching a tag value to an employee -----------------------------------
-// Tags often carry only a first name ("Receiver: Dennis") while the roster has
-// full names ("Dennis Kowalski"). Resolution order: exact full name, then a
-// unique first-name match, then a unique last-name match. Ambiguous matches
-// (two Dennises) resolve to nothing rather than risk showing one person's dock
-// status on someone else's badge.
+// Opendock tags are written by hand and rarely match the roster exactly. Real
+// examples: "DENNIS R." (first name + last initial), "MIKE" (first name only),
+// "MICHAEL R." — all upper-case, sometimes with a trailing period. The roster
+// holds full names like "Dennis Rodriguez".
+//
+// Resolution order (first hit wins):
+//   1. exact name
+//   2. first name + last initial  — "DENNIS R." -> Dennis Rodriguez
+//   3. first name + last name     — "DENNIS RODRIGUEZ"
+//   4. unique first name          — "MIKE" -> Mike Alvarez (only if one Mike)
+//   5. unique last name           — "RODRIGUEZ"
+// Anything ambiguous (two Mikes, two Dennis R.s) resolves to nothing rather
+// than risk showing one person's dock status on someone else's badge.
+
+// Comparison form: lower-case, punctuation dropped, spaces collapsed. This is
+// what makes "DENNIS R." and "Dennis R" compare equal.
+const canon = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[.,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+type NameEntry = { name: string; first: string; last: string | null };
+
 export type NameIndex = {
   full: Map<string, string>;
-  first: Map<string, string[]>;
-  last: Map<string, string[]>;
+  entries: NameEntry[];
 };
 
 export function buildNameIndex(names: string[]): NameIndex {
   const full = new Map<string, string>();
-  const first = new Map<string, string[]>();
-  const last = new Map<string, string[]>();
-  const push = (m: Map<string, string[]>, k: string, v: string) => {
-    if (!k) return;
-    const arr = m.get(k);
-    if (arr) arr.push(v);
-    else m.set(k, [v]);
-  };
+  const entries: NameEntry[] = [];
   for (const name of names) {
-    const n = norm(name);
-    if (!n) continue;
-    full.set(n, name);
-    const parts = n.split(" ");
-    push(first, parts[0], name);
-    if (parts.length > 1) push(last, parts[parts.length - 1], name);
+    const c = canon(name);
+    if (!c) continue;
+    if (!full.has(c)) full.set(c, name);
+    const parts = c.split(" ");
+    entries.push({
+      name,
+      first: parts[0],
+      last: parts.length > 1 ? parts[parts.length - 1] : null,
+    });
   }
-  return { full, first, last };
+  return { full, entries };
+}
+
+// Why a tag didn't resolve — surfaced in the admin diagnostic so a bad tag is
+// easy to act on.
+export type MatchResult =
+  | { name: string; reason: null }
+  | { name: null; reason: "no-match" | "ambiguous"; candidates: string[] };
+
+const nameOf = (r: MatchResult) => r.name;
+
+// Everyone matching `pred`. One distinct name = a match; several = ambiguous.
+function pick(entries: NameEntry[], pred: (e: NameEntry) => boolean): MatchResult | null {
+  const names = [...new Set(entries.filter(pred).map((e) => e.name))];
+  if (names.length === 1) return { name: names[0], reason: null };
+  if (names.length > 1)
+    return { name: null, reason: "ambiguous", candidates: names };
+  return null; // no hits — let the caller try the next strategy
+}
+
+export function matchEmployee(value: string, idx: NameIndex): MatchResult {
+  const miss: MatchResult = { name: null, reason: "no-match", candidates: [] };
+  const c = canon(value);
+  if (!c) return miss;
+
+  const exact = idx.full.get(c);
+  if (exact) return { name: exact, reason: null };
+
+  const tokens = c.split(" ");
+  const first = tokens[0];
+  const tail = tokens[tokens.length - 1];
+  const isInitial = tokens.length > 1 && tail.length === 1;
+
+  // "dennis r" — first name plus a last initial. The most common tag form.
+  if (isInitial) {
+    const hit = pick(
+      idx.entries,
+      (e) => e.first === first && !!e.last && e.last.startsWith(tail)
+    );
+    if (hit) return hit;
+  }
+
+  // "dennis rodriguez" — first and last, tolerating a middle name.
+  if (tokens.length > 1 && !isInitial) {
+    const hit = pick(idx.entries, (e) => e.first === first && e.last === tail);
+    if (hit) return hit;
+  }
+
+  // First name alone. Allowed for a bare "MIKE", and for "DENNIS R." when the
+  // roster only carries "Dennis" — but NOT for longer free text, so a note like
+  // "Mike said the reefer was off" can never land on Mike's badge.
+  if (tokens.length === 1 || isInitial) {
+    const hit = pick(idx.entries, (e) => e.first === first);
+    if (hit) return hit;
+  }
+
+  // A bare surname.
+  if (tokens.length === 1) {
+    const hit = pick(idx.entries, (e) => e.last === first);
+    if (hit) return hit;
+  }
+
+  return miss;
 }
 
 export function resolveEmployee(value: string, idx: NameIndex): string | null {
-  const v = norm(value);
-  if (!v) return null;
-  const exact = idx.full.get(v);
-  if (exact) return exact;
-  if (v.includes(" ")) return null; // a full-looking name that isn't on the roster
-  const byFirst = idx.first.get(v);
-  if (byFirst?.length === 1) return byFirst[0];
-  if (byFirst && byFirst.length > 1) return null; // ambiguous — don't guess
-  const byLast = idx.last.get(v);
-  if (byLast?.length === 1) return byLast[0];
-  return null;
+  return nameOf(matchEmployee(value, idx));
 }
 
 function dockLabel(appt: RawAppt, docks: Map<string, RawDock>): string | null {
@@ -456,9 +537,10 @@ export type PipelineCheck = {
   docksInWarehouse: number;
   appointmentsInWindow: number;
   doorTags: string[]; // distinct "DOOR: 23"-style tags
-  unmatchedTags: string[]; // person tags with no employee on the roster
+  unmatchedTags: string[]; // person tags that didn't resolve, with the reason
+  ignoredTags: number; // reference/paperwork tags skipped outright
   employees: number;
-  matchedEmployees: string[]; // "Receiver: Dennis → Dennis Kowalski"
+  matchedEmployees: string[]; // "RECEIVER: DENNIS R. → Dennis Rodriguez"
 };
 
 export type OpendockDiagnostic = {
@@ -663,16 +745,28 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
       const doorTags = new Set<string>();
       const matched = new Set<string>();
       const unmatched = new Set<string>();
+      let ignored = 0;
       for (const a of appts) {
         for (const t of parsedTags(a)) {
           if (isDoorTag(t)) {
             doorTags.add(t.value);
             continue;
           }
-          const employee = resolveEmployee(t.value, index);
+          if (isReferenceTag(t)) {
+            ignored++;
+            continue;
+          }
           const shown = t.role ? `${t.role}: ${t.value}` : t.value;
-          if (employee) matched.add(`${shown} → ${employee}`);
-          else unmatched.add(shown);
+          const res = matchEmployee(t.value, index);
+          if (res.name) {
+            matched.add(`${shown} → ${res.name}`);
+          } else {
+            unmatched.add(
+              res.reason === "ambiguous"
+                ? `${shown} — ambiguous (${res.candidates.join(", ")})`
+                : `${shown} — nobody on the roster`
+            );
+          }
         }
       }
       out.pipeline = {
@@ -680,8 +774,9 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
         appointmentsInWindow: appts.length,
         doorTags: [...doorTags].slice(0, 25),
         unmatchedTags: [...unmatched].slice(0, 25),
+        ignoredTags: ignored,
         employees: roster.length,
-        matchedEmployees: [...matched].slice(0, 25),
+        matchedEmployees: [...matched].slice(0, 40),
       };
     } catch {
       /* diagnostic extra — never fail the whole test over it */

@@ -35,6 +35,7 @@ type Diagnostic = {
     appointmentsInWindow: number;
     doorTags: string[];
     unmatchedTags: string[];
+    ignoredTags: number;
     employees: number;
     matchedEmployees: string[];
   } | null;
@@ -239,7 +240,7 @@ export default function IntegrationsPage() {
                   <dd className="text-zinc-300">{diag.pipeline.docksInWarehouse}</dd>
                   <dt className="text-zinc-500">Appointments (±12h)</dt>
                   <dd className="text-zinc-300">{diag.pipeline.appointmentsInWindow}</dd>
-                  <dt className="text-zinc-500">Matched to employees</dt>
+                  <dt className="text-zinc-500">Matched</dt>
                   <dd
                     className={
                       diag.pipeline.matchedEmployees.length
@@ -247,11 +248,17 @@ export default function IntegrationsPage() {
                         : "text-amber-400"
                     }
                   >
-                    {diag.pipeline.matchedEmployees.length
-                      ? diag.pipeline.matchedEmployees.join(" · ")
-                      : "none"}
+                    {diag.pipeline.matchedEmployees.length ? (
+                      <ul className="flex flex-col gap-0.5">
+                        {diag.pipeline.matchedEmployees.map((m) => (
+                          <li key={m}>{m}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "none"
+                    )}
                   </dd>
-                  <dt className="text-zinc-500">Unmatched tags</dt>
+                  <dt className="text-zinc-500">Unmatched</dt>
                   <dd
                     className={
                       diag.pipeline.unmatchedTags.length
@@ -259,9 +266,15 @@ export default function IntegrationsPage() {
                         : "text-zinc-300"
                     }
                   >
-                    {diag.pipeline.unmatchedTags.length
-                      ? diag.pipeline.unmatchedTags.join(" · ")
-                      : "none"}
+                    {diag.pipeline.unmatchedTags.length ? (
+                      <ul className="flex flex-col gap-0.5">
+                        {diag.pipeline.unmatchedTags.map((m) => (
+                          <li key={m}>{m}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "none"
+                    )}
                   </dd>
                   <dt className="text-zinc-500">Door tags</dt>
                   <dd className="text-zinc-300">
@@ -269,12 +282,18 @@ export default function IntegrationsPage() {
                       ? diag.pipeline.doorTags.join(", ")
                       : "none found"}
                   </dd>
+                  <dt className="text-zinc-500">Reference tags</dt>
+                  <dd className="text-zinc-300">
+                    {diag.pipeline.ignoredTags} skipped (PID / ASN / PO numbers)
+                  </dd>
                 </dl>
                 {diag.pipeline.unmatchedTags.length > 0 && (
                   <p className="mt-2 text-amber-400">
-                    Unmatched tags didn&apos;t line up with anyone on the roster.
-                    A first name matches only when exactly one employee has it —
-                    if two people share it, tag the full name in Opendock.
+                    &ldquo;nobody on the roster&rdquo; means no employee has that
+                    name — check the spelling in Opendock or the Employees tab.
+                    &ldquo;ambiguous&rdquo; means several people fit, so it
+                    won&apos;t guess; add the last initial (or full surname) to
+                    the Opendock tag.
                   </p>
                 )}
               </div>
