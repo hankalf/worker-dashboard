@@ -99,6 +99,28 @@ export async function getScrollSpeed(): Promise<number> {
   }
 }
 
+// Text size on the main dashboard, as a percentage. Applied like browser zoom
+// so everything scales together and the layout reflows (rather than clipping),
+// which is how a wall display gets readable from further away.
+export const FONT_SCALE_MIN = 75;
+export const FONT_SCALE_MAX = 200;
+export const FONT_SCALE_DEFAULT = 100;
+
+export function clampFontScale(value: unknown): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return FONT_SCALE_DEFAULT;
+  return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, n));
+}
+
+export async function getBoardFontScale(): Promise<number> {
+  try {
+    const raw = await readSetting("boardFontScale");
+    return raw ? clampFontScale(raw) : FONT_SCALE_DEFAULT;
+  } catch {
+    return FONT_SCALE_DEFAULT;
+  }
+}
+
 // Branding / theme: an optional logo (stored as a data URL so it survives
 // redeploys on hosts with an ephemeral filesystem) and a handful of accent
 // colors. Empty string = "unset", so the default styling is used.

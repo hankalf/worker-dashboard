@@ -663,23 +663,23 @@ export function clearOpendockCache(): void {
 
 // ---- Today's dock schedule (the wall-display view) -------------------------
 
-export type SchedulePerson = {
-  role: string; // "RECEIVER" / "LOADER"
-  name: string; // matched employee, or the raw tag when unmatched
-  matched: boolean;
-};
-
 export type ScheduleEntry = {
   id: string;
-  door: string | null;
-  start: string | null; // ISO
-  end: string | null;
+  scheduledAt: string | null; // the booked slot (appointment.start)
+  arrivedAt: string | null; // statusTimeline.Arrived
   status: string; // raw Opendock status, e.g. "Arrived"
   label: string; // friendly label
   tone: DockTone;
-  refNumber: string | null;
-  customer: string | null;
-  people: SchedulePerson[];
+  door: string | null; // from the "DOOR: 23" tag, else the dock's door number
+  poNumber: string | null; // refNumber
+  loadType: string | null;
+  direction: string | null; // Inbound / Outbound, from the load type
+  // Time on site: arrival until completion, or until now if still here.
+  dwellMs: number | null;
+  dwellOpen: boolean; // true while still counting up
+  // Arrival until work started (statusTimeline.InProgress).
+  processingMs: number | null;
+  tags: string[]; // every tag except the one used for the Door column
 };
 
 export type DockSchedule = {
@@ -689,18 +689,57 @@ export type DockSchedule = {
   error: string | null;
 };
 
-// A named custom field's value, e.g. the customer on the load.
-function customField(appt: RawAppt, match: RegExp): string | null {
-  const fields = appt.customFields;
-  if (!Array.isArray(fields)) return null;
-  for (const f of fields as { label?: string; name?: string; value?: unknown }[]) {
-    const key = `${f.label ?? ""} ${f.name ?? ""}`;
-    if (match.test(key) && typeof f.value === "string" && f.value.trim()) {
-      return f.value.trim();
-    }
+type RawLoadType = {
+  id?: string;
+  name?: string;
+  direction?: string;
+  [k: string]: unknown;
+};
+
+// Load types for the org, keyed by id. Carries the load's name and its
+// direction (inbound/outbound), which the appointment itself doesn't hold.
+async function fetchLoadTypes(
+  cfg: OpendockConfigFull,
+  token: string
+): Promise<Map<string, RawLoadType>> {
+  const body = await getJson(`${cfg.baseUrl}/loadType?limit=500`, token);
+  const map = new Map<string, RawLoadType>();
+  for (const lt of apptsFrom(body) as RawLoadType[]) {
+    if (lt.id) map.set(String(lt.id), lt);
   }
-  return null;
+  return map;
 }
+
+// Direction as Opendock reports it, falling back to reading it out of the load
+// type's name ("Inbound Raw Material") when the field isn't present.
+function directionOf(lt: RawLoadType | undefined): string | null {
+  if (!lt) return null;
+  const raw =
+    (typeof lt.direction === "string" && lt.direction) ||
+    (typeof lt.type === "string" && lt.type) ||
+    "";
+  const from = raw || String(lt.name ?? "");
+  const s = from.toLowerCase();
+  if (s.includes("outbound") || s === "out") return "Outbound";
+  if (s.includes("inbound") || s === "in") return "Inbound";
+  return raw ? raw : null;
+}
+
+// A timestamp off the appointment's status timeline, e.g. when it Arrived.
+function timelineAt(appt: RawAppt, key: string): string | null {
+  const t = appt.statusTimeline;
+  if (!t || typeof t !== "object") return null;
+  const v = (t as Record<string, unknown>)[key];
+  return typeof v === "string" && v ? v : null;
+}
+
+const msBetween = (from: string | null, to: string | null): number | null => {
+  if (!from || !to) return null;
+  const a = Date.parse(from);
+  const b = Date.parse(to);
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+  return b - a;
+};
 
 type ScheduleCacheEntry = { at: number; value: DockSchedule };
 const scheduleCache = new Map<string, ScheduleCacheEntry>();
@@ -733,42 +772,45 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
       const from = new Date(easternInputToUtcISO(`${date}T00:00`));
       const to = new Date(easternInputToUtcISO(`${date}T23:59`));
       const docks = await fetchDocks(cfg, token);
-      const appts = await fetchAppointments(cfg, token, [...docks.keys()], from, to);
+      const [appts, loadTypes] = await Promise.all([
+        fetchAppointments(cfg, token, [...docks.keys()], from, to),
+        fetchLoadTypes(cfg, token),
+      ]);
 
-      const roster = await prisma.employee.findMany({
-        where: { terminatedAt: null },
-        select: { name: true },
-      });
-      const index = buildNameIndex(roster.map((e) => e.name));
-      const roles = parsePersonRoles(cfg.personRoles);
-      const aliases = parseAliases(cfg.aliases);
-
+      const nowIso = now.toISOString();
       const entries: ScheduleEntry[] = appts.map((appt) => {
         const raw = String(appt.status ?? "");
         const { label, tone } = mapStatus(raw);
+        const lt = appt.loadTypeId ? loadTypes.get(String(appt.loadTypeId)) : undefined;
+        const arrivedAt = timelineAt(appt, "Arrived");
+        const completedAt = timelineAt(appt, "Completed");
+        const inProgressAt = timelineAt(appt, "InProgress");
+        const door = dockLabel(appt, docks);
+
         return {
-          id: String(appt.id ?? crypto.randomUUID()),
-          door: dockLabel(appt, docks),
-          start: appt.start ? String(appt.start) : null,
-          end: appt.end ? String(appt.end) : null,
+          id: String(appt.id ?? `${appt.dockId}-${appt.start}`),
+          scheduledAt: appt.start ? String(appt.start) : null,
+          arrivedAt,
           status: raw,
           label,
           tone,
-          refNumber:
+          door,
+          poNumber:
             typeof appt.refNumber === "string" && appt.refNumber ? appt.refNumber : null,
-          customer: customField(appt, /customer/i),
-          people: personTags(appt, roles).map((t) => {
-            const hit = matchEmployee(t.value, index, aliases).name;
-            return {
-              role: (t.role ?? "").toUpperCase(),
-              name: hit ?? t.value,
-              matched: !!hit,
-            };
-          }),
+          loadType: typeof lt?.name === "string" ? lt.name : null,
+          direction: directionOf(lt),
+          // Still on site → count up to now; finished → freeze at completion.
+          dwellMs: msBetween(arrivedAt, completedAt ?? nowIso),
+          dwellOpen: !!arrivedAt && !completedAt,
+          processingMs: msBetween(arrivedAt, inProgressAt),
+          // The door tag has its own column, so don't repeat it here.
+          tags: parsedTags(appt)
+            .filter((t) => !isDoorTag(t))
+            .map((t) => (t.role ? `${t.role}: ${t.value}` : t.value)),
         };
       });
 
-      entries.sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""));
+      entries.sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""));
       value = { enabled: true, date, entries, error: null };
     }
   } catch (e) {
@@ -938,6 +980,7 @@ function probeTargets(cfg: OpendockConfigFull): { label: string; url: string }[]
     { label: "appointment (no filter)", url: `${b}/appointment?limit=5` },
     { label: "appointments (plural)", url: `${b}/appointments?limit=5` },
     { label: "dock (list doors)", url: `${b}/dock?limit=5` },
+    { label: "loadType (name + direction)", url: `${b}/loadType?limit=5` },
     { label: "warehouse (list mine)", url: `${b}/warehouse?limit=5` },
     { label: "who am I", url: `${b}/user/me` },
   ];

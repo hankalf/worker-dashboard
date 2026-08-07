@@ -32,6 +32,7 @@ export function DashboardView({
   dockSchedule = null,
   dockHidden = "",
   scrollSpeed = 4,
+  fontScale = 100,
   branding,
   laborShare = [],
   version = "",
@@ -53,6 +54,7 @@ export function DashboardView({
   dockSchedule?: DockSchedule | null;
   dockHidden?: string;
   scrollSpeed?: number;
+  fontScale?: number;
   shiftBounds?: ShiftBounds;
 }) {
   const now = useNow();
@@ -154,7 +156,13 @@ export function DashboardView({
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col px-6 py-4 lg:overflow-hidden">
+      {/* `zoom` (not transform: scale) so the scaled content reflows inside the
+          fixed-height board instead of overflowing it. The header is left
+          alone: it's a fixed strip and scaling it would eat board space. */}
+      <main
+        style={fontScale === 100 ? undefined : { zoom: fontScale / 100 }}
+        className="flex min-h-0 flex-1 flex-col px-6 py-4 lg:overflow-hidden"
+      >
         {panel === "url" ? (
           <iframe
             src={rotatingUrl}

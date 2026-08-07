@@ -60,13 +60,45 @@ export default function IntegrationsPage() {
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [diag, setDiag] = useState<Diagnostic | null>(null);
   const [copied, setCopied] = useState(false);
+  // Board rotation for the dock schedule. Stored with the other display
+  // settings (/api/settings), but surfaced here so everything Opendock lives
+  // in one place.
+  const [rotate, setRotate] = useState(false);
+  const [hiddenTones, setHiddenTones] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/integrations/opendock")
       .then((r) => r.json())
       .then(setCfg)
       .catch(() => {});
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        setRotate(!!d.rotatingDock);
+        setHiddenTones(
+          String(d.rotatingDockHidden ?? "other,requested")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        );
+      })
+      .catch(() => {});
   }, []);
+
+  const toggleTone = (tone: string) =>
+    setHiddenTones((prev) =>
+      prev.includes(tone) ? prev.filter((t) => t !== tone) : [...prev, tone]
+    );
+
+  const saveRotation = () =>
+    fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rotatingDock: rotate,
+        rotatingDockHidden: hiddenTones.join(","),
+      }),
+    });
 
   const update = (patch: Partial<Config>) =>
     setCfg((c) => (c ? { ...c, ...patch } : c));
@@ -75,11 +107,14 @@ export default function IntegrationsPage() {
     if (!cfg) return;
     setSaving(true);
     setSaved(false);
-    const res = await fetch("/api/integrations/opendock", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...cfg, password: password || undefined }),
-    });
+    const [res] = await Promise.all([
+      fetch("/api/integrations/opendock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...cfg, password: password || undefined }),
+      }),
+      saveRotation(),
+    ]);
     setSaving(false);
     if (res.ok) {
       setCfg(await res.json());
@@ -229,6 +264,50 @@ export default function IntegrationsPage() {
               . Use for nicknames, initials, and first names two people share.
             </span>
           </label>
+        </div>
+
+        <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 p-3">
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={rotate}
+              onChange={(e) => setRotate(e.target.checked)}
+            />
+            Rotate the main dashboard through today&apos;s dock schedule
+          </label>
+          <p className="mt-1 text-xs text-zinc-500">
+            Adds a dock schedule panel to the board&apos;s rotation — scheduled
+            and arrival times, status, door, PO #, load type, direction and dwell
+            times. Rotation interval is set on the General tab.
+          </p>
+          {rotate && (
+            <div className="mt-3">
+              <div className="mb-1 text-xs text-zinc-400">Hide these statuses</div>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  ["active", "In progress"],
+                  ["arrived", "Arrived"],
+                  ["scheduled", "Scheduled"],
+                  ["requested", "Requested"],
+                  ["done", "Completed"],
+                  ["other", "Cancelled / other"],
+                ].map(([tone, label]) => (
+                  <label
+                    key={tone}
+                    className="flex items-center gap-1.5 text-xs text-zinc-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={hiddenTones.includes(tone)}
+                      onChange={() => toggleTone(tone)}
+                      className="h-3.5 w-3.5"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">

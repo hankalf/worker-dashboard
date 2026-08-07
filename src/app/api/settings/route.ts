@@ -7,6 +7,8 @@ import {
   setSetting,
   getRotationConfig,
   getScrollSpeed,
+  getBoardFontScale,
+  clampFontScale,
   getBranding,
   getShiftBounds,
   parseHhmm,
@@ -19,11 +21,12 @@ export const dynamic = "force-dynamic";
 
 // Public: current site settings (login page + rotating-dashboard editor).
 export async function GET() {
-  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+  const [dashboardName, rotation, scrollSpeed, boardFontScale, branding, shiftBounds] =
     await Promise.all([
       getDashboardName(),
       getRotationConfig(),
       getScrollSpeed(),
+      getBoardFontScale(),
       getBranding(),
       getShiftBounds(),
     ]);
@@ -35,6 +38,7 @@ export async function GET() {
     rotatingDock: rotation.dock,
     rotatingDockHidden: rotation.dockHidden,
     scrollSpeed,
+    boardFontScale,
     branding,
     shiftBounds,
   });
@@ -74,6 +78,9 @@ export async function PATCH(req: Request) {
       .map((s) => s.trim().toLowerCase())
       .filter((s) => allowed.includes(s));
     await setSetting("rotatingDockHidden", tones.join(","));
+  }
+  if (body.boardFontScale !== undefined) {
+    await setSetting("boardFontScale", String(clampFontScale(body.boardFontScale)));
   }
   if (body.scrollSpeed !== undefined) {
     const speed = Math.max(1, Math.min(10, Math.round(Number(body.scrollSpeed) || 4)));
@@ -132,11 +139,12 @@ export async function PATCH(req: Request) {
   }
 
   await logActivity("Settings", "Updated settings");
-  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+  const [dashboardName, rotation, scrollSpeed, boardFontScale, branding, shiftBounds] =
     await Promise.all([
       getDashboardName(),
       getRotationConfig(),
       getScrollSpeed(),
+      getBoardFontScale(),
       getBranding(),
       getShiftBounds(),
     ]);
@@ -148,6 +156,7 @@ export async function PATCH(req: Request) {
     rotatingDock: rotation.dock,
     rotatingDockHidden: rotation.dockHidden,
     scrollSpeed,
+    boardFontScale,
     branding,
     shiftBounds,
   });
