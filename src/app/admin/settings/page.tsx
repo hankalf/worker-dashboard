@@ -421,7 +421,6 @@ function RotatingDashboard() {
   const [url, setUrl] = useState("");
   const [seconds, setSeconds] = useState(30);
   const [enabled, setEnabled] = useState(false);
-  const [fontScale, setFontScale] = useState(100);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -433,7 +432,6 @@ function RotatingDashboard() {
         setUrl(d.rotatingUrl ?? "");
         setSeconds(d.rotationSeconds ?? 30);
         setEnabled(!!d.rotatingEnabled);
-        setFontScale(Number(d.boardFontScale) || 100);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -447,7 +445,6 @@ function RotatingDashboard() {
         rotatingUrl: url,
         rotationSeconds: seconds,
         rotatingEnabled: enabled,
-        boardFontScale: fontScale,
       }),
     });
     if (res.ok) {
@@ -496,40 +493,6 @@ function RotatingDashboard() {
           Enable rotating display on the dashboard
         </label>
 
-        <div className="rounded-md border border-zinc-800 bg-zinc-900 p-3">
-          <label className="flex items-center justify-between text-sm text-zinc-300">
-            <span>Dashboard text size</span>
-            <span className="tabular-nums text-zinc-400">{fontScale}%</span>
-          </label>
-          <input
-            type="range"
-            min={75}
-            max={200}
-            step={5}
-            value={fontScale}
-            onChange={(e) => setFontScale(Number(e.target.value))}
-            className="mt-2 w-full accent-blue-500"
-          />
-          <div className="flex justify-between text-[11px] text-zinc-600">
-            <span>75%</span>
-            <span>100%</span>
-            <span>200%</span>
-          </div>
-          <p className="mt-1 text-xs text-zinc-500">
-            Scales everything in the main dashboard body — the roster and the
-            dock schedule — like browser zoom, so it stays readable from further
-            across the floor. The header keeps its size.{" "}
-            {fontScale !== 100 && (
-              <button
-                type="button"
-                onClick={() => setFontScale(100)}
-                className="text-zinc-300 underline hover:text-white"
-              >
-                Reset to 100%
-              </button>
-            )}
-          </p>
-        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={save}

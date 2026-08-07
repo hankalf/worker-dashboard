@@ -23,7 +23,20 @@ const KEY = {
   windowHours: "opendock.windowHours",
   personRoles: "opendock.personRoles",
   aliases: "opendock.aliases",
+  fontScale: "opendock.fontScale",
 } as const;
+
+// Text size of the dock schedule panel, as a percentage. Applied like browser
+// zoom so the table reflows instead of clipping.
+export const DOCK_FONT_MIN = 75;
+export const DOCK_FONT_MAX = 200;
+export const DOCK_FONT_DEFAULT = 100;
+
+export function clampDockFontScale(value: unknown): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return DOCK_FONT_DEFAULT;
+  return Math.min(DOCK_FONT_MAX, Math.max(DOCK_FONT_MIN, n));
+}
 
 // How far either side of now an appointment can sit and still show on a badge.
 // Crews often tag the next shift's loads, so this needs headroom.
@@ -40,6 +53,7 @@ export type OpendockConfig = {
   windowHours: number;
   personRoles: string;
   aliases: string;
+  fontScale: number;
 };
 
 // The full config including the secret — server-only, never sent to the client.
@@ -65,6 +79,9 @@ async function fullConfig(): Promise<OpendockConfigFull> {
     windowHours: Number(m[KEY.windowHours]) || DEFAULT_WINDOW_HOURS,
     personRoles: m[KEY.personRoles] ?? DEFAULT_PERSON_ROLES,
     aliases: m[KEY.aliases] ?? "",
+    fontScale: m[KEY.fontScale]
+      ? clampDockFontScale(m[KEY.fontScale])
+      : DOCK_FONT_DEFAULT,
   };
 }
 
@@ -103,6 +120,7 @@ export async function getOpendockConfig(): Promise<
     windowHours: c.windowHours,
     personRoles: c.personRoles,
     aliases: c.aliases,
+    fontScale: c.fontScale,
     hasPassword: !!c.password,
   };
 }
@@ -118,6 +136,7 @@ export async function setOpendockConfig(input: {
   windowHours?: number;
   personRoles?: string;
   aliases?: string;
+  fontScale?: number;
 }): Promise<void> {
   const locationId = await getActiveLocationId();
   if (!locationId) return;
@@ -138,6 +157,8 @@ export async function setOpendockConfig(input: {
   }
   if (input.personRoles !== undefined) await set(KEY.personRoles, input.personRoles);
   if (input.aliases !== undefined) await set(KEY.aliases, input.aliases);
+  if (input.fontScale !== undefined)
+    await set(KEY.fontScale, String(clampDockFontScale(input.fontScale)));
   if (input.password) await set(KEY.password, input.password);
 }
 
@@ -687,6 +708,7 @@ export type DockSchedule = {
   date: string; // Eastern "YYYY-MM-DD"
   entries: ScheduleEntry[];
   error: string | null;
+  fontScale: number; // percent, applied to the panel like browser zoom
 };
 
 type RawLoadType = {
@@ -754,18 +776,19 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
   const hit = scheduleCache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
 
-  const empty = (error: string | null): DockSchedule => ({
+  const empty = (error: string | null, fontScale = DOCK_FONT_DEFAULT): DockSchedule => ({
     enabled: false,
     date,
     entries: [],
     error,
+    fontScale,
   });
 
   let value: DockSchedule;
   try {
     const cfg = await fullConfig();
     if (!cfg.enabled || !cfg.baseUrl || !cfg.email || !cfg.password || !cfg.warehouseId) {
-      value = empty(null); // simply not configured — the view says so
+      value = empty(null, cfg.fontScale); // not configured — the view says so
     } else {
       const token = await login(cfg);
       if (!token) throw new Error("Opendock login failed");
@@ -811,7 +834,7 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
       });
 
       entries.sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""));
-      value = { enabled: true, date, entries, error: null };
+      value = { enabled: true, date, entries, error: null, fontScale: cfg.fontScale };
     }
   } catch (e) {
     console.error("[opendock] schedule fetch failed:", (e as Error).message);

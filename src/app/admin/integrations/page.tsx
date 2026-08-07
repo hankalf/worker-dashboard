@@ -11,6 +11,7 @@ type Config = {
   windowHours: number;
   personRoles: string;
   aliases: string;
+  fontScale: number;
   hasPassword: boolean;
 };
 
@@ -308,6 +309,41 @@ export default function IntegrationsPage() {
               </div>
             </div>
           )}
+
+          <div className="mt-4 border-t border-zinc-800 pt-3">
+            <label className="flex items-center justify-between text-sm text-zinc-300">
+              <span>Dock schedule text size</span>
+              <span className="tabular-nums text-zinc-400">{cfg.fontScale}%</span>
+            </label>
+            <input
+              type="range"
+              min={75}
+              max={200}
+              step={5}
+              value={cfg.fontScale}
+              onChange={(e) => update({ fontScale: Number(e.target.value) })}
+              className="mt-2 w-full accent-blue-500"
+            />
+            <div className="flex justify-between text-[11px] text-zinc-600">
+              <span>75%</span>
+              <span>100%</span>
+              <span>200%</span>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">
+              Scales the dock schedule table like browser zoom, so it stays
+              readable from further across the floor. Only affects this screen —
+              the roster board is unchanged.{" "}
+              {cfg.fontScale !== 100 && (
+                <button
+                  type="button"
+                  onClick={() => update({ fontScale: 100 })}
+                  className="text-zinc-300 underline hover:text-white"
+                >
+                  Reset to 100%
+                </button>
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">

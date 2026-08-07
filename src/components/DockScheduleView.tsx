@@ -180,7 +180,13 @@ export function DockScheduleView({
         </span>
       </div>
 
+      {/* `zoom` (not transform: scale) so the table reflows within the panel
+          instead of overflowing it. The filter bar above stays at 100% so the
+          chips remain a predictable size. */}
       <main
+        style={
+          schedule.fontScale === 100 ? undefined : { zoom: schedule.fontScale / 100 }
+        }
         className={`min-h-0 flex-1 overflow-y-auto py-4 ${embedded ? "px-0" : "px-6"}`}
       >
         {!schedule.enabled ? (

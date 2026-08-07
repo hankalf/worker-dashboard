@@ -5,7 +5,6 @@ import {
   getDashboardName,
   getRotationConfig,
   getScrollSpeed,
-  getBoardFontScale,
   getBranding,
   getShiftBounds,
 } from "@/lib/settings";
@@ -60,7 +59,6 @@ export async function fetchBoardProps() {
 
   const rotation = await getRotationConfig();
   const scrollSpeed = await getScrollSpeed();
-  const fontScale = await getBoardFontScale();
   const branding = await getBranding();
   const shiftBounds = await getShiftBounds();
   const laborShare = await getActiveLaborShare(now);
@@ -92,7 +90,6 @@ export async function fetchBoardProps() {
     dockSchedule,
     dockHidden: rotation.dockHidden,
     scrollSpeed,
-    fontScale,
     branding,
     laborShare,
     version: APP_VERSION,

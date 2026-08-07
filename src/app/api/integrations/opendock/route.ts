@@ -37,6 +37,10 @@ export async function PUT(req: Request) {
     personRoles:
       typeof body.personRoles === "string" ? body.personRoles : undefined,
     aliases: typeof body.aliases === "string" ? body.aliases : undefined,
+    fontScale:
+      Number.isFinite(Number(body.fontScale)) && body.fontScale !== ""
+        ? Number(body.fontScale)
+        : undefined,
   });
   clearOpendockCache();
   await logActivity("Integration", "Updated Opendock settings");
