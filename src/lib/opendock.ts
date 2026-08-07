@@ -929,7 +929,14 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
         };
       });
 
-      entries.sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""));
+      // Live work first in slot order, then finished loads, then cancelled —
+      // so the board's top is always what still needs attention.
+      const group = (t: DockTone) => (t === "done" ? 1 : t === "other" ? 2 : 0);
+      entries.sort(
+        (a, b) =>
+          group(a.tone) - group(b.tone) ||
+          (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "")
+      );
       value = { enabled: true, date, entries, error: null, fontScale: cfg.fontScale };
     }
   } catch (e) {

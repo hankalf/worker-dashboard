@@ -92,24 +92,13 @@ export function DashboardView({
         className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-2 dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <h1 className="flex items-center gap-3 text-2xl font-semibold">
             {branding?.logo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={branding.logo} alt="" className="h-7 w-auto max-w-[7rem] object-contain" />
+              <img src={branding.logo} alt="" className="h-10 w-auto max-w-[10rem] object-contain" />
             )}
             {title}
           </h1>
-          {now && (
-            <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
-              Updated{" "}
-              {new Date(renderedAt).toLocaleTimeString(undefined, {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                timeZone: APP_TZ,
-              })}
-            </div>
-          )}
         </div>
         <div className="text-center leading-tight">
           {now && (
@@ -167,6 +156,8 @@ export function DashboardView({
             title={title}
             initialHidden={dockHidden}
             embedded
+            autoScroll
+            scrollSpeed={scrollSpeed}
           />
         ) : (
           <DashboardSections
@@ -194,11 +185,19 @@ export function DashboardView({
         )}
       </main>
 
-      {version && (
-        <footer className="shrink-0 border-t border-zinc-200 px-6 py-1 text-right text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
-          {version}
-        </footer>
-      )}
+      <footer className="grid shrink-0 grid-cols-3 items-center border-t border-zinc-200 px-6 py-1 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
+        <span />
+        <span className="text-center">
+          {now &&
+            `Updated ${new Date(renderedAt).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              timeZone: APP_TZ,
+            })}`}
+        </span>
+        <span className="text-right">{version}</span>
+      </footer>
     </div>
   );
 }

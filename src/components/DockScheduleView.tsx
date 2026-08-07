@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { APP_TZ } from "@/lib/time";
 import { useNow } from "@/components/DashboardSections";
+import { AutoScroll } from "@/components/AutoScroll";
 import type { DockSchedule } from "@/lib/opendock";
 
 // A wall-display view of today's Opendock dock schedule: one row per
@@ -99,6 +100,8 @@ export function DockScheduleView({
   initialHidden,
   interactive = true,
   embedded = false,
+  autoScroll = false,
+  scrollSpeed = 4,
 }: {
   schedule: DockSchedule;
   title: string;
@@ -109,6 +112,10 @@ export function DockScheduleView({
   // the location, clock and date, so this drops its full-page chrome and fills
   // the available space instead.
   embedded?: boolean;
+  // Drift the table up and down like the board's other sections, at the same
+  // speed the Settings slider sets.
+  autoScroll?: boolean;
+  scrollSpeed?: number;
 }) {
   // Seeded from a prop, so the server and client agree on first paint.
   const [hidden, setHidden] = useState<Set<Tone>>(() => parseHidden(initialHidden ?? null));
@@ -205,7 +212,9 @@ export function DockScheduleView({
         style={
           schedule.fontScale === 100 ? undefined : { zoom: schedule.fontScale / 100 }
         }
-        className={`min-h-0 flex-1 overflow-y-auto py-4 ${embedded ? "px-0" : "px-6"}`}
+        className={`flex min-h-0 flex-1 flex-col py-4 ${
+          embedded ? "px-0" : "px-6"
+        } ${autoScroll ? "" : "overflow-y-auto"}`}
       >
         {!schedule.enabled ? (
           <p className="mt-10 text-center text-xl text-zinc-500 dark:text-zinc-400">
@@ -224,7 +233,14 @@ export function DockScheduleView({
             Every appointment is hidden by the filters above.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          // flex-1 + min-h-0 rather than h-full: inside the board's flex column
+          // that resolves to the leftover space, which is what makes the
+          // overflow — and therefore the scrolling — real.
+          <AutoScroll
+            enabled={autoScroll}
+            speed={Math.max(1, Math.min(10, scrollSpeed)) * 0.1}
+            maxHeightClass="min-h-0 flex-1"
+          >
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
@@ -236,6 +252,7 @@ export function DockScheduleView({
                   <th className="px-3 py-2 font-medium">Dir</th>
                   <th className="px-3 py-2 font-medium">PO / Ref #</th>
                   <th className="px-3 py-2 text-right font-medium">On time</th>
+                  <th className="px-3 py-2 text-right font-medium">Dwell</th>
                   <th className="px-3 py-2 text-right font-medium">Processing</th>
                 </tr>
               </thead>
@@ -294,6 +311,14 @@ export function DockScheduleView({
                         {punctual.text}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">
+                        {duration(e.dwellMs)}
+                        {e.dwellOpen && e.dwellMs !== null && (
+                          <span className="ml-1 text-amber-500" title="Still on site">
+                            ●
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">
                         {duration(e.processingMs)}
                       </td>
                     </tr>
@@ -301,7 +326,7 @@ export function DockScheduleView({
                 })}
               </tbody>
             </table>
-          </div>
+          </AutoScroll>
         )}
       </main>
     </div>
