@@ -24,6 +24,7 @@ const KEY = {
   personRoles: "opendock.personRoles",
   aliases: "opendock.aliases",
   fontScale: "opendock.fontScale",
+  refreshSeconds: "opendock.refreshSeconds",
 } as const;
 
 // Text size of the dock schedule panel, as a percentage. Applied like browser
@@ -31,6 +32,13 @@ const KEY = {
 export const DOCK_FONT_MIN = 75;
 export const DOCK_FONT_MAX = 200;
 export const DOCK_FONT_DEFAULT = 100;
+
+// Poll interval in seconds, bounded so a typo can't hammer Opendock.
+export function clampRefresh(value: unknown): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_REFRESH_SECONDS;
+  return Math.min(MAX_REFRESH_SECONDS, Math.max(MIN_REFRESH_SECONDS, n));
+}
 
 export function clampDockFontScale(value: unknown): number {
   const n = Math.round(Number(value));
@@ -45,6 +53,12 @@ const DEFAULT_WINDOW_HOURS = 24;
 // Tag roles that name a person, e.g. "RECEIVER: DENNIS R.".
 const DEFAULT_PERSON_ROLES = "receiver, loader";
 
+// How often the board actually calls Opendock. The board re-renders every 15s,
+// but data is served from cache in between, so this is the real poll rate.
+const DEFAULT_REFRESH_SECONDS = 120;
+const MIN_REFRESH_SECONDS = 30;
+const MAX_REFRESH_SECONDS = 900;
+
 export type OpendockConfig = {
   enabled: boolean;
   baseUrl: string;
@@ -54,6 +68,7 @@ export type OpendockConfig = {
   personRoles: string;
   aliases: string;
   fontScale: number;
+  refreshSeconds: number;
 };
 
 // The full config including the secret — server-only, never sent to the client.
@@ -82,6 +97,7 @@ async function fullConfig(): Promise<OpendockConfigFull> {
     fontScale: m[KEY.fontScale]
       ? clampDockFontScale(m[KEY.fontScale])
       : DOCK_FONT_DEFAULT,
+    refreshSeconds: clampRefresh(m[KEY.refreshSeconds]),
   };
 }
 
@@ -121,6 +137,7 @@ export async function getOpendockConfig(): Promise<
     personRoles: c.personRoles,
     aliases: c.aliases,
     fontScale: c.fontScale,
+    refreshSeconds: c.refreshSeconds,
     hasPassword: !!c.password,
   };
 }
@@ -137,6 +154,7 @@ export async function setOpendockConfig(input: {
   personRoles?: string;
   aliases?: string;
   fontScale?: number;
+  refreshSeconds?: number;
 }): Promise<void> {
   const locationId = await getActiveLocationId();
   if (!locationId) return;
@@ -159,6 +177,8 @@ export async function setOpendockConfig(input: {
   if (input.aliases !== undefined) await set(KEY.aliases, input.aliases);
   if (input.fontScale !== undefined)
     await set(KEY.fontScale, String(clampDockFontScale(input.fontScale)));
+  if (input.refreshSeconds !== undefined)
+    await set(KEY.refreshSeconds, String(clampRefresh(input.refreshSeconds)));
   if (input.password) await set(KEY.password, input.password);
 }
 
@@ -514,16 +534,68 @@ function apptsFrom(body: unknown): RawAppt[] {
   return [];
 }
 
-// Log in and return a bearer token, or null.
-async function login(cfg: OpendockConfigFull): Promise<string | null> {
+// ---- Auth: log in rarely, reuse the token ---------------------------------
+// Opendock issues a long-lived JWT (its `expires_in` is measured in days) and
+// counts failed sign-ins against the account. Logging in on every poll would
+// mean thousands of sign-ins a day and get the account throttled or locked, so
+// the token is cached and reused until shortly before it expires.
+
+type TokenEntry = { token: string; expiresAt: number };
+const tokenCache = new Map<string, TokenEntry>();
+// After a failed login, wait before trying again rather than hammering.
+const loginBackoff = new Map<string, number>();
+
+const LOGIN_BACKOFF_MS = 5 * 60_000;
+// Never hold a token longer than this, even if Opendock says it lives longer.
+const MAX_TOKEN_LIFE_MS = 12 * 3600_000;
+// Renew this long before expiry so a request never races the deadline.
+const TOKEN_SKEW_MS = 5 * 60_000;
+
+// One fresh sign-in. Returns the token and how long Opendock says it lasts.
+async function loginFresh(
+  cfg: OpendockConfigFull
+): Promise<{ token: string; expiresInMs: number } | null> {
   const res = await fetch(`${cfg.baseUrl}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: cfg.email, password: cfg.password }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) return null;
   const body = await res.json().catch(() => ({}));
-  return tokenFrom(body);
+  const token = tokenFrom(body);
+  if (!token) return null;
+  const secs = Number((body as { expires_in?: unknown })?.expires_in);
+  return {
+    token,
+    expiresInMs: Number.isFinite(secs) && secs > 0 ? secs * 1000 : MAX_TOKEN_LIFE_MS,
+  };
+}
+
+// A usable bearer token — from cache when possible. Null while backing off from
+// a recent failure, so a bad password can't turn into a sign-in storm.
+async function login(cfg: OpendockConfigFull): Promise<string | null> {
+  const key = `${cfg.baseUrl}|${cfg.email}`;
+  const now = Date.now();
+
+  const hit = tokenCache.get(key);
+  if (hit && now < hit.expiresAt) return hit.token;
+
+  const retryAt = loginBackoff.get(key);
+  if (retryAt && now < retryAt) return null;
+
+  const fresh = await loginFresh(cfg).catch(() => null);
+  if (!fresh) {
+    loginBackoff.set(key, now + LOGIN_BACKOFF_MS);
+    return null;
+  }
+  loginBackoff.delete(key);
+  tokenCache.set(key, {
+    token: fresh.token,
+    expiresAt:
+      now + Math.max(60_000, Math.min(fresh.expiresInMs, MAX_TOKEN_LIFE_MS) - TOKEN_SKEW_MS),
+  });
+  return fresh.token;
 }
 
 async function getJson(url: string, token: string): Promise<unknown | null> {
@@ -615,7 +687,6 @@ function windowRange(now: Date, hours: number): [Date, Date] {
 // ---- Cache: don't hit Opendock on every 15s board refresh ------------------
 type CacheEntry = { at: number; byName: Record<string, DockStatus> };
 const cache = new Map<string, CacheEntry>();
-const TTL_MS = 45_000;
 
 // A name→status map for the active location's employees. Keyed by the tag text
 // (normalised), so a badge match is a simple lookup by employee name. Returns
@@ -624,7 +695,9 @@ const TTL_MS = 45_000;
 export async function getEmployeeDockStatuses(): Promise<Record<string, DockStatus>> {
   const locationId = (await getActiveLocationId()) ?? "default";
   const hit = cache.get(locationId);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.byName;
+  const cfgForTtl = await fullConfig();
+  if (hit && Date.now() - hit.at < cfgForTtl.refreshSeconds * 1000)
+    return hit.byName;
 
   const byName: Record<string, DockStatus> = {};
   try {
@@ -680,6 +753,9 @@ export async function getEmployeeDockStatuses(): Promise<Record<string, DockStat
 export function clearOpendockCache(): void {
   cache.clear();
   scheduleCache.clear();
+  // Credentials may have changed — force a fresh sign-in and clear any backoff.
+  tokenCache.clear();
+  loginBackoff.clear();
 }
 
 // ---- Today's dock schedule (the wall-display view) -------------------------
@@ -774,7 +850,8 @@ export async function getDockSchedule(now = new Date()): Promise<DockSchedule> {
   const date = easternDateKey(now);
   const key = `${locationId}:${date}`;
   const hit = scheduleCache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+  const cfgForTtl = await fullConfig();
+  if (hit && Date.now() - hit.at < cfgForTtl.refreshSeconds * 1000) return hit.value;
 
   const empty = (error: string | null, fontScale = DOCK_FONT_DEFAULT): DockSchedule => ({
     enabled: false,
@@ -875,6 +952,9 @@ export type PipelineCheck = {
   windowHours: number;
   appointmentsTotal: number; // for this warehouse, any date
   taggedOutsideWindow: string[]; // person tags on appointments outside the window
+  // Every candidate value the board could show for one real appointment, so a
+  // column can be pointed at the right source without guessing.
+  columnSources: Record<string, string> | null;
 };
 
 export type OpendockDiagnostic = {
@@ -1009,6 +1089,61 @@ function probeTargets(cfg: OpendockConfigFull): { label: string; url: string }[]
   ];
 }
 
+// Lay out every value the dock schedule could draw on for a single real
+// appointment — the raw fields, the resolved dock, the load type, and each
+// custom field — so columns can be mapped against actual data.
+function describeSources(
+  appt: RawAppt | undefined,
+  docks: Map<string, RawDock>,
+  loadTypes: Map<string, RawLoadType>
+): Record<string, string> | null {
+  if (!appt) return null;
+  const out: Record<string, string> = {};
+  const put = (k: string, v: unknown) => {
+    if (v === null || v === undefined || v === "") return;
+    out[k] = typeof v === "string" ? v : JSON.stringify(v);
+  };
+
+  put("appointment.start", appt.start);
+  put("appointment.end", appt.end);
+  put("appointment.status", appt.status);
+  put("appointment.statusTimeline", appt.statusTimeline);
+  put("appointment.refNumber", appt.refNumber);
+  put("appointment.refNumbers", appt.refNumbers);
+  put("appointment.confirmationNumber", appt.confirmationNumber);
+  put("appointment.type", appt.type);
+  put("appointment.notes", appt.notes);
+  put("appointment.eta", appt.eta);
+  put("appointment.tags", appt.tags);
+  put("appointment.dockId", appt.dockId);
+
+  const dock = appt.dockId ? docks.get(String(appt.dockId)) : undefined;
+  put("dock.name", dock?.name);
+  put("dock.doorNumber", dock?.doorNumber);
+
+  const lt = appt.loadTypeId ? loadTypes.get(String(appt.loadTypeId)) : undefined;
+  put("loadType.name", lt?.name);
+  put("loadType.direction", lt?.direction);
+  put("loadType.(all fields)", lt ? Object.keys(lt).join(", ") : undefined);
+
+  // Custom fields are per-warehouse, so list them by their visible label.
+  if (Array.isArray(appt.customFields)) {
+    for (const f of appt.customFields as {
+      label?: string;
+      name?: string;
+      value?: unknown;
+    }[]) {
+      const label = f.label ?? f.name;
+      if (label && f.value !== undefined && f.value !== "") {
+        put(`customField["${label}"]`, f.value);
+      }
+    }
+  }
+
+  put("→ door currently shown", dockLabel(appt, docks));
+  return out;
+}
+
 export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
   const cfg = await fullConfig();
   if (!cfg.baseUrl || !cfg.email || !cfg.password) {
@@ -1030,6 +1165,8 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
 
   let token: string | null = null;
   try {
+    // A real sign-in, bypassing the token cache: the point of this button is to
+    // verify the credentials right now.
     const res = await fetch(out.loginUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1073,6 +1210,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
       const dockIds = [...docks.keys()];
       const [from, to] = windowRange(now, cfg.windowHours);
       const appts = await fetchAppointments(cfg, token, dockIds, from, to);
+      const loadTypes = await fetchLoadTypes(cfg, token);
       // A wider sweep, so we can say whether the tags you expect are simply
       // sitting outside the badge window.
       const [wideFrom, wideTo] = windowRange(now, 24 * 7);
@@ -1136,6 +1274,7 @@ export async function diagnoseOpendock(): Promise<OpendockDiagnostic> {
         windowHours: cfg.windowHours,
         appointmentsTotal: wide.length,
         taggedOutsideWindow: [...outside].slice(0, 25),
+        columnSources: describeSources(appts[0] ?? wide[0], docks, loadTypes),
       };
     } catch {
       /* diagnostic extra — never fail the whole test over it */

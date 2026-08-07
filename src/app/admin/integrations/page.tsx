@@ -12,6 +12,7 @@ type Config = {
   personRoles: string;
   aliases: string;
   fontScale: number;
+  refreshSeconds: number;
   hasPassword: boolean;
 };
 
@@ -45,6 +46,7 @@ type Diagnostic = {
     windowHours: number;
     appointmentsTotal: number;
     taggedOutsideWindow: string[];
+    columnSources: Record<string, string> | null;
   } | null;
 };
 
@@ -235,6 +237,22 @@ export default function IntegrationsPage() {
             <span className="mt-1 block text-[11px] text-zinc-500">
               Only appointments starting within this many hours show on badges.
               Raise it if crews tag loads well ahead of the shift.
+            </span>
+          </label>
+          <label className="text-xs text-zinc-400">
+            Refresh interval (seconds)
+            <input
+              type="number"
+              min={30}
+              max={900}
+              className={inputClass}
+              value={cfg.refreshSeconds}
+              onChange={(e) => update({ refreshSeconds: Number(e.target.value) })}
+            />
+            <span className="mt-1 block text-[11px] text-zinc-500">
+              How often the board actually calls Opendock. The board itself
+              refreshes every 15s but serves cached data in between. The sign-in
+              token is reused across polls, so this does not add sign-ins.
             </span>
           </label>
           <label className="text-xs text-zinc-400">
@@ -454,7 +472,23 @@ export default function IntegrationsPage() {
                   <dd className="text-zinc-300">
                     {diag.pipeline.ignoredTags} skipped (PID / ASN / PO numbers)
                   </dd>
-                  {diag.pipeline.taggedOutsideWindow.length > 0 && (
+                  {diag.pipeline.columnSources && (
+                  <div className="mt-3">
+                    <div className="mb-1 text-zinc-400">
+                      Available fields (one real appointment) — tell me which
+                      should feed which column
+                    </div>
+                    <dl className="grid grid-cols-[minmax(0,14rem)_1fr] gap-x-3 gap-y-0.5 font-mono text-[11px]">
+                      {Object.entries(diag.pipeline.columnSources).map(([k, v]) => (
+                        <div key={k} className="contents">
+                          <dt className="truncate text-zinc-500">{k}</dt>
+                          <dd className="truncate text-zinc-300">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
+                {diag.pipeline.taggedOutsideWindow.length > 0 && (
                     <>
                       <dt className="text-zinc-500">Outside window</dt>
                       <dd className="text-amber-400">
@@ -463,6 +497,22 @@ export default function IntegrationsPage() {
                     </>
                   )}
                 </dl>
+                {diag.pipeline.columnSources && (
+                  <div className="mt-3">
+                    <div className="mb-1 text-zinc-400">
+                      Available fields (one real appointment) — tell me which
+                      should feed which column
+                    </div>
+                    <dl className="grid grid-cols-[minmax(0,14rem)_1fr] gap-x-3 gap-y-0.5 font-mono text-[11px]">
+                      {Object.entries(diag.pipeline.columnSources).map(([k, v]) => (
+                        <div key={k} className="contents">
+                          <dt className="truncate text-zinc-500">{k}</dt>
+                          <dd className="truncate text-zinc-300">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
                 {diag.pipeline.taggedOutsideWindow.length > 0 && (
                   <p className="mb-2 text-amber-400">
                     These name tags are on appointments outside the ±

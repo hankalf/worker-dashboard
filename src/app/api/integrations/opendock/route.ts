@@ -41,6 +41,10 @@ export async function PUT(req: Request) {
       Number.isFinite(Number(body.fontScale)) && body.fontScale !== ""
         ? Number(body.fontScale)
         : undefined,
+    refreshSeconds:
+      Number.isFinite(Number(body.refreshSeconds)) && body.refreshSeconds !== ""
+        ? Number(body.refreshSeconds)
+        : undefined,
   });
   clearOpendockCache();
   await logActivity("Integration", "Updated Opendock settings");
