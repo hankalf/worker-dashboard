@@ -89,7 +89,7 @@ export function DashboardView({
           backgroundColor: branding?.headerBg || undefined,
           color: branding?.headerFg || undefined,
         }}
-        className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-200 bg-white px-6 py-2 dark:border-zinc-800 dark:bg-zinc-900"
+        className="grid shrink-0 grid-cols-3 items-center border-b border-zinc-400 bg-white px-6 py-2 dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div className="min-w-0">
           <h1 className="flex items-center gap-3 text-2xl font-semibold">
@@ -148,7 +148,7 @@ export function DashboardView({
           <iframe
             src={rotatingUrl}
             title="Rotating display"
-            className="min-h-0 w-full flex-1 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800"
+            className="min-h-0 w-full flex-1 rounded-lg border border-zinc-400 bg-white dark:border-zinc-800"
           />
         ) : panel === "dock" && dockSchedule ? (
           <DockScheduleView
@@ -185,7 +185,7 @@ export function DashboardView({
         )}
       </main>
 
-      <footer className="grid shrink-0 grid-cols-3 items-center border-t border-zinc-200 px-6 py-1 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
+      <footer className="grid shrink-0 grid-cols-3 items-center border-t border-zinc-400 px-6 py-1 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
         <span />
         <span className="text-center">
           {now &&

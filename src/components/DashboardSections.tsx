@@ -138,7 +138,7 @@ function LunchPanel({
   children: ReactNode;
 }) {
   const listClass =
-    "divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900";
+    "divide-y divide-zinc-400 rounded-lg border border-zinc-400 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900";
   if (autoScroll) {
     return (
       <AutoScroll enabled speed={speed} maxHeightClass="h-[9.5rem]">
@@ -542,7 +542,7 @@ export function DashboardSections({
             </h2>
             {onLunch.length === 0 ? (
               <div
-                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-200 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
+                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-400 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
               >
                 No one is on lunch right now.
               </div>
@@ -578,7 +578,7 @@ export function DashboardSections({
             </h2>
             {lunchSchedule.length === 0 ? (
               <div
-                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-200 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
+                className={`flex ${lunchBoxClass} items-center justify-center rounded-lg border border-zinc-400 bg-white text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400`}
               >
                 No lunches scheduled.
               </div>
@@ -629,14 +629,14 @@ export function DashboardSections({
 
       {showCoverage && (
         <div className="mb-8 flex flex-wrap gap-2 text-sm">
-          <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+          <span className="rounded-lg border border-zinc-400 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
             <span className="font-semibold">{presentCount}</span> present
           </span>
-          <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <span className="rounded-lg border border-zinc-400 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             {onShiftCount} on shift
           </span>
           {onLunch.length > 0 && (
-            <span className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            <span className="rounded-lg border border-zinc-400 bg-white px-3 py-1.5 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
               {onLunch.length} on lunch
             </span>
           )}
@@ -659,7 +659,7 @@ export function DashboardSections({
                   className={`rounded-lg border px-3 py-1.5 ${
                     short
                       ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
-                      : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                      : "border-zinc-400 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
                   }`}
                 >
                   <span className="font-semibold text-zinc-900 dark:text-zinc-100">
@@ -692,7 +692,7 @@ export function DashboardSections({
                   className={`rounded-lg border px-3 py-1.5 ${
                     count === 0
                       ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300"
-                      : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                      : "border-zinc-400 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
                   }`}
                 >
                   <span className="font-semibold text-zinc-900 dark:text-zinc-100">
@@ -782,7 +782,7 @@ export function DashboardSections({
               {visibleColumns.map((column) => (
                 <div
                   key={column.id}
-                  className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  className="flex flex-col rounded-lg border border-zinc-400 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -816,7 +816,7 @@ export function DashboardSections({
                           className={`rounded-md border px-3 py-3 ${
                             showCoverage && activeNow(member)
                               ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
-                              : "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
+                              : "border-zinc-400 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50"
                           }`}
                         >
                           <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
@@ -862,7 +862,7 @@ export function DashboardSections({
                 className={`rounded-lg border p-4 shadow-sm ${
                   showCoverage && activeNow(member)
                     ? "border-violet-400 bg-violet-50 ring-1 ring-violet-400 dark:border-violet-600 dark:bg-violet-950/30 dark:ring-violet-600"
-                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+                    : "border-zinc-400 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
                 <MemberBody member={member} stayingOver={stayingOverNow(member)} covering={coveringNow(member)} today={today} hidePosition={!showCoverage} hideLunch={!showCoverage} badgeColor={brand?.badge} />
@@ -938,7 +938,7 @@ export function SideTasksSection({
         // Slim top-row variant: one line per task (title · chips · assignee),
         // no descriptions — details live on the admin Side Tasks tab.
         <AutoScroll enabled={autoScroll} speed={speed} maxHeightClass="max-h-[20vh]">
-          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <ul className="divide-y divide-zinc-400 overflow-hidden rounded-lg border border-zinc-400 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {jobGroups.flatMap((group) =>
               group.jobs.map((job) => (
                 <li
@@ -993,7 +993,7 @@ export function SideTasksSection({
                   {group.jobs.map((job) => (
                     <div
                       key={job.id}
-                      className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                      className="rounded-lg border border-zinc-400 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <h3 className="font-medium">{job.title}</h3>

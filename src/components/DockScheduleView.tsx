@@ -183,7 +183,7 @@ export function DockScheduleView({
       }
     >
       {!embedded && (
-        <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-zinc-400 px-6 py-4 dark:border-zinc-800">
           <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">
             {title}
             <span className="ml-3 text-xl font-normal text-zinc-500 dark:text-zinc-400">Dock Schedule</span>
@@ -206,7 +206,7 @@ export function DockScheduleView({
       )}
 
       <div
-        className={`flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-200 py-3 dark:border-zinc-800 ${
+        className={`flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-400 py-3 dark:border-zinc-800 ${
           embedded ? "px-0" : "px-6"
         }`}
       >
@@ -275,8 +275,15 @@ export function DockScheduleView({
             maxHeightClass="min-h-0 flex-1"
           >
             <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
+              {/* A border on a sticky thead doesn't paint under
+                  border-collapse, so the rule that separates it from rows
+                  sliding beneath is drawn with a shadow instead. */}
+              <thead
+                className={`sticky top-0 z-10 shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-zinc-400 dark:shadow-zinc-700 ${
+                  embedded ? "bg-zinc-50 dark:bg-zinc-950" : "bg-white dark:bg-zinc-950"
+                }`}
+              >
+                <tr className="text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200">
                   <th className="px-3 py-2 font-medium">Time</th>
                   <th className="px-3 py-2 font-medium">Arrived</th>
                   <th className="px-3 py-2 font-medium">Status</th>
