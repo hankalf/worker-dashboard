@@ -7,6 +7,7 @@ import type { Branding } from "@/lib/settings";
 import type { ShiftBounds } from "@/lib/shift";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DockScheduleView } from "@/components/DockScheduleView";
+import { OfflineBanner, useConnectionStatus } from "@/components/OfflineBanner";
 import type { DockSchedule } from "@/lib/opendock";
 import { APP_TZ } from "@/lib/time";
 import {
@@ -59,6 +60,10 @@ export function DashboardView({
 }) {
   const now = useNow();
   useAutoRefresh();
+  // Losing the network doesn't blank the board: router.refresh() simply fails
+  // and React keeps the last good render, so the only thing that changes is
+  // this banner going up.
+  const { online, lastSeen } = useConnectionStatus();
 
   // Rotating display: cycle the body through the board, the Opendock dock
   // schedule, and an external URL (the header with the clock/date stays put).
@@ -86,6 +91,7 @@ export function DashboardView({
     // On lg+ screens the board locks to the viewport height (no page scroll —
     // long sections scroll inside themselves instead).
     <div className="flex flex-1 flex-col lg:h-screen lg:flex-none lg:overflow-hidden">
+      {!online && <OfflineBanner lastSeen={lastSeen} />}
       <header
         style={{
           backgroundColor: branding?.headerBg || undefined,

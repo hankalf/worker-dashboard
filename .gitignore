@@ -42,3 +42,10 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Recorded video SOP. Kept out of git so the repo stays small — it is a large
+# binary that changes wholesale on every re-record. Regenerate it with
+# scripts/sop-video (see docs/SOP-video-script.md) and host it wherever the team
+# keeps training material.
+/docs/*.mp4
+/docs/*.webm

@@ -12,10 +12,14 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
 
 - **[docs/SOP.md](docs/SOP.md)** — the standard operating procedure: how to run the
   board day to day, every admin tab, the screen fleet, and the Opendock
-  integration. Written for supervisors and admins, not developers.
-- **[docs/SOP-video-script.md](docs/SOP-video-script.md)** — the recorded
-  walkthrough (`docs/worker-dashboard-sop.webm`), its chapter list, and how to
-  re-record it after UI changes.
+  integration. Written for supervisors and admins, not developers. Also as
+  [PDF](docs/Worker-Dashboard-SOP.pdf) and
+  [Word](docs/Worker-Dashboard-SOP.docx) — rebuild both with
+  `scripts/docs/build-sop-docs.mjs`.
+- **[docs/SOP-video-script.md](docs/SOP-video-script.md)** — the recorded video
+  walkthrough: its chapter list, where the file is kept (deliberately not in
+  this repo — it is a large binary), and how to re-record it after UI changes
+  with `scripts/sop-video/`.
 
 ## Local development
 

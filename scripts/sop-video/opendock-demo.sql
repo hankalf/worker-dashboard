@@ -15,7 +15,9 @@ FROM "Location" l,
         ('opendock.personRoles', 'receiver, loader'),
         ('opendock.fontScale', '100'),
         ('opendock.refreshSeconds', '60'),
-        ('rotatingDock', 'true'),
+        -- Off by default: the walkthrough stays on the roster. Flip to 'true'
+        -- to include the dock schedule screen in the recording.
+        ('rotatingDock', 'false'),
         ('rotatingDockHidden', 'other,requested'),
         ('rotationSeconds', '25')
      ) AS k(key, value)

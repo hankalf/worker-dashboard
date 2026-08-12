@@ -7,3 +7,26 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* Outage banner on the board. It flashes so it's noticed from across the
+   warehouse; under reduced-motion it stays solid red instead. */
+@keyframes sop-offline-flash {
+  0%,
+  100% {
+    background-color: #dc2626;
+  }
+  50% {
+    background-color: #7f1d1d;
+  }
+}
+
+.sop-offline {
+  background-color: #dc2626;
+  animation: sop-offline-flash 1.1s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sop-offline {
+    animation: none;
+  }
+}

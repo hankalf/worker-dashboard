@@ -5,9 +5,11 @@ the wall displays are managed, and how the Opendock dock schedule works.
 
 Written for supervisors, leads and admins. No engineering knowledge assumed.
 
-> **Prefer to watch it?** There is a recorded walkthrough of everything below —
-> `worker-dashboard-sop.webm` in this folder, about twelve minutes. See
-> [SOP-video-script.md](./SOP-video-script.md) for its chapter list.
+> **Other formats.** This document is also in this folder as
+> `Worker-Dashboard-SOP.pdf` and `Worker-Dashboard-SOP.docx`. There is also a
+> recorded walkthrough of about eleven minutes — it is kept outside the repo
+> because of its size; see [SOP-video-script.md](./SOP-video-script.md) for the
+> chapter list and where to find it.
 
 ---
 
@@ -568,6 +570,22 @@ What the floor sees. It needs no interaction.
 - **Light and dark mode** — both are supported and cards carry a distinct border
   in light mode so they stay readable under warehouse lighting.
 
+### If the connection drops
+
+A flashing red **NO INTERNET** bar appears across the top of the board, with the
+time of the last good update.
+
+The board underneath keeps running on the last data it received — the clock
+still ticks, panels still rotate, sections still scroll — so the floor still has
+something to read while the network is being fixed. Nothing is lost and nobody
+needs to touch the screen: when the connection comes back the bar disappears and
+the board pulls fresh data straight away.
+
+The bar means the screen cannot reach the dashboard server. That can be the
+site's internet, the local network, or the server itself — it is not a fault in
+the display. If the bar is up on **every** screen, look at the network or the
+server; if it is up on **one**, look at that TV's connection.
+
 ---
 
 ## 21. The Opendock dock schedule screen
@@ -615,6 +633,11 @@ bottom, followed by **cancelled**. Live work always sits at the top.
 ---
 
 ## 22. Troubleshooting
+
+**A screen shows a flashing NO INTERNET bar**
+It cannot reach the server. The board keeps showing its last update, so there is
+no rush at the screen itself — check the site's network or the server. It clears
+itself when the connection returns.
 
 **A screen is blank or stuck**
 Check Screen Fleet — is it *online now*? Send **Refresh**. If it still shows

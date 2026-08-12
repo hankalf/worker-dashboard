@@ -1,12 +1,16 @@
 # Worker Dashboard — video SOP
 
 A recorded walkthrough of the board and the admin panel, with on-screen chapter
-cards, captions and a highlight marker. Roughly twelve minutes.
+cards, captions and a highlight marker. Roughly eleven minutes.
 
-- **File:** `docs/worker-dashboard-sop.webm` (VP8/WebM, 1440×900, no audio —
-  narration is on-screen text)
-- **Plays in:** Chrome, Edge, Firefox, VLC. Drag it into a browser tab, or host
-  it wherever your team keeps training material.
+- **Format:** H.264 MP4, 1440×900, no audio — the narration is on-screen text.
+  Plays in anything: Windows, macOS, phones, PowerPoint, VLC, any browser.
+- **Where it lives:** *not in this repo.* It is ~18 MB of binary that changes
+  wholesale on every re-record, so git is the wrong home for it — keep it
+  wherever your team keeps training material (SharePoint, Drive, the shared
+  drive) and link to it from here. `.gitignore` keeps `docs/*.mp4` out.
+- **Getting a copy:** ask whoever published it, or regenerate it from this repo
+  in about fifteen minutes — see below.
 
 The video is recorded against a **local demo instance with demo data and a
 stand-in Opendock API** — no customer data and no calls to the real Opendock
@@ -19,16 +23,15 @@ account.
 | # | Chapter | Covers |
 |---|---|---|
 | — | The board | Header, handoff note, notices, side tasks, team by position, dock pills |
-| 1 | The dock schedule screen | Rotation, colour legend, sync freshness, door tags, on-time / dwell / processing, frozen header |
-| 2 | Signing in | Access levels, Master Dashboard, choosing a warehouse |
-| 3 | Admin Dashboard | The live mirror, roles shown here only, screen-offline warning |
-| 4 | Notices | Posting, start / expiry / pin, handoff notes |
-| 5 | Assign | Mark all Present, handoff notes, Fill open positions, Stagger lunches, Reset |
-| 6 | Lunches, Side Tasks, Attendance | Lunch edits, task lifecycle, coverage by weekday, days out per person |
-| 7 | Setup | Dashboard name, auto-scroll speed, shift times, backup; Employees + CSV; Positions, Roles, Equipment |
-| 8 | Opendock | Connection fields, refresh interval, tag conventions, Test connection |
-| 9 | Locations and screens | Creating warehouses, registering TVs, refresh / identify / message, Activity |
-| 10 | Back to the floor | The completed daily loop |
+| 1 | Signing in | Access levels, Master Dashboard, choosing a warehouse |
+| 2 | Admin Dashboard | The live mirror, roles shown here only, screen-offline warning |
+| 3 | Notices | Posting, start / expiry / pin, handoff notes |
+| 4 | Assign | Mark all Present, handoff notes, Fill open positions, Stagger lunches, Reset |
+| 5 | Lunches, Side Tasks, Attendance | Lunch edits, task lifecycle, coverage by weekday, days out per person |
+| 6 | Setup | Dashboard name, auto-scroll speed, shift times, backup; Employees + CSV; Positions, Roles, Equipment |
+| 7 | Opendock | Connection fields, refresh interval, tag conventions, Test connection |
+| 8 | Locations and screens | Creating warehouses, registering TVs, refresh / identify / message, Activity |
+| 9 | Back to the floor | The completed daily loop |
 
 Everything shown is written up in more detail in [`SOP.md`](./SOP.md).
 
@@ -62,9 +65,17 @@ psql "$DATABASE_URL" -f scripts/sop-video/opendock-demo.sql
 npm run build
 npx next start -p 3210 &
 
-# 6. record — writes a .webm next to the script
+# 6. record — writes a .webm into scripts/sop-video/out/
 node scripts/sop-video/record-sop.mjs
+
+# 7. convert to MP4 (H.264 plays everywhere; the raw capture is VP8/WebM)
+ffmpeg -i scripts/sop-video/out/*.webm -c:v libx264 -preset slow -crf 26 \
+  -pix_fmt yuv420p -r 15 -movflags +faststart docs/worker-dashboard-sop.mp4
 ```
+
+`opendock-demo.sql` leaves the dock-schedule rotation **off**, so the board stays
+on the roster for the whole recording. Set `rotatingDock` to `true` in that file
+if you want the dock screen in the walkthrough as well.
 
 `record-sop.mjs` holds the full narration inline; edit the `say(...)` calls to
 change wording, and the `chapter(...)` calls to change the chapter cards. Every
@@ -75,9 +86,8 @@ rather than a failed recording.
 
 - Captions are timed from their own length (about 52 ms per character, minimum
   2.9 seconds), so rewriting a line automatically retimes it.
-- The video has no audio track. Playwright's bundled ffmpeg only encodes VP8, so
-  WebM is the output format; convert with a full ffmpeg build if you need MP4:
-  `ffmpeg -i worker-dashboard-sop.webm -c:v libx264 -crf 23 worker-dashboard-sop.mp4`
+- The video has no audio track. Playwright captures VP8/WebM; step 7 above
+  converts it to H.264 MP4, which is what gets committed.
 - The mock Opendock server serves the same endpoints and payload shapes as the
   real Neutron API (`/auth/login`, `/dock`, `/appointment`, `/loadType`,
   `/warehouse`), including the nestjs-crud `s` filter, so the dock schedule in

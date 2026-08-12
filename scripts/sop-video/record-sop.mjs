@@ -257,7 +257,7 @@ await say(
 );
 await focus("text=/^NOTICE/").catch(() => {});
 await say(
-  "Notices scroll beside it. The board shows up to five at a time — anything beyond that queues up.",
+  "Notices scroll beside it. The board shows up to three at a time — anything beyond that queues up.",
   "The board"
 );
 await focus("text=SIDE TASKS");
@@ -289,60 +289,9 @@ await say(
 await page.evaluate(() => window.scrollTo(0, 0));
 
 // ===========================================================================
-// 2 — Dock schedule
+// 2 — Signing in
 // ===========================================================================
-await chapter(
-  "CHAPTER 1",
-  "The dock schedule screen",
-  "Today's Opendock appointments, rotating in with the roster"
-);
-await say("The board rotates. Give it a moment and the dock schedule comes round.", "Dock schedule");
-for (let i = 0; i < 60; i++) {
-  await wait(1000);
-  const t = await page.innerText("body").catch(() => "");
-  if (/PO \/ REF/i.test(t)) break;
-}
-await ensure();
-await say(
-  "Every appointment on today's dock schedule, sorted by booked time — live work first, finished loads at the bottom.",
-  "Dock schedule"
-);
-await focus("text=/Rejected/i").catch(() => {});
-await say(
-  "The legend at the top explains the colours: red for a rejected load, yellow for late or overdue, green for completed.",
-  "Dock schedule",
-  600
-);
-await clearFocus();
-await focus("text=/Synced/i").catch(() => {});
-await say(
-  "Beside it, how fresh the data is. If this ever says the sync is stale, the Opendock connection needs attention — the dock isn't just quiet.",
-  "Dock schedule"
-);
-await clearFocus();
-await focus("th:has-text('DOOR')").catch(() => {});
-await say(
-  "The door number comes from a DOOR tag on the appointment. It is never guessed from the dock's name, so a blank here means the load simply isn't tagged yet.",
-  "Dock schedule"
-);
-await clearFocus();
-await focus("th:has-text('ON TIME')").catch(() => {});
-await say(
-  "On time compares arrival against the booked slot. Dwell counts from arrival, and keeps running while the truck is still on site. Processing is arrival to in-progress.",
-  "Dock schedule",
-  800
-);
-await clearFocus();
-await say(
-  "The header row stays frozen while the table auto-scrolls, so you always know which column you are reading.",
-  "Dock schedule"
-);
-await wait(6000);
-
-// ===========================================================================
-// 3 — Signing in
-// ===========================================================================
-await chapter("CHAPTER 2", "Signing in", "And choosing which warehouse you are working on");
+await chapter("CHAPTER 1", "Signing in", "And choosing which warehouse you are working on");
 await go("/login");
 await say("Add slash-admin to the board's address to reach the panel. Everyone signs in with their own account.", "Sign in");
 await focus('input[autocomplete="username"]', { ringIt: false });
@@ -388,9 +337,9 @@ await say(
 await clearFocus();
 
 // ===========================================================================
-// 4 — Admin Dashboard
+// 3 — Admin Dashboard
 // ===========================================================================
-await chapter("CHAPTER 3", "Admin Dashboard", "A live mirror of what the floor is seeing");
+await chapter("CHAPTER 2", "Admin Dashboard", "A live mirror of what the floor is seeing");
 await go("/admin");
 await say(
   "Once a warehouse is selected, this tab mirrors the wall board — the same roster, the same counts, the same notices.",
@@ -408,9 +357,9 @@ await say(
 await page.evaluate(() => window.scrollTo(0, 0));
 
 // ===========================================================================
-// 5 — Notices
+// 4 — Notices
 // ===========================================================================
-await chapter("CHAPTER 4", "Notices", "Messages for the floor, and the shift handoff");
+await chapter("CHAPTER 3", "Notices", "Messages for the floor, and the shift handoff");
 await go("/admin/notices");
 await say("Notices are the short messages that scroll on the board. Type it, post it, and it is live.", "Notices");
 const noticeBox = page.locator('input[placeholder*="Notice shown"]').first();
@@ -432,9 +381,9 @@ await say(
 );
 
 // ===========================================================================
-// 6 — Assign
+// 5 — Assign
 // ===========================================================================
-await chapter("CHAPTER 5", "Assign", "The daily plan — attendance, positions and lunches");
+await chapter("CHAPTER 4", "Assign", "The daily plan — attendance, positions and lunches");
 await go("/admin/assign", { settle: 2600 });
 await say("This is where the shift gets set up. Start at the top row of buttons.", "Assign");
 await focus("button:has-text('Mark all Present')");
@@ -498,9 +447,9 @@ await say(
 await clearFocus();
 
 // ===========================================================================
-// 7 — Lunches / Side tasks / Attendance
+// 6 — Lunches / Side tasks / Attendance
 // ===========================================================================
-await chapter("CHAPTER 6", "Lunches, Side Tasks, Attendance", "The rest of the daily tabs");
+await chapter("CHAPTER 5", "Lunches, Side Tasks, Attendance", "The rest of the daily tabs");
 await go("/admin/lunches");
 await say(
   "The Lunches tab shows every lunch window for the shift — including the ones the stagger just laid out — and lets you edit any of them by hand.",
@@ -545,9 +494,9 @@ await say(
 await page.evaluate(() => window.scrollTo(0, 0));
 
 // ===========================================================================
-// 8 — Setup
+// 7 — Setup
 // ===========================================================================
-await chapter("CHAPTER 7", "Setup", "The configuration behind all of it");
+await chapter("CHAPTER 6", "Setup", "The configuration behind all of it");
 await go("/admin/settings", { settle: 2600 });
 await say(
   "Setup is Admin only, and everything in it applies to the warehouse you have selected.",
@@ -624,12 +573,12 @@ await say(
 );
 
 // ===========================================================================
-// 9 — Integrations
+// 8 — Integrations
 // ===========================================================================
-await chapter("CHAPTER 8", "Opendock", "Connecting the dock schedule");
+await chapter("CHAPTER 7", "Opendock", "Where the dock status on the cards comes from");
 await go("/admin/integrations", { settle: 2600 });
 await say(
-  "This is where the dock data comes from. The connection belongs to the selected warehouse, so each site points at its own Opendock warehouse.",
+  "This is where the dock data on those employee cards comes from. The connection belongs to the selected warehouse, so each site points at its own Opendock warehouse.",
   "Integrations",
   600
 );
@@ -688,15 +637,15 @@ await pan(1700);
 await wait(2500);
 await page.evaluate(() => window.scrollTo(0, 0));
 await say(
-  "Rotating the dock schedule onto the board, its text size, and which statuses to hide are all set on this page too — cancelled and requested are hidden by default.",
+  "There is also an optional full dock schedule screen — today's appointments as a table — that can rotate onto the board. Its text size and which statuses it hides are set on this page too.",
   "Integrations",
   700
 );
 
 // ===========================================================================
-// 10 — Locations and screens
+// 9 — Locations and screens
 // ===========================================================================
-await chapter("CHAPTER 9", "Locations and screens", "Running more than one warehouse");
+await chapter("CHAPTER 8", "Locations and screens", "Running more than one warehouse");
 await go("/admin/locations", { settle: 2200 });
 await say(
   "Super-admins get two more tabs. Locations is where warehouses are created and renamed.",
@@ -741,9 +690,9 @@ await say(
 );
 
 // ===========================================================================
-// 11 — Close
+// 10 — Close
 // ===========================================================================
-await chapter("CHAPTER 10", "Back to the floor", "What the shift sees now");
+await chapter("CHAPTER 9", "Back to the floor", "What the shift sees now");
 await go("/", { settle: 3000 });
 await say(
   "Back on the board: the new notice is up, and the lunches the stagger laid out are now on the schedule.",
@@ -757,7 +706,7 @@ await say(
   900
 );
 await page.evaluate(() => window.scrollTo(0, 0));
-await chapter("", "That's the walkthrough", "The written SOP in docs/SOP.md covers every screen in detail");
+await chapter("", "That's the walkthrough", "The written SOP covers every screen in more detail");
 await wait(1200);
 
 await page.evaluate(() => window.__sop.clearCaption());
