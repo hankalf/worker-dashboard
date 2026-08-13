@@ -1,0 +1,10 @@
+# Railway / Nixpacks build config.
+#
+# Prisma 7 requires Node 20.19+ (and @prisma/streams-local wants 22+), but
+# Nixpacks defaults to Node 18 and does not always pick up `.node-version`.
+# NIXPACKS_NODE_VERSION is the setting its Node provider checks first, so
+# pinning it here keeps the builder off 18 regardless of detection order.
+# `engines.node` in package.json and `.nvmrc` say the same thing for every
+# other tool.
+[variables]
+NIXPACKS_NODE_VERSION = "22"

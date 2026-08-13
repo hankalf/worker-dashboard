@@ -47,6 +47,23 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
 
 No local Postgres install? Prisma can run one for you: `npx prisma dev --name warehouse -d` starts a local Postgres and prints a `DATABASE_URL` to put in `.env`. If you use it, also set `PG_IDLE_TIMEOUT_MS=1` in `.env` — that server drops idle connections, so the app must release them immediately.
 
+## Deploying to Railway
+
+`railway.json` sets the build (Nixpacks) and the start command, which migrates,
+seeds, and then launches the server on Railway's `$PORT`. Point the service at
+this repo, add a PostgreSQL plugin so `DATABASE_URL` is injected, and set
+`NEXTAUTH_SECRET` (plus `SUPERADMIN_PASSWORD` if you want a known super-admin
+password).
+
+**Node version.** The stack needs **Node 22+** — Prisma 7 refuses to install on
+anything below 20.19, and `@prisma/streams-local` wants 22. Nixpacks defaults to
+Node 18, so the version is pinned in three places: `NIXPACKS_NODE_VERSION` in
+`nixpacks.toml`, `engines.node` in `package.json`, and `.nvmrc` / `.node-version`.
+If a build still reports `v18.x` and dies on
+`Prisma only supports Node.js versions 20.19+`, add a service variable
+`NIXPACKS_NODE_VERSION=22` in the Railway dashboard — that setting wins over
+everything in the repo.
+
 ## Deploying to Render
 
 This repo includes a `render.yaml` Blueprint that provisions both services in one step:
