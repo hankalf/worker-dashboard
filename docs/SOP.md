@@ -544,6 +544,54 @@ usually means the TV is off, the browser crashed, or the box lost network.
 
 Treat the display URL as a secret — anyone with it can see that board.
 
+### Setting up a Google TV / Android TV box (e.g. onn)
+
+A cheap streaming box (onn, Chromecast with Google TV, any Android TV stick)
+makes a fine wall display, but Google TV ships without a browser and has no
+built-in "open a web page at boot". **Fully Kiosk Browser** fills both gaps:
+it launches itself when the box powers on, loads the screen URL full-screen,
+keeps the display awake, and reloads the page if it ever dies.
+
+**One-time install** (the app is not in the TV Play Store, so it is sideloaded):
+
+1. On the box, open the Play Store and install **Downloader** (by AFTVnews).
+2. **Settings → System → About** and click **Android TV OS build** seven times
+   to unlock Developer options.
+3. **Settings → Apps → Security & restrictions → Unknown sources** — allow
+   **Downloader**.
+4. Open Downloader, go to `fully-kiosk.com`, download the Fully Kiosk Browser
+   APK and install it.
+
+**Configure Fully Kiosk:**
+
+1. **Start URL** — paste the screen's `/screen/<token>` URL from Screen Fleet
+   (use Fully's Remote Admin or a USB keyboard to avoid typing a token with the
+   remote).
+2. **Settings → Device Management** — turn on **Launch on Boot** and
+   **Keep Screen On**.
+3. **Settings → Web Auto Reload** — turn on reload on internet reconnect and
+   an idle reload (e.g. every few hours), so a crashed page heals itself.
+4. Optional: the paid Plus licence (one-time, per device) adds full kiosk
+   lockdown so the remote can't leave the app. Not required for a wall display.
+
+**Box settings so it never sleeps:**
+
+- **Settings → System → Energy saver → Turn off display** → **Never** (Google
+  TV defaults to switching the display off after a few idle hours).
+- Screen saver / Ambient mode → set to never start, or leave it — Fully's
+  Keep Screen On overrides it.
+
+**Power-cycle behaviour:** power the box from its own wall adapter, not the
+TV's USB port (TV USB can underpower it and adds a second failure point). When
+power returns after an outage the box boots on its own, Fully launches on boot,
+and the board is back with nobody touching a remote. Enable HDMI-CEC on the TV
+so it wakes and switches to the box's input. If the board was up before the
+network was, the NO INTERNET bar shows until the connection returns, then
+clears itself (§20).
+
+**Verify:** the screen shows **online now** in Screen Fleet — send **Identify**
+to flash that TV and confirm you're looking at the right one.
+
 ---
 
 ## 20. The wall board
