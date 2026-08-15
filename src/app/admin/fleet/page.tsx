@@ -10,6 +10,7 @@ type Screen = {
   token: string;
   locationId: string;
   lastSeenAt: string | null;
+  theme: string;
   location: { name: string; slug: string };
 };
 
@@ -98,6 +99,24 @@ export default function FleetPage() {
     });
     setSent(res.ok ? `${screen.id}:${command}` : null);
     setTimeout(() => setSent((s) => (s === `${screen.id}:${command}` ? null : s)), 1500);
+  };
+
+  // Theme is a persistent setting (survives reboots), not a one-shot command —
+  // the live screen picks the change up on its next heartbeat (≤15s).
+  const toggleTheme = async (screen: Screen) => {
+    const next = screen.theme === "dark" ? "light" : "dark";
+    const res = await fetch(`/api/screens/${screen.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme: next }),
+    });
+    if (res.ok) {
+      setScreens((all) =>
+        all.map((s) => (s.id === screen.id ? { ...s, theme: next } : s))
+      );
+      setSent(`${screen.id}:theme`);
+      setTimeout(() => setSent((s) => (s === `${screen.id}:theme` ? null : s)), 1500);
+    }
   };
 
   const copyUrl = async (token: string) => {
@@ -222,6 +241,17 @@ export default function FleetPage() {
                           {sent === `${screen.id}:${cmd}` ? "Sent ✓" : cmd}
                         </button>
                       ))}
+                      <button
+                        onClick={() => toggleTheme(screen)}
+                        title={`Now in ${screen.theme} mode — click to switch. The screen updates within ~15s.`}
+                        className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                      >
+                        {sent === `${screen.id}:theme`
+                          ? "Saved ✓"
+                          : screen.theme === "dark"
+                            ? "☀ Light mode"
+                            : "🌙 Dark mode"}
+                      </button>
                     </div>
                   </li>
                 );

@@ -27,7 +27,12 @@ export function ScreenController({ token, name }: { token: string; name: string 
       try {
         const res = await fetch(`/api/screen/${token}/heartbeat`, { method: "POST" });
         if (!res.ok || !alive) return;
-        const { command, commandArg } = await res.json();
+        const { command, commandArg, theme } = await res.json();
+        // Theme is a persistent per-screen setting; re-assert it on every beat
+        // so a Fleet toggle lands within one poll, no reload needed.
+        if (theme === "dark" || theme === "light") {
+          document.documentElement.classList.toggle("dark", theme === "dark");
+        }
         if (command === "refresh") {
           window.location.reload();
         } else if (command === "identify") {

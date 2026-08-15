@@ -32,9 +32,11 @@ export async function POST(
     },
   });
 
+  // theme rides along on every beat, so a Fleet toggle reaches the screen
+  // within one poll and a rebooted screen re-syncs immediately.
   return NextResponse.json(
     fresh
-      ? { command: screen.command, commandArg: screen.commandArg }
-      : { command: null }
+      ? { command: screen.command, commandArg: screen.commandArg, theme: screen.theme }
+      : { command: null, theme: screen.theme }
   );
 }

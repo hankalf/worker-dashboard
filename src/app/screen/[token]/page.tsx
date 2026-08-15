@@ -53,6 +53,16 @@ export default async function ScreenPage({
   const props = await runWithLocation(screen.locationId, fetchBoardProps);
   return (
     <>
+      {/* The root layout themes from the viewer's cookie, which a wall display
+          doesn't have — apply this screen's own theme before first paint. The
+          heartbeat re-asserts it afterwards, so Fleet toggles land live. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.documentElement.classList.${
+            screen.theme === "dark" ? "add" : "remove"
+          }("dark");`,
+        }}
+      />
       <ScreenController token={screen.token} name={screen.name} />
       <DashboardView {...props} title={screen.location.name} isAdmin={false} />
     </>

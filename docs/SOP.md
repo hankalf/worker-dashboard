@@ -534,8 +534,10 @@ screens apart from the tab bar alone.
 | **Refresh** | Reloads the screen. Use after a settings change that has not appeared. |
 | **Identify** | Flashes a marker on that screen so you can tell which physical TV it is. |
 | **Message** | Puts a short message on that one screen. |
+| **Dark / Light mode** | Switches that screen's theme. Unlike the three commands above this is a **setting, not a one-shot** — it sticks through reboots and power cycles. The button shows the mode it will switch *to*. |
 
-Commands are picked up on the screen's next check-in, so allow a few seconds.
+Commands are picked up on the screen's next check-in, so allow a few seconds —
+the theme toggle lands the same way, within about 15 seconds, no reload needed.
 
 **Status** — each screen shows **online now** or when it was last seen, or
 *never opened* if the URL has not been loaded yet. If a screen goes quiet for
