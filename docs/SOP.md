@@ -535,9 +535,12 @@ screens apart from the tab bar alone.
 | **Identify** | Flashes a marker on that screen so you can tell which physical TV it is. |
 | **Message** | Puts a short message on that one screen. |
 | **Dark / Light mode** | Switches that screen's theme. Unlike the three commands above this is a **setting, not a one-shot** — it sticks through reboots and power cycles. The button shows the mode it will switch *to*. |
+| **A− / A+ (text size)** | Scales everything on that screen, 50–200%. Like browser zoom, so the layout reflows rather than cropping. A TV read from across the floor usually wants **130–150%**; a desk monitor stays at 100%. A setting, like theme — it survives reboots. |
 
 Commands are picked up on the screen's next check-in, so allow a few seconds —
-the theme toggle lands the same way, within about 15 seconds, no reload needed.
+the theme and text-size settings land the same way, within about 15 seconds, no
+reload needed. Because both are applied by the board itself, they work on any
+device showing the URL — locked-down signage players included.
 
 **Status** — each screen shows **online now** or when it was last seen, or
 *never opened* if the URL has not been loaded yet. If a screen goes quiet for
@@ -550,11 +553,23 @@ Treat the display URL as a secret — anyone with it can see that board.
 
 A cheap streaming box (onn, Chromecast with Google TV, any Android TV stick)
 makes a fine wall display, but Google TV ships without a browser and has no
-built-in "open a web page at boot". **Fully Kiosk Browser** fills both gaps:
+built-in "open a web page at boot". Two ways to fill that gap:
+
+**Option A — a signage player from the TV's own Play Store (no sideloading).**
+Install a digital-signage app such as **AbleSign** from the Play Store, add the
+screen's display URL as a web-page item, and enable the app's start-on-boot
+option. A dedicated signage device such as the **Amazon Signage Stick** works
+the same way: give its player the display URL. These players are deliberately
+locked down and expose few page controls — that is fine, because theme and text
+size are set **from Screen Fleet**, not on the device.
+
+**Option B — Fully Kiosk Browser (sideloaded).** More control (remote admin,
+auto-reload tuning, full kiosk lockdown), at the cost of a one-time sideload:
 it launches itself when the box powers on, loads the screen URL full-screen,
 keeps the display awake, and reloads the page if it ever dies.
 
-**One-time install** (the app is not in the TV Play Store, so it is sideloaded):
+**One-time install for Option B** (the app is not in the TV Play Store, so it
+is sideloaded):
 
 1. On the box, open the Play Store and install **Downloader** (by AFTVnews).
 2. **Settings → System → About** and click **Android TV OS build** seven times
@@ -590,6 +605,17 @@ and the board is back with nobody touching a remote. Enable HDMI-CEC on the TV
 so it wakes and switches to the box's input. If the board was up before the
 network was, the NO INTERNET bar shows until the connection returns, then
 clears itself (§20).
+
+**If the text looks small or soft on the TV:**
+
+- Small → raise that screen's **text size** in Screen Fleet (A+); 130–150% is
+  typical for a TV read from across the floor.
+- Soft/blurry → that is the device's video output, not the board. Check the
+  box or stick is outputting the TV's native resolution (Settings → Display —
+  1080p minimum, 4K if the panel is 4K), turn off the TV's overscan (picture
+  size **Just Scan** / **Fit** / **100%**), and put that HDMI input in
+  **PC/Game mode** so the TV stops re-processing the image. Refresh rate
+  (60 Hz vs 30 Hz) does not blur text — resolution and overscan do.
 
 **Verify:** the screen shows **online now** in Screen Fleet — send **Identify**
 to flash that TV and confirm you're looking at the right one.

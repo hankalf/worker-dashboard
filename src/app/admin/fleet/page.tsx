@@ -11,8 +11,15 @@ type Screen = {
   locationId: string;
   lastSeenAt: string | null;
   theme: string;
+  zoom: number;
   location: { name: string; slug: string };
 };
+
+// Text-size steps offered per screen. 100 = normal; TVs read from across the
+// floor usually land around 130–150.
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
+const ZOOM_STEP = 10;
 
 // A screen counts as "online" if it's loaded the board in the last 2 minutes
 // (the board auto-refreshes well within that window).
@@ -116,6 +123,23 @@ export default function FleetPage() {
       );
       setSent(`${screen.id}:theme`);
       setTimeout(() => setSent((s) => (s === `${screen.id}:theme` ? null : s)), 1500);
+    }
+  };
+
+  // Like theme, text size is a persistent setting — the live screen picks the
+  // change up on its next heartbeat (≤15s) and it survives reboots.
+  const stepZoom = async (screen: Screen, delta: number) => {
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, screen.zoom + delta));
+    if (next === screen.zoom) return;
+    const res = await fetch(`/api/screens/${screen.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ zoom: next }),
+    });
+    if (res.ok) {
+      setScreens((all) =>
+        all.map((s) => (s.id === screen.id ? { ...s, zoom: next } : s))
+      );
     }
   };
 
@@ -252,6 +276,30 @@ export default function FleetPage() {
                             ? "☀ Light mode"
                             : "🌙 Dark mode"}
                       </button>
+                      <span
+                        className="ml-1 inline-flex items-center overflow-hidden rounded-md border border-zinc-700"
+                        title="Text size on this screen — updates within ~15s, no reload. TVs usually read best at 130–150%."
+                      >
+                        <button
+                          onClick={() => stepZoom(screen, -ZOOM_STEP)}
+                          disabled={screen.zoom <= ZOOM_MIN}
+                          aria-label="Smaller text"
+                          className="px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                        >
+                          A−
+                        </button>
+                        <span className="border-x border-zinc-700 px-2 py-1 text-xs tabular-nums text-zinc-400">
+                          {screen.zoom}%
+                        </span>
+                        <button
+                          onClick={() => stepZoom(screen, ZOOM_STEP)}
+                          disabled={screen.zoom >= ZOOM_MAX}
+                          aria-label="Larger text"
+                          className="px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                        >
+                          A+
+                        </button>
+                      </span>
                     </div>
                   </li>
                 );

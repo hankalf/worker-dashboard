@@ -27,11 +27,17 @@ export function ScreenController({ token, name }: { token: string; name: string 
       try {
         const res = await fetch(`/api/screen/${token}/heartbeat`, { method: "POST" });
         if (!res.ok || !alive) return;
-        const { command, commandArg, theme } = await res.json();
-        // Theme is a persistent per-screen setting; re-assert it on every beat
-        // so a Fleet toggle lands within one poll, no reload needed.
+        const { command, commandArg, theme, zoom } = await res.json();
+        // Theme and text size are persistent per-screen settings; re-assert
+        // them on every beat so a Fleet change lands within one poll.
         if (theme === "dark" || theme === "light") {
           document.documentElement.classList.toggle("dark", theme === "dark");
+        }
+        if (typeof zoom === "number" && zoom >= 50 && zoom <= 200) {
+          // CSS zoom (not transform) so everything reflows; modern Chromium
+          // keeps viewport units visually correct under root zoom, so the
+          // board's fixed-height layout still fits the screen exactly.
+          document.documentElement.style.zoom = zoom === 100 ? "" : `${zoom}%`;
         }
         if (command === "refresh") {
           window.location.reload();

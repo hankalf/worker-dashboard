@@ -103,6 +103,10 @@ model Screen {
   // reboots), applied server-side on /screen/[token] and re-applied live via
   // the heartbeat, so the Fleet toggle takes effect within one poll.
   theme      String    @default("light")
+  // Text size for this screen as a percentage (50–200). Applied like browser
+  // zoom so everything reflows; a TV read from across the floor wants ~130%
+  // where a desk monitor wants 100%. Same persistence/live path as theme.
+  zoom       Int       @default(100)
   // A one-shot command pushed to this screen, picked up (and cleared) on its
   // next heartbeat poll: "refresh" | "identify" | "message". commandArg carries
   // the message text; commandAt gates it to a short freshness window.

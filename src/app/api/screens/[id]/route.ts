@@ -11,9 +11,9 @@ export async function PATCH(
   if (!(await requireSuperAdmin()))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
-  const { name, locationId, theme } = await req.json();
+  const { name, locationId, theme, zoom } = await req.json();
 
-  const data: { name?: string; locationId?: string; theme?: string } = {};
+  const data: { name?: string; locationId?: string; theme?: string; zoom?: number } = {};
   if (typeof name === "string" && name.trim()) data.name = name.trim();
   if (typeof locationId === "string" && locationId) {
     const location = await prisma.location.findUnique({ where: { id: locationId } });
@@ -27,13 +27,26 @@ export async function PATCH(
     }
     data.theme = theme;
   }
-  if (!data.name && !data.locationId && !data.theme) {
+  if (zoom !== undefined) {
+    const z = Math.round(Number(zoom));
+    if (!Number.isFinite(z) || z < 50 || z > 200) {
+      return NextResponse.json(
+        { error: "Text size must be between 50 and 200 percent" },
+        { status: 400 }
+      );
+    }
+    data.zoom = z;
+  }
+  if (!data.name && !data.locationId && !data.theme && data.zoom === undefined) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
   const screen = await prisma.screen.update({ where: { id }, data });
   if (data.theme) {
     await logActivity("Fleet", `Set screen "${screen.name}" to ${data.theme} mode`);
+  }
+  if (data.zoom !== undefined) {
+    await logActivity("Fleet", `Set screen "${screen.name}" text size to ${data.zoom}%`);
   }
   return NextResponse.json(screen);
 }

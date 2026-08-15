@@ -54,13 +54,18 @@ export default async function ScreenPage({
   return (
     <>
       {/* The root layout themes from the viewer's cookie, which a wall display
-          doesn't have — apply this screen's own theme before first paint. The
-          heartbeat re-asserts it afterwards, so Fleet toggles land live. */}
+          doesn't have — apply this screen's own theme and text size before
+          first paint. The heartbeat re-asserts both, so Fleet changes land
+          live. */}
       <script
         dangerouslySetInnerHTML={{
-          __html: `document.documentElement.classList.${
-            screen.theme === "dark" ? "add" : "remove"
-          }("dark");`,
+          __html:
+            `document.documentElement.classList.${
+              screen.theme === "dark" ? "add" : "remove"
+            }("dark");` +
+            (screen.zoom !== 100
+              ? `document.documentElement.style.zoom="${screen.zoom}%";`
+              : ""),
         }}
       />
       <ScreenController token={screen.token} name={screen.name} />
