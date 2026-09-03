@@ -114,6 +114,13 @@ model Screen {
   commandArg String?
   commandAt  DateTime?
   createdAt  DateTime  @default(now())
+
+  // This index already exists in the database — the screen_fleet migration
+  // creates Screen_locationId_idx — but it was never declared here. Declaring
+  // it costs nothing (the column is indexed either way) and stops the next
+  // `prisma migrate dev` generating a migration that DROPS it, which would
+  // quietly slow every per-location screen lookup.
+  @@index([locationId])
 }
 
 // Every person in the warehouse. Employees with admin access get a
