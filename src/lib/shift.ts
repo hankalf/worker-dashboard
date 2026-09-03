@@ -124,3 +124,42 @@ export const currentShift = (
   if (cur >= bounds.secondStart && cur < bounds.thirdStart) return "SECOND";
   return "THIRD";
 };
+
+// Which shift a "Coming In" time falls in, or null when there isn't one. The
+// stored value is an instant, so this is just currentShift() at that instant.
+export const comingInShift = (
+  comingInAt: Date | string | null | undefined,
+  bounds: ShiftBounds = DEFAULT_SHIFT_BOUNDS
+): ShiftKey | null => {
+  if (!comingInAt) return null;
+  const at = comingInAt instanceof Date ? comingInAt : new Date(comingInAt);
+  return Number.isNaN(at.getTime()) ? null : currentShift(at, bounds);
+};
+
+// The shift an employee is actually working, which is not always the one on
+// their record: marking someone "Coming In" at a time inside another shift
+// means they are working THAT shift today. Their own shift's page should stop
+// listing them, or a lead counting heads sees the same person twice.
+//
+// `coverUntil` bounds it — once that has passed the arrangement is over and
+// they revert to their own shift.
+export function effectiveShift(
+  employee: {
+    shift: ShiftKey | string | null;
+    comingInAt?: Date | string | null;
+    coverUntil?: Date | string | null;
+  },
+  now: Date,
+  bounds: ShiftBounds = DEFAULT_SHIFT_BOUNDS
+): ShiftKey | null {
+  const own = (employee.shift ?? null) as ShiftKey | null;
+  const cover = employee.coverUntil ? new Date(employee.coverUntil) : null;
+  // An expired (or missing) cover window means the arrangement is not live.
+  if (!cover || Number.isNaN(cover.getTime()) || cover.getTime() <= now.getTime())
+    return own;
+  const coming = comingInShift(employee.comingInAt, bounds);
+  // No coming-in time, or coming in on their own shift: nothing moves. Someone
+  // with no shift at all has nothing to be displaced from.
+  if (!coming || !own || coming === own) return own;
+  return coming;
+}

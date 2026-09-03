@@ -115,6 +115,11 @@ export async function PATCH(
     if (body.username !== undefined) data.username = body.username || null;
     if (body.hireDate !== undefined) data.hireDate = body.hireDate || null;
     if (body.birthDate !== undefined) data.birthDate = body.birthDate || null;
+    // Employee number and the two misc fields: admin-only, hence in this block.
+    if (body.employeeNumber !== undefined)
+      data.employeeNumber = body.employeeNumber || null;
+    if (body.misc1 !== undefined) data.misc1 = body.misc1 || null;
+    if (body.misc2 !== undefined) data.misc2 = body.misc2 || null;
     if (body.roleIds !== undefined) {
       data.roles = {
         set: (body.roleIds as string[]).map((roleId) => ({ id: roleId })),

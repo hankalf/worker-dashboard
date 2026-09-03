@@ -21,6 +21,10 @@ export async function GET(req: Request) {
 
   const employees = await prisma.employee.findMany({
     where: includeTerminated ? undefined : { terminatedAt: null },
+    // The misc fields are admin-only by definition, and leads/supervisors fetch
+    // this same roster to run the Assign board. Don't select them for anyone
+    // else, rather than trusting the UI not to render what it was sent.
+    omit: staff.isAdmin ? undefined : { misc1: true, misc2: true },
     include: {
       position: true,
       roles: true,
@@ -52,6 +56,9 @@ export async function POST(req: Request) {
     breakStart,
     hireDate,
     birthDate,
+    employeeNumber,
+    misc1,
+    misc2,
   } = await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -83,6 +90,9 @@ export async function POST(req: Request) {
         breakStart: breakStart || null,
         hireDate: hireDate || null,
         birthDate: birthDate || null,
+        employeeNumber: employeeNumber || null,
+        misc1: misc1 || null,
+        misc2: misc2 || null,
         roles: {
           connect: (roleIds ?? []).map((id: string) => ({ id })),
         },
