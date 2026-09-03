@@ -11,5 +11,12 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // Only needed by the commands that replay migrations into a scratch
+    // database — `prisma migrate dev` and the drift check:
+    //   prisma migrate diff --from-migrations ./prisma/migrations \
+    //     --to-schema ./prisma/schema.prisma --exit-code
+    // (exit 0 = schema.prisma and the migrations agree, 2 = they have drifted).
+    // Unset in production, where `migrate deploy` never touches it.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
