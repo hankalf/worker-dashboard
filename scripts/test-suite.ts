@@ -19,7 +19,21 @@ import {
   easternDateTimeInput,
   easternInputToUtcISO,
 } from "@/lib/time";
-import { currentShift, shiftEndDate, SHIFTS } from "@/lib/shift";
+import {
+  currentShift,
+  shiftEndDate,
+  SHIFTS,
+  effectiveShift,
+  comingInShift,
+  DEFAULT_SHIFT_BOUNDS,
+} from "@/lib/shift";
+import {
+  normalizeDate,
+  normalizeBirthday,
+  inferDateStyle,
+  matchPosition,
+  suggestPositions,
+} from "@/lib/importValues";
 import { splitNotices, MAX_VISIBLE_NOTICES } from "@/lib/announcements";
 import {
   priorityLabel,
@@ -266,6 +280,134 @@ function unitTests() {
   eq("anniversary (month) any day in month", anniversaryYearsThisMonth("2020-07-25", "2026-07-08"), 6);
   eq("anniversary (month) null other months", anniversaryYearsThisMonth("2020-06-25", "2026-07-08"), null);
   eq("anniversary (month) null under 1 year", anniversaryYearsThisMonth("2026-07-25", "2026-07-08"), null);
+
+  // ---- spreadsheet import: date normalization ----------------------------
+  group("importValues.normalizeDate");
+  eq("already ISO", normalizeDate("2021-03-15"), "2021-03-15");
+  eq("ISO with a time part", normalizeDate("2021-03-15T00:00:00Z"), "2021-03-15");
+  eq("US slashes", normalizeDate("3/15/2021"), "2021-03-15");
+  eq("US zero-padded", normalizeDate("03/15/2021"), "2021-03-15");
+  eq("dashes", normalizeDate("3-15-2021"), "2021-03-15");
+  eq("dots", normalizeDate("3.15.2021"), "2021-03-15");
+  eq("two-digit year 21 -> 2021", normalizeDate("3/15/21"), "2021-03-15");
+  eq("two-digit year 98 -> 1998", normalizeDate("3/15/98"), "1998-03-15");
+  eq("leading 4-digit year", normalizeDate("2021/03/15"), "2021-03-15");
+  eq("day over 12 forces DMY", normalizeDate("25/12/2021"), "2021-12-25");
+  eq("explicit DMY style", normalizeDate("3/4/2021", "DMY"), "2021-04-03");
+  eq("explicit MDY style", normalizeDate("3/4/2021", "MDY"), "2021-03-04");
+  eq("named month, day first", normalizeDate("15-Mar-2021"), "2021-03-15");
+  eq("named month, month first", normalizeDate("Mar 15 2021"), "2021-03-15");
+  eq("named month with ordinal", normalizeDate("March 15th, 2021"), "2021-03-15");
+  eq("a real Date cell", normalizeDate(new Date("2021-03-15T00:00:00Z")), "2021-03-15");
+  eq("Excel serial number", normalizeDate(44270), "2021-03-15");
+  eq("blank is null", normalizeDate(""), null);
+  eq("nonsense is null", normalizeDate("not a date"), null);
+  eq("impossible day is null", normalizeDate("2/30/2021"), null);
+  eq("a bare year is not a date", normalizeDate(2021), null);
+
+  group("importValues.inferDateStyle");
+  eq("day over 12 anywhere -> DMY", inferDateStyle(["3/4/2021", "25/12/2021"]), "DMY");
+  eq("month over 12 -> MDY", inferDateStyle(["3/25/2021", "3/4/2021"]), "MDY");
+  eq("ambiguous defaults to MDY", inferDateStyle(["3/4/2021"]), "MDY");
+
+  group("importValues.normalizeBirthday");
+  eq("full date drops the year", normalizeBirthday("1992-07-08"), "0000-07-08");
+  eq("US slashes", normalizeBirthday("7/8/1992"), "0000-07-08");
+  eq("month/day only", normalizeBirthday("7/8"), "0000-07-08");
+  eq("day over 12, no year", normalizeBirthday("25/12"), "0000-12-25");
+  eq("Feb 29 is allowed", normalizeBirthday("2/29"), "0000-02-29");
+  eq("blank is null", normalizeBirthday(""), null);
+
+  // ---- spreadsheet import: position matching -----------------------------
+  const POS = [
+    { id: "p1", title: "Forklift Operator" },
+    { id: "p2", title: "Receiving Clerk" },
+    { id: "p3", title: "Shipping" },
+  ];
+  group("importValues.matchPosition");
+  eq("exact", matchPosition("Forklift Operator", POS)?.id, "p1");
+  eq("case-insensitive", matchPosition("forklift operator", POS)?.id, "p1");
+  eq("ignores punctuation/spacing", matchPosition("Fork-Lift  Operator", POS)?.id, "p1");
+  eq("no match returns null", matchPosition("Fokrlift Operator", POS), null);
+  eq("blank returns null", matchPosition("", POS), null);
+
+  group("importValues.suggestPositions");
+  eq(
+    "transposed letters",
+    suggestPositions("Fokrlift Operator", POS)[0]?.id,
+    "p1"
+  );
+  eq("dropped letter", suggestPositions("Shiping", POS)[0]?.id, "p3");
+  eq("partial entry", suggestPositions("fork", POS)[0]?.id, "p1");
+  eq("unrelated gets nothing", suggestPositions("Accounting Manager", POS).length, 0);
+
+  // ---- "Coming In" on another shift moves them off their own shift -------
+  group("shift.comingInShift");
+  const b = DEFAULT_SHIFT_BOUNDS;
+  eq("8am is 1st", comingInShift(easternAt("2026-07-04T08:00"), b), "FIRST");
+  eq("3pm is 2nd", comingInShift(easternAt("2026-07-04T15:00"), b), "SECOND");
+  eq("11pm is 3rd", comingInShift(easternAt("2026-07-04T23:00"), b), "THIRD");
+  eq("none is null", comingInShift(null, b), null);
+
+  group("shift.effectiveShift");
+  const noon = easternAt("2026-07-04T12:00");
+  eq(
+    "no coming-in time keeps their own shift",
+    effectiveShift({ shift: "FIRST", comingInAt: null, coverUntil: null }, noon, b),
+    "FIRST"
+  );
+  eq(
+    "coming in on another shift moves them to it",
+    effectiveShift(
+      {
+        shift: "FIRST",
+        comingInAt: easternAt("2026-07-04T15:00"),
+        coverUntil: easternAt("2026-07-05T06:00"),
+      },
+      noon,
+      b
+    ),
+    "SECOND"
+  );
+  eq(
+    "coming in on their own shift changes nothing",
+    effectiveShift(
+      {
+        shift: "FIRST",
+        comingInAt: easternAt("2026-07-04T08:00"),
+        coverUntil: easternAt("2026-07-05T06:00"),
+      },
+      noon,
+      b
+    ),
+    "FIRST"
+  );
+  eq(
+    "an expired cover window reverts them",
+    effectiveShift(
+      {
+        shift: "FIRST",
+        comingInAt: easternAt("2026-07-03T15:00"),
+        coverUntil: easternAt("2026-07-04T06:00"),
+      },
+      noon,
+      b
+    ),
+    "FIRST"
+  );
+  eq(
+    "no shift on record stays no shift",
+    effectiveShift(
+      {
+        shift: null,
+        comingInAt: easternAt("2026-07-04T15:00"),
+        coverUntil: easternAt("2026-07-05T06:00"),
+      },
+      noon,
+      b
+    ),
+    null
+  );
 }
 
 // ===========================================================================

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { APP_TZ } from "@/lib/time";
 import { todayKey, anniversaryYears, isBirthday } from "@/lib/celebrations";
+import { effectiveShift } from "@/lib/shift";
+import { CsvImport } from "@/components/CsvImport";
 
 type Position = { id: string; title: string };
 type Role = { id: string; name: string };
@@ -31,6 +33,12 @@ type Employee = {
   lunchStart: string | null;
   hireDate: string | null;
   birthDate: string | null;
+  employeeNumber: string | null;
+  // Admin-only. Stripped for non-admins by the API and never sent to the board.
+  misc1: string | null;
+  misc2: string | null;
+  comingInAt: string | null;
+  coverUntil: string | null;
   terminatedAt: string | null;
 };
 
@@ -177,7 +185,12 @@ function EmployeeCardRow({
               </span>
             )}
           </div>
-          {/* Position */}
+          {/* Employee number, then position */}
+          {employee.employeeNumber && (
+            <div className="mt-0.5 font-mono text-xs text-zinc-500">
+              #{employee.employeeNumber}
+            </div>
+          )}
           <div className="mt-0.5 text-sm text-zinc-400">
             {employee.position?.title ?? "No position"}
             {employee.username ? ` · ${employee.username}` : ""}
@@ -186,6 +199,14 @@ function EmployeeCardRow({
           {employee.capabilities.length > 0 && (
             <div className="mt-1 text-xs font-bold text-zinc-200">
               {employee.capabilities.map((cap) => cap.name).join(" · ")}
+            </div>
+          )}
+          {/* Admin-only misc fields. This page is admin-gated and these never
+              reach the board, so showing them here is the point of them. */}
+          {(employee.misc1 || employee.misc2) && (
+            <div className="mt-1 flex flex-col gap-0.5 border-l-2 border-zinc-700 pl-2 text-xs text-zinc-400">
+              {employee.misc1 && <span>{employee.misc1}</span>}
+              {employee.misc2 && <span>{employee.misc2}</span>}
             </div>
           )}
           {/* Hire / birth dates (always shown) */}
@@ -264,6 +285,10 @@ export default function EmployeesPage() {
   const [attendance, setAttendance] = useState<Attendance>("PRESENT");
   const [isLead, setIsLead] = useState(false);
   const [hireDate, setHireDate] = useState("");
+  const [employeeNumber, setEmployeeNumber] = useState("");
+  // Two free-text admin-only fields — see the Employee model.
+  const [misc1, setMisc1] = useState("");
+  const [misc2, setMisc2] = useState("");
   // Birthday is month + day only (stored as "0000-MM-DD" — the year is ignored
   // everywhere birthdays are shown).
   const [birthMonth, setBirthMonth] = useState("");
@@ -274,9 +299,6 @@ export default function EmployeesPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async (withTerminated = showTerminated) => {
     const [employeesRes, positionsRes, rolesRes, capabilitiesRes] =
@@ -343,6 +365,9 @@ export default function EmployeesPage() {
     setHireDate("");
     setBirthMonth("");
     setBirthDay("");
+    setEmployeeNumber("");
+    setMisc1("");
+    setMisc2("");
     setEditingId(null);
   };
 
@@ -388,6 +413,9 @@ export default function EmployeesPage() {
         hireDate,
         birthDate:
           birthMonth && birthDay ? `0000-${birthMonth}-${birthDay}` : "",
+        employeeNumber,
+        misc1,
+        misc2,
       }),
     });
 
@@ -414,6 +442,9 @@ export default function EmployeesPage() {
     setAttendance(employee.attendance ?? "PRESENT");
     setIsLead(employee.isLead ?? false);
     setHireDate(employee.hireDate ?? "");
+    setEmployeeNumber(employee.employeeNumber ?? "");
+    setMisc1(employee.misc1 ?? "");
+    setMisc2(employee.misc2 ?? "");
     setBirthMonth(employee.birthDate ? employee.birthDate.slice(5, 7) : "");
     setBirthDay(employee.birthDate ? employee.birthDate.slice(8, 10) : "");
     // The form lives at the top of a long list, so clicking Edit far down the
@@ -443,32 +474,6 @@ export default function EmployeesPage() {
     load();
   };
 
-  const handleImport = async (file: File) => {
-    setImporting(true);
-    setImportResult(null);
-    setError(null);
-
-    const csv = await file.text();
-    const res = await fetch("/api/employees/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ csv }),
-    });
-    const body = await res.json().catch(() => ({}));
-    setImporting(false);
-
-    if (!res.ok) {
-      setError(body.error ?? "Import failed");
-      return;
-    }
-
-    const parts = [`Imported ${body.created} employee${body.created === 1 ? "" : "s"}.`];
-    if (body.errors?.length) {
-      parts.push(`Skipped ${body.errors.length}: ${body.errors.join(" · ")}`);
-    }
-    setImportResult(parts.join(" "));
-    load();
-  };
 
   if (!guarded) {
     return <p className="text-sm text-zinc-500">Checking access…</p>;
@@ -482,61 +487,48 @@ export default function EmployeesPage() {
     <div>
       <h2 className="mb-4 text-lg font-semibold text-white">Employees</h2>
 
-      <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-white">Import from CSV</h3>
-          <a
-            href="/api/employees/export"
-            download
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
-          >
-            Export all employees
-          </a>
-        </div>
-        <p className="mb-3 text-sm text-zinc-400">
-          Upload a CSV with columns: <code className="text-zinc-300">name</code>,{" "}
-          <code className="text-zinc-300">position</code>,{" "}
-          <code className="text-zinc-300">equipment</code> and{" "}
-          <code className="text-zinc-300">roles</code> (separate multiple with
-          semicolons), <code className="text-zinc-300">admin</code>{" "}
-          (yes/no), <code className="text-zinc-300">username</code> and{" "}
-          <code className="text-zinc-300">password</code> (required for admins),
-          <code className="text-zinc-300">shift</code> (1, 2, or 3), and{" "}
-          <code className="text-zinc-300">hire_date</code> /{" "}
-          <code className="text-zinc-300">birth_date</code> (YYYY-MM-DD).
-          Positions, equipment, and roles that don&apos;t exist yet are created
-          automatically.{" "}
-          <a
-            href="/employee-import-sample.csv"
-            download
-            className="text-blue-400 underline hover:text-blue-300"
-          >
-            Download the sample CSV
-          </a>
-          . Export writes these same columns (minus{" "}
-          <code className="text-zinc-300">password</code>, which is only stored
-          hashed) plus <code className="text-zinc-300">terminated_at</code>, and
-          covers current and terminated employees.
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          disabled={importing}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              handleImport(file);
-              e.target.value = "";
-            }
-          }}
-          className="text-sm text-zinc-400 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-blue-500"
-        />
-        {importing && <p className="mt-2 text-sm text-zinc-400">Importing...</p>}
-        {importResult && (
-          <p className="mt-2 text-sm text-green-400">{importResult}</p>
-        )}
+      <div className="mb-2 flex justify-end">
+        <a
+          href="/api/employees/export"
+          download
+          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
+        >
+          Export all employees
+        </a>
       </div>
+      <CsvImport
+        endpoint="/api/employees/import"
+        sampleHref="/employee-import-sample.csv"
+        onDone={load}
+        instructions={
+          <>
+            Upload a <code className="text-zinc-300">.csv</code> or{" "}
+            <code className="text-zinc-300">.xlsx</code> with columns:{" "}
+            <code className="text-zinc-300">name</code>,{" "}
+            <code className="text-zinc-300">employee_number</code>,{" "}
+            <code className="text-zinc-300">position</code>,{" "}
+            <code className="text-zinc-300">equipment</code> and{" "}
+            <code className="text-zinc-300">roles</code> (separate multiple with
+            semicolons), <code className="text-zinc-300">misc1</code> /{" "}
+            <code className="text-zinc-300">misc2</code>,{" "}
+            <code className="text-zinc-300">admin</code> (yes/no),{" "}
+            <code className="text-zinc-300">username</code> and{" "}
+            <code className="text-zinc-300">password</code> (required for
+            admins), <code className="text-zinc-300">shift</code> (1, 2, or 3),
+            and <code className="text-zinc-300">hire_date</code> /{" "}
+            <code className="text-zinc-300">birth_date</code> in any common
+            format — they are reformatted to match. Equipment and roles that
+            don&apos;t exist are created automatically;{" "}
+            <strong className="text-zinc-300">positions are not</strong> — an
+            unrecognised position is queried before anything is imported, so a
+            typo can&apos;t add a column to the board. Export writes these same
+            columns (minus <code className="text-zinc-300">password</code>,
+            which is only stored hashed) plus{" "}
+            <code className="text-zinc-300">terminated_at</code>, and covers
+            current and terminated employees.
+          </>
+        }
+      />
 
       <form
         ref={formRef}
@@ -550,14 +542,22 @@ export default function EmployeesPage() {
             assignment on the left, capabilities + panel access on the right. */}
         <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-3">
-        <input
-          ref={nameRef}
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className={inputClass}
-        />
+        <div className="grid grid-cols-3 gap-3">
+          <input
+            ref={nameRef}
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className={`col-span-2 ${inputClass}`}
+          />
+          <input
+            placeholder="Employee #"
+            value={employeeNumber}
+            onChange={(e) => setEmployeeNumber(e.target.value)}
+            className={inputClass}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <select
             value={positionId}
@@ -641,6 +641,27 @@ export default function EmployeesPage() {
               className="h-4 w-4"
             />
             Lead (shown first in their position)
+          </label>
+          {/* Admin-only notes. Never sent to the board (see boardData.ts) and
+              stripped from the roster leads fetch, so nothing typed here can
+              reach a wall display. */}
+          <label className="col-span-2 text-xs text-zinc-400">
+            Misc 1 (admin only — not shown on the dashboard)
+            <input
+              value={misc1}
+              onChange={(e) => setMisc1(e.target.value)}
+              placeholder="e.g. locker 14, size L, shoe voucher used"
+              className={`mt-1 block w-full ${inputClass}`}
+            />
+          </label>
+          <label className="col-span-2 text-xs text-zinc-400">
+            Misc 2 (admin only — not shown on the dashboard)
+            <input
+              value={misc2}
+              onChange={(e) => setMisc2(e.target.value)}
+              placeholder="anything else you need on file"
+              className={`mt-1 block w-full ${inputClass}`}
+            />
           </label>
         </div>
         </div>
@@ -830,7 +851,12 @@ export default function EmployeesPage() {
           <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {SHIFT_COLUMNS.map((col) => {
-              const members = workers.filter((e) => e.shift === col.key);
+              // Group by the shift they're actually working: someone marked
+              // "Coming In" during another shift belongs in that column today,
+              // not the one on their record.
+              const members = workers.filter(
+                (e) => effectiveShift(e, new Date()) === col.key
+              );
               // Hide the "No shift" column when empty; keep the real shifts.
               if (col.key === null && members.length === 0) return null;
               return (

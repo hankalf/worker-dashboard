@@ -6,10 +6,12 @@ import type { Job, Employee, Position, Role } from "@/generated/prisma/client";
 import { appMinutes, APP_TZ } from "@/lib/time";
 import {
   currentShift,
+  effectiveShift,
   SHIFTS,
   shiftRange,
   DEFAULT_SHIFT_BOUNDS,
   type ShiftBounds,
+  type ShiftKey,
 } from "@/lib/shift";
 import {
   todayKey,
@@ -34,7 +36,13 @@ export type DockStatus = {
   expiresAt?: string | null;
 };
 
-export type EmployeeWithRelations = Employee & {
+// The board's view of an employee. The admin-only fields are subtracted from
+// the type on purpose: boardData.ts omits them from the query, and stating that
+// here makes it a compile error for anything on a wall display to read one.
+export type EmployeeWithRelations = Omit<
+  Employee,
+  "employeeNumber" | "misc1" | "misc2"
+> & {
   position: Position | null;
   roles: Role[];
   capabilities: { id: string; name: string }[];
@@ -410,13 +418,18 @@ export function DashboardSections({
   // Covering: marked to work the current shift (e.g. came in early).
   const covering = (e: EmployeeWithRelations) =>
     !!e.coverUntil && !!now && new Date(e.coverUntil).getTime() > now.getTime();
+  // The shift they're actually working today: someone marked "Coming In" at a
+  // time inside another shift is working THAT shift, so their own shift stops
+  // listing them (otherwise a lead counting heads sees them twice).
+  const worksShift = (e: EmployeeWithRelations) =>
+    now ? effectiveShift(e, now, shiftBounds) : (e.shift as ShiftKey | null);
   // Show current shift's crew (by clock) + anyone staying over or covering.
   // In `ignoreShift` mode (day-ahead preview) every shift's crew is shown.
   const onShift = (e: EmployeeWithRelations) =>
     ignoreShift ||
     !shiftKey ||
     e.shift === null ||
-    e.shift === shiftKey ||
+    worksShift(e) === shiftKey ||
     stayingOver(e) ||
     covering(e);
   // Actively staying past their own shift (used for the badge).
@@ -459,7 +472,7 @@ export function DashboardSections({
         (a, b) =>
           Number(b.isLead) - Number(a.isLead) ||
           (ignoreShift
-            ? shiftRank(a.shift) - shiftRank(b.shift) ||
+            ? shiftRank(worksShift(a)) - shiftRank(worksShift(b)) ||
               a.name.localeCompare(b.name)
             : 0)
       );

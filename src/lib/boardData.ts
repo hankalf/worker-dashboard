@@ -33,6 +33,12 @@ export async function fetchBoardProps() {
       }),
       prisma.employee.findMany({
         where: { terminatedAt: null },
+        // These props are serialized into the page a wall display renders, and
+        // anyone with the screen URL can read them. Admin-only fields must not
+        // ride along: omit them here rather than trusting every component
+        // downstream not to render them. (passwordHash is omitted globally in
+        // src/lib/prisma.ts.)
+        omit: { employeeNumber: true, misc1: true, misc2: true },
         include: {
           position: true,
           roles: true,
