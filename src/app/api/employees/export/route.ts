@@ -22,9 +22,12 @@ const SHIFT_LABEL: Record<string, string> = {
 // so a re-imported terminated employee comes back active.
 const HEADER = [
   "name",
+  "employee_number",
   "position",
   "equipment",
   "roles",
+  "misc1",
+  "misc2",
   "admin",
   "username",
   "shift",
@@ -57,10 +60,13 @@ export async function GET() {
 
   const rows = ordered.map((e) => [
     e.name,
+    e.employeeNumber ?? "",
     e.position?.title ?? "",
     // Semicolon-separated, matching the import's format for multi-value cells.
     e.roles.map((r) => r.name).join("; "),
     e.capabilities.map((c) => c.name).join("; "),
+    e.misc1 ?? "",
+    e.misc2 ?? "",
     e.accessLevel === "ADMIN" ? "yes" : "",
     e.username ?? "",
     e.shift ? (SHIFT_LABEL[e.shift] ?? "") : "",

@@ -153,6 +153,16 @@ model Employee {
   shift        Shift?
   attendance   Attendance @default(PRESENT)
   isLead       Boolean    @default(false)
+  // Payroll / badge number. Free text, not an integer: real ones carry leading
+  // zeros and letters. Admin-facing only — kept off the public board, like the
+  // two misc fields below.
+  employeeNumber String?
+  // Two free-text fields for whatever this warehouse needs to record against a
+  // person (locker, badge, uniform size, notes). ADMIN-ONLY: stripped from the
+  // roster the Assign board fetches, and omitted from the public board payload
+  // in src/lib/boardData.ts. Never render these on a wall display.
+  misc1        String?
+  misc2        String?
   // Calendar dates as "YYYY-MM-DD" (date-only, so no timezone drift) — drive
   // the work-anniversary and birthday badges.
   hireDate     String?
