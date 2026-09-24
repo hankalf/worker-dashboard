@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { cleanCapacity } from "@/lib/lunchCapacity";
 
 export async function PATCH(
   req: Request,
@@ -20,6 +21,7 @@ export async function PATCH(
     minFirst,
     minSecond,
     minThird,
+    lunchCapacity,
   } = await req.json();
   const clampMin = (v: unknown) => Math.max(0, Math.min(99, Number(v) || 0));
   const position = await prisma.position.update({
@@ -39,6 +41,9 @@ export async function PATCH(
       ...(minFirst !== undefined ? { minFirst: clampMin(minFirst) } : {}),
       ...(minSecond !== undefined ? { minSecond: clampMin(minSecond) } : {}),
       ...(minThird !== undefined ? { minThird: clampMin(minThird) } : {}),
+      ...(lunchCapacity !== undefined
+        ? { lunchCapacity: cleanCapacity(lunchCapacity) }
+        : {}),
     },
   });
   await logActivity("Position", `Renamed position to ${position.title}`);

@@ -28,6 +28,12 @@ import {
   DEFAULT_SHIFT_BOUNDS,
 } from "@/lib/shift";
 import {
+  lunchConflicts,
+  slotsNeeded,
+  cleanCapacity,
+  lunchGroupKey,
+} from "@/lib/lunchCapacity";
+import {
   normalizeDate,
   normalizeBirthday,
   inferDateStyle,
@@ -340,6 +346,76 @@ function unitTests() {
   eq("dropped letter", suggestPositions("Shiping", POS)[0]?.id, "p3");
   eq("partial entry", suggestPositions("fork", POS)[0]?.id, "p1");
   eq("unrelated gets nothing", suggestPositions("Accounting Manager", POS).length, 0);
+
+  // ---- per-position lunch capacity ---------------------------------------
+  group("lunchCapacity.cleanCapacity");
+  eq("default when blank", cleanCapacity(undefined), 1);
+  eq("zero floors to 1 (nobody could ever eat)", cleanCapacity(0), 1);
+  eq("negative floors to 1", cleanCapacity(-4), 1);
+  eq("passes a real value", cleanCapacity(3), 3);
+  eq("numeric string", cleanCapacity("2"), 2);
+  eq("caps at 99", cleanCapacity(500), 99);
+  eq("junk falls back to 1", cleanCapacity("abc"), 1);
+
+  group("lunchCapacity.slotsNeeded");
+  eq("4 people, 1 at a time", slotsNeeded(4, 1), 4);
+  eq("4 people, 2 at a time", slotsNeeded(4, 2), 2);
+  eq("5 people, 2 at a time", slotsNeeded(5, 2), 3);
+  eq("nobody still needs a slot", slotsNeeded(0, 1), 1);
+
+  group("lunchCapacity.lunchGroupKey");
+  ok(
+    "same position, different shift are separate groups",
+    lunchGroupKey("p1", "FIRST") !== lunchGroupKey("p1", "SECOND")
+  );
+  eq(
+    "no position groups together",
+    lunchGroupKey(null, "FIRST"),
+    lunchGroupKey(undefined, "FIRST")
+  );
+
+  group("lunchCapacity.lunchConflicts");
+  const cap1 = () => 1;
+  const row = (id: string, lunchStart: string | null, positionId = "p1", shift = "FIRST") =>
+    ({ id, lunchStart, positionId, shift });
+
+  const staggered = lunchConflicts(
+    [row("a", "11:00"), row("b", "11:30"), row("c", "12:00")],
+    cap1
+  );
+  eq("back-to-back lunches do not clash", staggered.get("a")?.over, false);
+  eq("nor the middle one", staggered.get("b")?.over, false);
+  eq("alone means concurrent 1", staggered.get("a")?.concurrent, 1);
+
+  const overlapping = lunchConflicts([row("a", "11:00"), row("b", "11:15")], cap1);
+  eq("overlap at capacity 1 is flagged", overlapping.get("a")?.over, true);
+  eq("both sides flagged", overlapping.get("b")?.over, true);
+  eq("concurrent counts both", overlapping.get("a")?.concurrent, 2);
+
+  const allowed = lunchConflicts([row("a", "11:00"), row("b", "11:15")], () => 2);
+  eq("same overlap is fine at capacity 2", allowed.get("a")?.over, false);
+
+  const three = lunchConflicts(
+    [row("a", "11:00"), row("b", "11:10"), row("c", "11:20")],
+    () => 2
+  );
+  eq("three overlapping exceeds capacity 2", three.get("a")?.over, true);
+
+  const crossPosition = lunchConflicts(
+    [row("a", "11:00", "p1"), row("b", "11:00", "p2")],
+    cap1
+  );
+  eq("different positions never clash", crossPosition.get("a")?.over, false);
+
+  const crossShift = lunchConflicts(
+    [row("a", "11:00", "p1", "FIRST"), row("b", "11:00", "p1", "THIRD")],
+    cap1
+  );
+  eq("same position on different shifts never clash", crossShift.get("a")?.over, false);
+
+  const unscheduled = lunchConflicts([row("a", null), row("b", "11:00")], cap1);
+  eq("rows without a lunch are ignored", unscheduled.has("a"), false);
+  eq("and do not inflate the count", unscheduled.get("b")?.concurrent, 1);
 
   // ---- "Coming In" on another shift moves them off their own shift -------
   group("shift.comingInShift");
