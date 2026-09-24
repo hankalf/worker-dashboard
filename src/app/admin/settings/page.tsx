@@ -168,6 +168,154 @@ function ShiftTimes() {
   );
 }
 
+// Per-shift lunch windows: the time frame within which lunches are taken. The
+// whole 30-minute lunch has to finish inside the window, so an 11:30–12:15
+// window means the floor is fully back at 12:15. Leave a shift blank to keep
+// the automatic placement (centred in that shift).
+function LunchWindows() {
+  const SHIFTS = [
+    { key: "FIRST", label: "1st shift" },
+    { key: "SECOND", label: "2nd shift" },
+    { key: "THIRD", label: "3rd shift" },
+  ] as const;
+
+  const [values, setValues] = useState<Record<string, { start: string; end: string }>>({
+    FIRST: { start: "", end: "" },
+    SECOND: { start: "", end: "" },
+    THIRD: { start: "", end: "" },
+  });
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const minToHHMM = (min: number) =>
+    `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.lunchWindows) {
+          setValues((v) => {
+            const next = { ...v };
+            for (const { key } of SHIFTS) {
+              const w = d.lunchWindows[key];
+              next[key] = w
+                ? { start: minToHHMM(w.start), end: minToHHMM(w.end) }
+                : { start: "", end: "" };
+            }
+            return next;
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    // SHIFTS is a module-level constant in effect; listing it would re-run this
+    // on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const set = (key: string, edge: "start" | "end", value: string) => {
+    setValues((v) => ({ ...v, [key]: { ...v[key], [edge]: value } }));
+    setSaved(false);
+    setError(null);
+  };
+
+  // How many 30-minute lunches fit back-to-back, so the effect of a window is
+  // visible before saving rather than discovered on the Lunches tab.
+  const slotsIn = (start: string, end: string): number | null => {
+    const toMin = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return Number.isNaN(h) ? null : h * 60 + m;
+    };
+    const a = toMin(start);
+    const b = toMin(end);
+    if (a === null || b === null || b <= a) return null;
+    return Math.floor((b - a - 30) / 30) + 1;
+  };
+
+  const save = async () => {
+    setError(null);
+    setSaved(false);
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lunchWindows: values }),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      setError(b.error ?? "Could not save lunch windows.");
+      return;
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-white">Lunch windows</h3>
+      <p className="mb-3 mt-1 text-sm text-zinc-400">
+        When lunches may be taken on each shift. A lunch is 30 minutes and has to
+        finish inside the window, so 11:30&nbsp;AM&nbsp;–&nbsp;12:15&nbsp;PM
+        means everyone is back on the floor at 12:15. Leave a shift blank to
+        place its lunches automatically. Auto-stagger fills the window from its
+        opening; if the crew doesn&apos;t fit at their positions&apos; lunch
+        limits, the overflow still gets times and is flagged on the Lunches tab.
+      </p>
+      <div className="flex flex-col gap-3">
+        {SHIFTS.map(({ key, label }) => {
+          const v = values[key];
+          const fit = v.start && v.end ? slotsIn(v.start, v.end) : null;
+          return (
+            <div key={key} className="flex flex-wrap items-center gap-3 text-sm text-zinc-300">
+              <span className="w-20 shrink-0">{label}</span>
+              <input
+                type="time"
+                aria-label={`${label} lunch window start`}
+                value={v.start}
+                onChange={(e) => set(key, "start", e.target.value)}
+                disabled={loading}
+                style={{ colorScheme: "dark" }}
+                className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+              />
+              <span className="text-zinc-500">to</span>
+              <input
+                type="time"
+                aria-label={`${label} lunch window end`}
+                value={v.end}
+                onChange={(e) => set(key, "end", e.target.value)}
+                disabled={loading}
+                style={{ colorScheme: "dark" }}
+                className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+              />
+              <span className="text-xs text-zinc-500">
+                {!v.start && !v.end
+                  ? "automatic"
+                  : fit === null
+                    ? "end must be after start"
+                    : fit < 1
+                      ? "too short for a 30-minute lunch"
+                      : `fits ${fit} lunch${fit === 1 ? "" : "es"} back-to-back`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={loading}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+        >
+          Save lunch windows
+        </button>
+        {saved && <span className="text-sm text-green-400">Saved</span>}
+      </div>
+    </div>
+  );
+}
+
 type DescItem = {
   id: string;
   name?: string;
@@ -635,6 +783,8 @@ export default function SettingsPage() {
           </div>
 
           <ShiftTimes />
+
+          <LunchWindows />
 
           <RotatingDashboard />
 
