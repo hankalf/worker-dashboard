@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useNow, useAutoRefresh, formatClock } from "@/components/DashboardSections";
 import { appMinutes } from "@/lib/time";
 import { SHIFTS, type ShiftKey } from "@/lib/shift";
+import { lunchConflicts, DEFAULT_LUNCH_CAPACITY } from "@/lib/lunchCapacity";
 
 export type TodayLunch = {
   id: string;
@@ -12,6 +13,9 @@ export type TodayLunch = {
   lunchStart: string; // "HH:MM"
   breakStart: string | null; // "HH:MM"
   position: string | null;
+  positionId: string | null;
+  // How many of this position may be out together (Positions tab).
+  lunchCapacity: number;
   shift: string | null;
 };
 
@@ -90,6 +94,17 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
   const schedule = rows
     .filter((r) => r.lunchStart)
     .sort((a, b) => toMin(a.lunchStart) - toMin(b.lunchStart));
+
+  // Auto-stagger respects each position's lunch capacity, but these rows can be
+  // edited by hand — so check the same rule here and say so when an edit puts
+  // more of a position on lunch together than the position allows.
+  const capacityByPosition = new Map(
+    rows.map((r) => [r.positionId, r.lunchCapacity ?? DEFAULT_LUNCH_CAPACITY])
+  );
+  const conflicts = lunchConflicts(rows, (positionId) =>
+    capacityByPosition.get(positionId) ?? DEFAULT_LUNCH_CAPACITY
+  );
+  const overCount = schedule.filter((l) => conflicts.get(l.id)?.over).length;
   const cur = now ? appMinutes(now) : -1;
   const onLunch =
     cur < 0
@@ -141,6 +156,14 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
         <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
           Today&apos;s Lunch Schedule{schedule.length > 0 ? ` (${schedule.length})` : ""}
         </h3>
+        {overCount > 0 && (
+          <p className="mb-2 rounded-md border border-amber-700/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+            {overCount} lunch{overCount === 1 ? "" : "es"} put more people from a
+            position on lunch at once than that position allows. The rows are
+            marked below — change a time, or raise the limit on the Positions
+            tab.
+          </p>
+        )}
         {schedule.length === 0 ? (
           <div className="flex h-[9.5rem] items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-sm text-zinc-500">
             No lunches scheduled today.
@@ -149,6 +172,7 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
           <ul className="max-h-72 divide-y divide-zinc-800 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900">
             {schedule.map((l) => {
               const open = editingId === l.id;
+              const clash = conflicts.get(l.id);
               return (
                 <li key={l.id} className="px-2 py-1">
                   <button
@@ -158,7 +182,11 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
                     className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1 text-left hover:bg-zinc-800/60"
                   >
                     <span className="flex min-w-0 items-baseline gap-2">
-                      <span className="w-20 shrink-0 text-sm font-semibold tabular-nums text-teal-300">
+                      <span
+                        className={`w-20 shrink-0 text-sm font-semibold tabular-nums ${
+                          clash?.over ? "text-amber-300" : "text-teal-300"
+                        }`}
+                      >
                         {formatClock(l.lunchStart)}
                       </span>
                       <span className="truncate text-sm font-medium text-zinc-100">
@@ -167,6 +195,14 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
                       {busyId === l.id && <span className="text-zinc-500">…</span>}
+                      {clash?.over && (
+                        <span
+                          title={`${clash.concurrent} from this position are on lunch together; the limit is ${clash.capacity}`}
+                          className="whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 font-medium text-amber-300"
+                        >
+                          {clash.concurrent} of {clash.capacity}
+                        </span>
+                      )}
                       {l.position && <span className="truncate">{l.position}</span>}
                       {shiftLabel(l.shift) && (
                         <span className="rounded-full bg-blue-950 px-2 py-0.5 text-blue-300">

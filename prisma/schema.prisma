@@ -221,6 +221,11 @@ model Position {
   minFirst       Int        @default(0)
   minSecond      Int        @default(0)
   minThird       Int        @default(0)
+  // How many people in this position may be at lunch simultaneously. Defaults
+  // to 1 — one out at a time keeps the position covered, which is what a
+  // warehouse wants unless it says otherwise. Minimum 1: 0 would mean nobody
+  // in the position could ever take a lunch.
+  lunchCapacity  Int        @default(1)
   employees      Employee[]
   scheduledAssignments ScheduledAssignment[]
   laborShares    LaborShare[]
