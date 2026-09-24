@@ -1,4 +1,4 @@
-title,description,equipment,role
-Receiving,Unload inbound trucks,Scanner,Receive
-Picking,Pull orders for outbound,,Pick
-Loading,Load outbound trailers,Forklift,Ship
+title,description,equipment,role,lunch_capacity
+Receiving,Unload inbound trucks,Scanner,Receive,1
+Picking,Pull orders for outbound,,Pick,2
+Loading,Load outbound trailers,Forklift,Ship,1

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { cleanCapacity } from "@/lib/lunchCapacity";
 
 export async function GET() {
   const positions = await prisma.position.findMany({
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
     minFirst,
     minSecond,
     minThird,
+    lunchCapacity,
   } = await req.json();
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
       minFirst: clampMin(minFirst),
       minSecond: clampMin(minSecond),
       minThird: clampMin(minThird),
+      lunchCapacity: cleanCapacity(lunchCapacity),
     },
   });
   await logActivity("Position", `Added position ${position.title}`);

@@ -35,6 +35,7 @@ type Position = {
   minFirst: number;
   minSecond: number;
   minThird: number;
+  lunchCapacity: number;
 };
 
 function SortablePosition({
@@ -92,6 +93,9 @@ function SortablePosition({
               Requires role: {position.requiredCapability.name}
             </div>
           )}
+          <div className="text-xs text-zinc-500">
+            Lunch: {position.lunchCapacity ?? 1} at a time
+          </div>
         </div>
       </div>
       <div className="flex shrink-0 gap-3 text-sm">
@@ -124,6 +128,8 @@ export default function PositionsPage() {
   const [minFirst, setMinFirst] = useState("0");
   const [minSecond, setMinSecond] = useState("0");
   const [minThird, setMinThird] = useState("0");
+  // How many of this position may be at lunch together. 1 = one out at a time.
+  const [lunchCapacity, setLunchCapacity] = useState("1");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,6 +161,7 @@ export default function PositionsPage() {
     setMinFirst("0");
     setMinSecond("0");
     setMinThird("0");
+    setLunchCapacity("1");
     setEditingId(null);
   };
 
@@ -175,6 +182,7 @@ export default function PositionsPage() {
         minFirst,
         minSecond,
         minThird,
+        lunchCapacity,
         // New positions go to the end; editing leaves the order untouched.
         ...(editingId ? {} : { sortOrder: positions.length }),
       }),
@@ -199,6 +207,7 @@ export default function PositionsPage() {
     setMinFirst(String(position.minFirst ?? 0));
     setMinSecond(String(position.minSecond ?? 0));
     setMinThird(String(position.minThird ?? 0));
+    setLunchCapacity(String(position.lunchCapacity ?? 1));
   };
 
   const handleDelete = async (id: string) => {
@@ -323,6 +332,20 @@ export default function PositionsPage() {
             ))}
           </div>
         </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-400">
+            How many people in this position may be at lunch at the same time
+            (1 = one out at a time, keeping the position covered)
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={lunchCapacity}
+            onChange={(e) => setLunchCapacity(e.target.value)}
+            className="w-28 rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100"
+          />
+        </label>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button

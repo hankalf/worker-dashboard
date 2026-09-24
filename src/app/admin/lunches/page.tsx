@@ -5,6 +5,7 @@ import { easternDateKey } from "@/lib/time";
 import { SHIFTS, type ShiftKey } from "@/lib/shift";
 import { recordLunchHistory, purgeOldLunchHistory } from "@/lib/lunchHistory";
 import { LunchesView, type TodayLunch } from "@/components/LunchesView";
+import { DEFAULT_LUNCH_CAPACITY } from "@/lib/lunchCapacity";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ export default async function LunchesPage() {
       lunchStart: e.lunchStart!,
       breakStart: e.breakStart,
       position: e.position?.title ?? null,
+      positionId: e.positionId,
+      // Carried per row so the view can flag a hand edit that puts more of a
+      // position on lunch together than the position allows.
+      lunchCapacity: e.position?.lunchCapacity ?? DEFAULT_LUNCH_CAPACITY,
       shift: e.shift,
     }));
 

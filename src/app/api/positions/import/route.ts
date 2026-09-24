@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/rbac";
 import { parseCsv } from "@/lib/csv";
 import { logActivity } from "@/lib/activity";
+import { cleanCapacity } from "@/lib/lunchCapacity";
 
 // CSV columns (header required, any order):
 //   title        required — matched to an existing position or created
 //   description  optional
 //   equipment    optional — required-equipment name (created if new)
 //   role         optional — required-role (job function) name (created if new)
+//   lunch_capacity optional — how many may be at lunch at once (default 1)
 export async function POST(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -67,6 +69,12 @@ export async function POST(req: Request) {
         requiredCapabilityId = c.id;
       }
 
+      // Blank cell (or no column) means "leave it alone" on an update and
+      // "use the default of 1" on a create — never silently reset a limit
+      // someone set in the UI.
+      const capacityCell = get("lunch_capacity");
+      const lunchCapacity = capacityCell ? cleanCapacity(capacityCell) : null;
+
       const existing = await prisma.position.findFirst({ where: { title } });
       if (existing) {
         await prisma.position.update({
@@ -76,6 +84,7 @@ export async function POST(req: Request) {
             requiredRoleId: requiredRoleId ?? existing.requiredRoleId,
             requiredCapabilityId:
               requiredCapabilityId ?? existing.requiredCapabilityId,
+            ...(lunchCapacity !== null ? { lunchCapacity } : {}),
           },
         });
         updated++;
@@ -87,6 +96,7 @@ export async function POST(req: Request) {
             requiredRoleId,
             requiredCapabilityId,
             sortOrder: nextSort++,
+            ...(lunchCapacity !== null ? { lunchCapacity } : {}),
           },
         });
         created++;
