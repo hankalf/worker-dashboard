@@ -28,6 +28,12 @@ import {
   DEFAULT_SHIFT_BOUNDS,
 } from "@/lib/shift";
 import {
+  frameAncestors,
+  frameAncestorsCsp,
+  crossSiteCookies,
+  crossSiteCookieOptions,
+} from "@/lib/embed";
+import {
   usableSpan,
   fitsInWindow,
   outsideWindow,
@@ -424,6 +430,83 @@ function unitTests() {
   const unscheduled = lunchConflicts([row("a", null), row("b", "11:00")], cap1);
   eq("rows without a lunch are ignored", unscheduled.has("a"), false);
   eq("and do not inflate the count", unscheduled.get("b")?.concurrent, 1);
+
+  // ---- embedding (iframe cookies + frame-ancestors) -----------------------
+  group("embed.frameAncestors");
+  // These read process.env, so each case sets it and the original is put back.
+  const withEnv = <T,>(value: string | undefined, fn: () => T): T => {
+    const had = Object.prototype.hasOwnProperty.call(
+      process.env,
+      "EMBED_FRAME_ANCESTORS"
+    );
+    const prev = process.env.EMBED_FRAME_ANCESTORS;
+    if (value === undefined) delete process.env.EMBED_FRAME_ANCESTORS;
+    else process.env.EMBED_FRAME_ANCESTORS = value;
+    try {
+      return fn();
+    } finally {
+      if (had) process.env.EMBED_FRAME_ANCESTORS = prev;
+      else delete process.env.EMBED_FRAME_ANCESTORS;
+    }
+  };
+
+  eq(
+    "defaults to both Monday hosts",
+    withEnv(undefined, frameAncestors),
+    ["https://*.monday.com", "https://*.monday.app"]
+  );
+  eq("splits on spaces", withEnv("https://a.com https://b.com", frameAncestors), [
+    "https://a.com",
+    "https://b.com",
+  ]);
+  eq("splits on commas", withEnv("https://a.com,https://b.com", frameAncestors), [
+    "https://a.com",
+    "https://b.com",
+  ]);
+  eq('"none" disables embedding', withEnv("none", frameAncestors), []);
+  eq('"NONE" too', withEnv("NONE", frameAncestors), []);
+  eq("blank disables embedding", withEnv("   ", frameAncestors), []);
+  eq("keeps a wildcard subdomain", withEnv("https://*.monday.app", frameAncestors), [
+    "https://*.monday.app",
+  ]);
+  eq("keeps a port", withEnv("http://localhost:3000", frameAncestors), [
+    "http://localhost:3000",
+  ]);
+  eq("keeps 'self'", withEnv("'self'", frameAncestors), ["'self'"]);
+  // A malformed source makes a browser drop the whole directive, so junk is
+  // filtered out rather than passed through.
+  eq(
+    "drops junk but keeps the good ones",
+    withEnv("javascript:alert(1) https://ok.com not a host", frameAncestors),
+    ["https://ok.com"]
+  );
+  eq("drops a bare hostname with no scheme", withEnv("monday.com", frameAncestors), []);
+  eq("drops a path", withEnv("https://a.com/x", frameAncestors), []);
+
+  group("embed.frameAncestorsCsp");
+  eq(
+    "adds 'self' ahead of the configured hosts",
+    withEnv("https://*.monday.com", frameAncestorsCsp),
+    "frame-ancestors 'self' https://*.monday.com"
+  );
+  eq(
+    "does not add 'self' twice",
+    withEnv("'self' https://a.com", frameAncestorsCsp),
+    "frame-ancestors 'self' https://a.com"
+  );
+  eq("no header at all when disabled", withEnv("none", frameAncestorsCsp), null);
+
+  group("embed.crossSiteCookies");
+  // NODE_ENV is "development" under the test runner, so cross-site attributes
+  // must stay off: SameSite=None without Secure is invalid, and Secure cookies
+  // are dropped over plain HTTP, which would break signing in at localhost.
+  eq("off in development even with hosts set", withEnv(undefined, crossSiteCookies), false);
+  eq(
+    "and the options are empty, leaving defaults alone",
+    withEnv(undefined, crossSiteCookieOptions),
+    {}
+  );
+  eq("off when embedding is disabled", withEnv("none", crossSiteCookies), false);
 
   // ---- lunch windows ------------------------------------------------------
   // The real configuration asked for: 1st 11:30am-12:15pm, 2nd 7-8:15pm.
