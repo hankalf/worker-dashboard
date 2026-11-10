@@ -28,6 +28,20 @@ import {
   DEFAULT_SHIFT_BOUNDS,
 } from "@/lib/shift";
 import {
+  frameAncestors,
+  frameAncestorsCsp,
+  crossSiteCookies,
+  crossSiteCookieOptions,
+} from "@/lib/embed";
+import {
+  usableSpan,
+  fitsInWindow,
+  outsideWindow,
+  windowProblem,
+  windowFor,
+  toClock,
+} from "@/lib/lunchWindow";
+import {
   lunchConflicts,
   slotsNeeded,
   cleanCapacity,
@@ -416,6 +430,130 @@ function unitTests() {
   const unscheduled = lunchConflicts([row("a", null), row("b", "11:00")], cap1);
   eq("rows without a lunch are ignored", unscheduled.has("a"), false);
   eq("and do not inflate the count", unscheduled.get("b")?.concurrent, 1);
+
+  // ---- embedding (iframe cookies + frame-ancestors) -----------------------
+  group("embed.frameAncestors");
+  // These read process.env, so each case sets it and the original is put back.
+  const withEnv = <T,>(value: string | undefined, fn: () => T): T => {
+    const had = Object.prototype.hasOwnProperty.call(
+      process.env,
+      "EMBED_FRAME_ANCESTORS"
+    );
+    const prev = process.env.EMBED_FRAME_ANCESTORS;
+    if (value === undefined) delete process.env.EMBED_FRAME_ANCESTORS;
+    else process.env.EMBED_FRAME_ANCESTORS = value;
+    try {
+      return fn();
+    } finally {
+      if (had) process.env.EMBED_FRAME_ANCESTORS = prev;
+      else delete process.env.EMBED_FRAME_ANCESTORS;
+    }
+  };
+
+  eq(
+    "defaults to both Monday hosts",
+    withEnv(undefined, frameAncestors),
+    ["https://*.monday.com", "https://*.monday.app"]
+  );
+  eq("splits on spaces", withEnv("https://a.com https://b.com", frameAncestors), [
+    "https://a.com",
+    "https://b.com",
+  ]);
+  eq("splits on commas", withEnv("https://a.com,https://b.com", frameAncestors), [
+    "https://a.com",
+    "https://b.com",
+  ]);
+  eq('"none" disables embedding', withEnv("none", frameAncestors), []);
+  eq('"NONE" too', withEnv("NONE", frameAncestors), []);
+  eq("blank disables embedding", withEnv("   ", frameAncestors), []);
+  eq("keeps a wildcard subdomain", withEnv("https://*.monday.app", frameAncestors), [
+    "https://*.monday.app",
+  ]);
+  eq("keeps a port", withEnv("http://localhost:3000", frameAncestors), [
+    "http://localhost:3000",
+  ]);
+  eq("keeps 'self'", withEnv("'self'", frameAncestors), ["'self'"]);
+  // A malformed source makes a browser drop the whole directive, so junk is
+  // filtered out rather than passed through.
+  eq(
+    "drops junk but keeps the good ones",
+    withEnv("javascript:alert(1) https://ok.com not a host", frameAncestors),
+    ["https://ok.com"]
+  );
+  eq("drops a bare hostname with no scheme", withEnv("monday.com", frameAncestors), []);
+  eq("drops a path", withEnv("https://a.com/x", frameAncestors), []);
+
+  group("embed.frameAncestorsCsp");
+  eq(
+    "adds 'self' ahead of the configured hosts",
+    withEnv("https://*.monday.com", frameAncestorsCsp),
+    "frame-ancestors 'self' https://*.monday.com"
+  );
+  eq(
+    "does not add 'self' twice",
+    withEnv("'self' https://a.com", frameAncestorsCsp),
+    "frame-ancestors 'self' https://a.com"
+  );
+  eq("no header at all when disabled", withEnv("none", frameAncestorsCsp), null);
+
+  group("embed.crossSiteCookies");
+  // NODE_ENV is "development" under the test runner, so cross-site attributes
+  // must stay off: SameSite=None without Secure is invalid, and Secure cookies
+  // are dropped over plain HTTP, which would break signing in at localhost.
+  eq("off in development even with hosts set", withEnv(undefined, crossSiteCookies), false);
+  eq(
+    "and the options are empty, leaving defaults alone",
+    withEnv(undefined, crossSiteCookieOptions),
+    {}
+  );
+  eq("off when embedding is disabled", withEnv("none", crossSiteCookies), false);
+
+  // ---- lunch windows ------------------------------------------------------
+  // The real configuration asked for: 1st 11:30am-12:15pm, 2nd 7-8:15pm.
+  const FIRST_WINDOW = { start: 11 * 60 + 30, end: 12 * 60 + 15 };
+  const SECOND_WINDOW = { start: 19 * 60, end: 20 * 60 + 15 };
+  const WINDOWS = { FIRST: FIRST_WINDOW, SECOND: SECOND_WINDOW };
+
+  group("lunchWindow.usableSpan");
+  eq("last start is 30 min before the end", usableSpan(FIRST_WINDOW).latest, 11 * 60 + 45);
+  eq("first start is the opening", usableSpan(FIRST_WINDOW).earliest, 11 * 60 + 30);
+
+  group("lunchWindow.fitsInWindow");
+  ok("opening fits", fitsInWindow(11 * 60 + 30, FIRST_WINDOW));
+  ok("11:45 finishes exactly at 12:15", fitsInWindow(11 * 60 + 45, FIRST_WINDOW));
+  ok("12:00 would end at 12:30, too late", !fitsInWindow(12 * 60, FIRST_WINDOW));
+  ok("before the opening does not fit", !fitsInWindow(11 * 60, FIRST_WINDOW));
+  ok("2nd shift 19:45 finishes at 20:15", fitsInWindow(19 * 60 + 45, SECOND_WINDOW));
+  ok("2nd shift 20:00 would run over", !fitsInWindow(20 * 60, SECOND_WINDOW));
+
+  group("lunchWindow.outsideWindow");
+  ok("in-window lunch is fine", !outsideWindow("11:30", "FIRST", WINDOWS));
+  ok("late lunch is flagged", outsideWindow("12:00", "FIRST", WINDOWS));
+  ok("shift with no window is never flagged", !outsideWindow("03:00", "THIRD", WINDOWS));
+  ok("no lunch time is never flagged", !outsideWindow(null, "FIRST", WINDOWS));
+  ok(
+    "a time valid on one shift can be wrong on another",
+    outsideWindow("19:00", "FIRST", WINDOWS) && !outsideWindow("19:00", "SECOND", WINDOWS)
+  );
+
+  group("lunchWindow.windowFor");
+  eq("known shift", windowFor("FIRST", WINDOWS)?.start, 11 * 60 + 30);
+  eq("unset shift", windowFor("THIRD", WINDOWS), null);
+  eq("no shift at all", windowFor(null, WINDOWS), null);
+
+  group("lunchWindow.windowProblem");
+  eq("a good window", windowProblem(11 * 60 + 30, 12 * 60 + 15), null);
+  eq("exactly one lunch long is allowed", windowProblem(11 * 60, 11 * 60 + 30), null);
+  eq("backwards", windowProblem(12 * 60, 11 * 60), "backwards");
+  eq("equal start and end", windowProblem(12 * 60, 12 * 60), "backwards");
+  eq("shorter than a lunch", windowProblem(11 * 60, 11 * 60 + 20), "tooShort");
+  eq("missing a side", windowProblem(null, 12 * 60), "malformed");
+
+  group("lunchWindow.toClock");
+  eq("morning", toClock(11 * 60 + 30), "11:30 AM");
+  eq("noon", toClock(12 * 60), "12:00 PM");
+  eq("evening", toClock(20 * 60 + 15), "8:15 PM");
+  eq("midnight", toClock(0), "12:00 AM");
 
   // ---- "Coming In" on another shift moves them off their own shift -------
   group("shift.comingInShift");

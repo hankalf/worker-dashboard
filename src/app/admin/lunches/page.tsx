@@ -6,6 +6,7 @@ import { SHIFTS, type ShiftKey } from "@/lib/shift";
 import { recordLunchHistory, purgeOldLunchHistory } from "@/lib/lunchHistory";
 import { LunchesView, type TodayLunch } from "@/components/LunchesView";
 import { DEFAULT_LUNCH_CAPACITY } from "@/lib/lunchCapacity";
+import { getLunchWindows } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export default async function LunchesPage() {
 
   const now = new Date();
   const today = easternDateKey(now);
+
+  const lunchWindows = await getLunchWindows();
 
   const employees = await prisma.employee.findMany({
     where: { terminatedAt: null, accessLevel: { not: "ADMIN" } },
@@ -81,7 +84,7 @@ export default async function LunchesPage() {
       </p>
 
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <LunchesView todays={todays} />
+        <LunchesView todays={todays} lunchWindows={lunchWindows} />
       </div>
 
       <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-zinc-400">

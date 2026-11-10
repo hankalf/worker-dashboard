@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma, ACTIVE_LOCATION_COOKIE } from "@/lib/prisma";
 import { DASHBOARD_SELECTED_COOKIE } from "@/lib/location";
 import { requireSuperAdmin } from "@/lib/rbac";
+import { crossSiteCookieOptions } from "@/lib/embed";
 
 // POST /api/locations/switch — set the active location for a super-admin.
 // { locationId }. The cookie is httpOnly (only the server-side scoping reads
@@ -28,6 +29,9 @@ export async function POST(req: Request) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     secure: process.env.NODE_ENV === "production",
+    // Framed, this is third-party like the session cookie; without the same
+    // attributes the switcher silently stops holding its choice.
+    ...crossSiteCookieOptions(),
   });
   // Mark that a dashboard has been chosen this session, so the Admin Dashboard
   // tab shows the selected board rather than the Master Dashboard picker. No
@@ -37,6 +41,7 @@ export async function POST(req: Request) {
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
+    ...crossSiteCookieOptions(),
   });
   return res;
 }

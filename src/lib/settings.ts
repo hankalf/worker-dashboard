@@ -1,5 +1,10 @@
 import { prisma, getActiveLocationId } from "@/lib/prisma";
-import { DEFAULT_SHIFT_BOUNDS, type ShiftBounds } from "@/lib/shift";
+import { DEFAULT_SHIFT_BOUNDS, type ShiftBounds, type ShiftKey } from "@/lib/shift";
+import {
+  SHIFT_KEYS as LUNCH_SHIFT_KEYS,
+  windowProblem,
+  type LunchWindows,
+} from "@/lib/lunchWindow";
 
 // Editable display settings, stored per-location in the LocationSetting table
 // (keyed by the active location) so each warehouse's board has its own name,
@@ -53,6 +58,35 @@ export async function getShiftBounds(): Promise<ShiftBounds> {
     return DEFAULT_SHIFT_BOUNDS;
   } catch {
     return DEFAULT_SHIFT_BOUNDS;
+  }
+}
+
+// Per-shift lunch windows. Keys look like "lunchWindowFIRSTStart". A shift with
+// no stored (or unusable) pair simply has no window, which means lunches are
+// placed automatically for it — the behaviour before windows existed.
+export const lunchWindowKey = (shift: ShiftKey, edge: "Start" | "End") =>
+  `lunchWindow${shift}${edge}`;
+
+export async function getLunchWindows(): Promise<LunchWindows> {
+  try {
+    const keys = LUNCH_SHIFT_KEYS.flatMap((k) => [
+      lunchWindowKey(k, "Start"),
+      lunchWindowKey(k, "End"),
+    ]);
+    const m = await readSettings(keys);
+    const out: LunchWindows = {};
+    for (const shift of LUNCH_SHIFT_KEYS) {
+      const start = parseHhmm(m[lunchWindowKey(shift, "Start")]);
+      const end = parseHhmm(m[lunchWindowKey(shift, "End")]);
+      // Anything stored that no longer validates is treated as unset rather
+      // than throwing: a bad row must never take the Lunches tab down.
+      if (start !== null && end !== null && windowProblem(start, end) === null) {
+        out[shift] = { start, end };
+      }
+    }
+    return out;
+  } catch {
+    return {};
   }
 }
 

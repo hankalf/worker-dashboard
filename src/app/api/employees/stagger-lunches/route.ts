@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
-import { getShiftBounds } from "@/lib/settings";
+import { getShiftBounds, getLunchWindows } from "@/lib/settings";
 import { shiftWindow, type ShiftKey } from "@/lib/shift";
 import {
   NO_POSITION,
@@ -10,16 +10,25 @@ import {
   slotsNeeded,
   LUNCH_MINUTES,
 } from "@/lib/lunchCapacity";
+import { usableSpan, type LunchWindow, type LunchWindows } from "@/lib/lunchWindow";
 
 // Auto-stagger lunches. Everyone present is grouped by position and sent out in
 // chunks the size of that position's lunch capacity — so a position with the
 // default capacity of 1 sends one person per slot and keeps full cover, while a
 // position set to 3 sends three at a time and finishes in a third of the slots.
 //
-// Slots are laid out inside the employee's own shift, using the configured
-// shift times rather than fixed hours: the block of lunches is centred in the
-// shift, spaced 30 minutes apart, and compressed if a large crew wouldn't
-// otherwise fit before the shift ends.
+// Where the slots land depends on whether the shift has a lunch window set
+// (Settings -> Lunch windows):
+//
+//   window set — lunches run from the window's opening at 30-minute spacing.
+//     A window is a promise that the floor is back by a given time, so the
+//     whole 30-minute lunch must finish inside it. A crew too big for that
+//     still gets times (nobody is left unfed) and the ones that spill past the
+//     end are flagged on the Lunches tab rather than silently squeezed.
+//
+//   no window — the old behaviour: the block of lunches is centred in the
+//     employee's own shift, spaced 30 minutes apart, and compressed if a large
+//     crew wouldn't otherwise fit before the shift ends.
 
 const PREFERRED_GAP = 30;
 const MIN_GAP = 5;
@@ -31,10 +40,29 @@ function edgeMargin(shiftLength: number): number {
 }
 
 // The lunch start times for a shift, given how many slots are needed.
-function slotsFor(shift: ShiftKey, count: number, bounds: Parameters<typeof shiftWindow>[1]) {
+function slotsFor(
+  shift: ShiftKey,
+  count: number,
+  bounds: Parameters<typeof shiftWindow>[1],
+  lunchWindow: LunchWindow | null
+) {
   const { start, length } = shiftWindow(shift, bounds);
-  const margin = edgeMargin(length);
 
+  if (lunchWindow) {
+    // Window minutes are minute-of-day. Third shift starts in the evening and
+    // runs past midnight, so a window at 02:00 belongs to the FOLLOWING day
+    // relative to the shift's start — shift it forward so the comparisons and
+    // the stored times land on the right side of midnight.
+    const dayShift = lunchWindow.start < start ? 1440 : 0;
+    const opening = lunchWindow.start + dayShift;
+    // Fixed spacing on purpose: a window that cannot hold the whole crew
+    // overflows past its end (and is flagged) rather than bunching people up.
+    return Array.from({ length: Math.max(1, count) }, (_, i) =>
+      Math.round(opening + i * PREFERRED_GAP)
+    );
+  }
+
+  const margin = edgeMargin(length);
   // The first and last lunch may start no earlier / later than this, so the
   // whole break lands inside the shift.
   const earliest = start + margin;
@@ -61,6 +89,7 @@ export async function POST() {
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const bounds = await getShiftBounds();
+  const lunchWindows: LunchWindows = await getLunchWindows();
 
   const present = await prisma.employee.findMany({
     where: { terminatedAt: null, attendance: "PRESENT", shift: { not: null } },
@@ -88,6 +117,9 @@ export async function POST() {
   }
 
   const updates: { id: string; lunchStart: string }[] = [];
+  // Lunches that could not finish inside their shift's window, per shift, so
+  // the answer can say so instead of leaving it to be noticed later.
+  const spilled = new Map<ShiftKey, number>();
   for (const [shift, positions] of byShift) {
     // Enough slots for whichever position needs the most rounds to get its crew
     // through at its own capacity; positions that need fewer use the earlier
@@ -97,13 +129,24 @@ export async function POST() {
         slotsNeeded(crew.length, capacityOf(key))
       )
     );
-    const slots = slotsFor(shift, needed, bounds);
+    const lunchWindow = lunchWindows[shift] ?? null;
+    const slots = slotsFor(shift, needed, bounds, lunchWindow);
+    // The last start that still lets a lunch finish inside the window, on the
+    // same side of midnight as the slots themselves.
+    const cutoff = lunchWindow
+      ? usableSpan(lunchWindow).latest +
+        (lunchWindow.start < shiftWindow(shift, bounds).start ? 1440 : 0)
+      : null;
     for (const [key, crew] of positions) {
       const capacity = capacityOf(key);
       crew.forEach((id, i) => {
         // Chunk of `capacity` share a slot, so 3 with capacity 2 go out as
         // (slot 0, slot 0, slot 1).
-        updates.push({ id, lunchStart: hhmm(slots[Math.floor(i / capacity)]) });
+        const at = slots[Math.floor(i / capacity)];
+        if (cutoff !== null && at > cutoff) {
+          spilled.set(shift, (spilled.get(shift) ?? 0) + 1);
+        }
+        updates.push({ id, lunchStart: hhmm(at) });
       });
     }
   }
@@ -116,6 +159,17 @@ export async function POST() {
       })
     )
   );
-  await logActivity("Assign", `Staggered lunches (${updates.length})`);
-  return NextResponse.json({ ok: true, count: updates.length });
+  const outsideWindow = [...spilled.values()].reduce((a, b) => a + b, 0);
+  await logActivity(
+    "Assign",
+    `Staggered lunches (${updates.length})` +
+      (outsideWindow ? `, ${outsideWindow} past the lunch window` : "")
+  );
+  return NextResponse.json({
+    ok: true,
+    count: updates.length,
+    // >0 means the crew does not fit the configured window at their positions'
+    // limits; those lunches are still set, and flagged on the Lunches tab.
+    outsideWindow,
+  });
 }

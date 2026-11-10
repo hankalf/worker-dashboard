@@ -9,8 +9,15 @@ import {
   getScrollSpeed,
   getBranding,
   getShiftBounds,
+  getLunchWindows,
+  lunchWindowKey,
   parseHhmm,
 } from "@/lib/settings";
+import {
+  SHIFT_KEYS as LUNCH_SHIFT_KEYS,
+  windowProblem,
+  WINDOW_PROBLEM_MESSAGE,
+} from "@/lib/lunchWindow";
 
 const isHexColor = (v: unknown): v is string =>
   typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v);
@@ -19,13 +26,14 @@ export const dynamic = "force-dynamic";
 
 // Public: current site settings (login page + rotating-dashboard editor).
 export async function GET() {
-  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds, lunchWindows] =
     await Promise.all([
       getDashboardName(),
       getRotationConfig(),
       getScrollSpeed(),
       getBranding(),
       getShiftBounds(),
+      getLunchWindows(),
     ]);
   return NextResponse.json({
     dashboardName,
@@ -37,6 +45,7 @@ export async function GET() {
     scrollSpeed,
     branding,
     shiftBounds,
+    lunchWindows,
   });
 }
 
@@ -101,6 +110,35 @@ export async function PATCH(req: Request) {
     await setSetting("shiftSecondStart", String(s.secondStart).trim());
     await setSetting("shiftThirdStart", String(s.thirdStart).trim());
   }
+  if (body.lunchWindows !== undefined) {
+    // { FIRST: { start, end }, ... } as "HH:MM". A shift whose pair is blank
+    // has its window cleared, which returns it to automatic placement.
+    const w = body.lunchWindows ?? {};
+    const writes: { key: string; value: string }[] = [];
+    for (const shift of LUNCH_SHIFT_KEYS) {
+      const pair = w[shift];
+      if (pair === undefined) continue;
+      const rawStart = String(pair?.start ?? "").trim();
+      const rawEnd = String(pair?.end ?? "").trim();
+      if (!rawStart && !rawEnd) {
+        writes.push({ key: lunchWindowKey(shift, "Start"), value: "" });
+        writes.push({ key: lunchWindowKey(shift, "End"), value: "" });
+        continue;
+      }
+      const problem = windowProblem(parseHhmm(rawStart), parseHhmm(rawEnd));
+      if (problem) {
+        return NextResponse.json(
+          { error: `${shift}: ${WINDOW_PROBLEM_MESSAGE[problem]}` },
+          { status: 400 }
+        );
+      }
+      writes.push({ key: lunchWindowKey(shift, "Start"), value: rawStart });
+      writes.push({ key: lunchWindowKey(shift, "End"), value: rawEnd });
+    }
+    // Written only once every shift validated, so a bad 2nd-shift window can't
+    // leave a half-saved 1st.
+    for (const { key, value } of writes) await setSetting(key, value);
+  }
   if (body.branding !== undefined) {
     const b = body.branding ?? {};
     // Colors: store a valid hex, or "" to clear (fall back to the default).
@@ -132,13 +170,14 @@ export async function PATCH(req: Request) {
   }
 
   await logActivity("Settings", "Updated settings");
-  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds] =
+  const [dashboardName, rotation, scrollSpeed, branding, shiftBounds, lunchWindows] =
     await Promise.all([
       getDashboardName(),
       getRotationConfig(),
       getScrollSpeed(),
       getBranding(),
       getShiftBounds(),
+      getLunchWindows(),
     ]);
   return NextResponse.json({
     dashboardName,
@@ -150,5 +189,6 @@ export async function PATCH(req: Request) {
     scrollSpeed,
     branding,
     shiftBounds,
+    lunchWindows,
   });
 }

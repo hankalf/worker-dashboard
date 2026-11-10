@@ -1,4 +1,12 @@
 import type { NextAuthConfig } from "next-auth";
+import { crossSiteCookieOptions } from "@/lib/embed";
+
+// Only `options` is given for each cookie, never `name`: Auth.js deep-merges
+// this over its own defaults, so it keeps deciding the names (and the
+// __Secure-/__Host- prefixes it adds over HTTPS) while we add just the
+// attributes that let a session survive inside an iframe. Empty when embedding
+// is off, which leaves every default untouched.
+const embedCookie = { options: crossSiteCookieOptions() };
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
@@ -10,6 +18,19 @@ export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
+  },
+  // Sign-in is a POST that reads the CSRF cookie and writes the session and
+  // callback-url cookies, so all three need the cross-site attributes or the
+  // flow breaks halfway through. The OAuth-only cookies are included so a
+  // provider added later does not quietly fail the same way.
+  cookies: {
+    sessionToken: embedCookie,
+    callbackUrl: embedCookie,
+    csrfToken: embedCookie,
+    pkceCodeVerifier: embedCookie,
+    state: embedCookie,
+    nonce: embedCookie,
+    webauthnChallenge: embedCookie,
   },
   providers: [],
   callbacks: {

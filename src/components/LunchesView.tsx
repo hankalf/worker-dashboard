@@ -6,6 +6,12 @@ import { useNow, useAutoRefresh, formatClock } from "@/components/DashboardSecti
 import { appMinutes } from "@/lib/time";
 import { SHIFTS, type ShiftKey } from "@/lib/shift";
 import { lunchConflicts, DEFAULT_LUNCH_CAPACITY } from "@/lib/lunchCapacity";
+import {
+  outsideWindow,
+  windowFor,
+  toClock,
+  type LunchWindows,
+} from "@/lib/lunchWindow";
 
 export type TodayLunch = {
   id: string;
@@ -50,7 +56,13 @@ const timeSelectClass =
 // full lunch schedule for today. Ticks with the clock so "On lunch" updates and
 // soft-refreshes so Assign-board edits show up. Rows in the schedule can be
 // clicked to adjust that employee's lunch and break times inline.
-export function LunchesView({ todays }: { todays: TodayLunch[] }) {
+export function LunchesView({
+  todays,
+  lunchWindows = {},
+}: {
+  todays: TodayLunch[];
+  lunchWindows?: LunchWindows;
+}) {
   const now = useNow();
   useAutoRefresh();
   const router = useRouter();
@@ -105,6 +117,13 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
     capacityByPosition.get(positionId) ?? DEFAULT_LUNCH_CAPACITY
   );
   const overCount = schedule.filter((l) => conflicts.get(l.id)?.over).length;
+
+  // A shift's lunch window is a promise that the floor is back by a set time,
+  // so a lunch that cannot finish inside it is called out — whether it got
+  // there by a hand edit or by a crew too big for the window.
+  const isLate = (l: TodayLunch) =>
+    outsideWindow(l.lunchStart, l.shift, lunchWindows);
+  const lateCount = schedule.filter(isLate).length;
   const cur = now ? appMinutes(now) : -1;
   const onLunch =
     cur < 0
@@ -156,6 +175,13 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
         <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
           Today&apos;s Lunch Schedule{schedule.length > 0 ? ` (${schedule.length})` : ""}
         </h3>
+        {lateCount > 0 && (
+          <p className="mb-2 rounded-md border border-rose-800/60 bg-rose-950/30 px-3 py-2 text-xs text-rose-200">
+            {lateCount} lunch{lateCount === 1 ? "" : "es"} cannot finish inside
+            the lunch window for their shift. The rows are marked below — move
+            them, or widen the window in Settings.
+          </p>
+        )}
         {overCount > 0 && (
           <p className="mb-2 rounded-md border border-amber-700/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
             {overCount} lunch{overCount === 1 ? "" : "es"} put more people from a
@@ -173,6 +199,8 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
             {schedule.map((l) => {
               const open = editingId === l.id;
               const clash = conflicts.get(l.id);
+              const late = isLate(l);
+              const win = windowFor(l.shift, lunchWindows);
               return (
                 <li key={l.id} className="px-2 py-1">
                   <button
@@ -184,7 +212,11 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
                     <span className="flex min-w-0 items-baseline gap-2">
                       <span
                         className={`w-20 shrink-0 text-sm font-semibold tabular-nums ${
-                          clash?.over ? "text-amber-300" : "text-teal-300"
+                          late
+                            ? "text-rose-300"
+                            : clash?.over
+                              ? "text-amber-300"
+                              : "text-teal-300"
                         }`}
                       >
                         {formatClock(l.lunchStart)}
@@ -195,6 +227,14 @@ export function LunchesView({ todays }: { todays: TodayLunch[] }) {
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
                       {busyId === l.id && <span className="text-zinc-500">…</span>}
+                      {late && win && (
+                        <span
+                          title={`This shift's lunch window is ${toClock(win.start)}–${toClock(win.end)}; a 30-minute lunch starting here would not finish inside it`}
+                          className="whitespace-nowrap rounded-full bg-rose-500/20 px-2 py-0.5 font-medium text-rose-300"
+                        >
+                          outside window
+                        </span>
+                      )}
                       {clash?.over && (
                         <span
                           title={`${clash.concurrent} from this position are on lunch together; the limit is ${clash.capacity}`}
