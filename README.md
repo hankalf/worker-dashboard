@@ -30,6 +30,8 @@ A warehouse job dashboard with a dark-mode admin panel for managing jobs, tabs (
 2. Copy `.env.example` to `.env` and fill in:
    - `DATABASE_URL` — a PostgreSQL connection string
    - `NEXTAUTH_SECRET` — any random string (`npx auth secret` can generate one)
+   - `EMBED_FRAME_ANCESTORS` — optional; who may embed the dashboard in an
+     iframe. Defaults to Monday; see [Embedding the dashboard](#embedding-the-dashboard-in-another-app-monday-etc)
 3. Apply the database schema:
    ```bash
    npx prisma migrate deploy
@@ -104,6 +106,60 @@ Two paths, both bundling the app + Postgres via Docker Compose:
   Update later with `docker compose -f docker-compose.prebuilt.yml pull && docker compose -f docker-compose.prebuilt.yml up -d`.
 
 Either way the container migrates, seeds the admin/superadmin, and serves on `http://<box-ip>:${APP_PORT:-3000}`. Point wall displays at `/screen/<token>`.
+
+## Embedding the dashboard in another app (Monday, etc.)
+
+The dashboard can run inside an iframe in another product — a Monday board view,
+for example. Two things have to be true, and having one without the other is
+what makes it look broken:
+
+**The other site must be allowed to frame it.** Sent as a
+`Content-Security-Policy: frame-ancestors` header. `EMBED_FRAME_ANCESTORS`
+controls it and **defaults to Monday**:
+
+```
+EMBED_FRAME_ANCESTORS="https://*.monday.com https://*.monday.app"
+```
+
+Space- or comma-separated; `'self'` is always included. Set it to `none` to
+forbid embedding. Monday nests app views (`*.monday.app`) inside
+`*.monday.com`, and `frame-ancestors` is checked against every frame in the
+chain, so both are needed. `X-Frame-Options` is deliberately never sent — it
+has no wildcard syntax and browsers honour the stricter of the two, so adding
+it would override this.
+
+**Cookies must survive being third-party.** Inside an iframe the browser treats
+the dashboard's cookies as cross-site, and the default `SameSite=Lax` means
+they are not sent at all. The login POST succeeds, the session cookie comes
+back, and the next request arrives with no session — which reads as "I can't
+log in" even though the password was fine. So when embedding is enabled the
+session, CSRF, callback-url and active-location cookies are issued with
+`SameSite=None; Secure; Partitioned`.
+
+`Partitioned` ([CHIPS](https://developers.google.com/privacy-sandbox/3pcd/chips))
+is what keeps this from being a blanket third-party cookie: the cookie is stored
+against the embedding site, so a session created inside Monday is only ever sent
+back inside Monday. Chrome is phasing out unpartitioned third-party cookies, so
+the alternative is a session that stops working later rather than one that works
+now.
+
+Two consequences worth knowing up front:
+
+- **Signing in at the dashboard's own URL and signing in inside Monday are two
+  separate logins.** Partitioned cookies live in separate jars per embedding
+  site. That is inherent to CHIPS, not a choice this code makes.
+- **It only applies in production.** `SameSite=None` is invalid without
+  `Secure`, and `Secure` cookies are dropped over plain HTTP, so enabling it in
+  local development would break signing in at `localhost` rather than fix
+  anything. Testing the embed locally needs HTTPS (a tunnel such as `ngrok`),
+  not a code change.
+
+`EMBED_FRAME_ANCESTORS` is read when the server starts, so changing it needs a
+redeploy (Railway redeploys on a variable change by default). Note the small
+asymmetry if you set it to `none`: the cookies revert as soon as the process
+restarts, but the CSP header is baked into the build output and goes on being
+sent until the next deploy. Framing stops working either way, because the
+session cookie is no longer sent.
 
 ## Project structure
 
