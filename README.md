@@ -107,6 +107,65 @@ Two paths, both bundling the app + Postgres via Docker Compose:
 
 Either way the container migrates, seeds the admin/superadmin, and serves on `http://<box-ip>:${APP_PORT:-3000}`. Point wall displays at `/screen/<token>`.
 
+## Syncing the roster from a Monday.com board
+
+Admin → Integrations → **Monday.com board** keeps the employee roster in step
+with a board. **One row on the board is one person**, and the row's title is
+their name unless you map a name column. Other columns can be mapped to
+position, shift, employee number and the two misc fields; a blank mapping means
+that field is not synced.
+
+Get an API token from Monday (avatar → Developers → My access tokens), paste it
+with the board ID, then press **Test connection**. That reads the board once,
+writes nothing, and reports the board's columns with their IDs (copy them into
+the mapping), how the first rows map to people, and a dry run of what a sync
+would change. **Sync now** runs it; otherwise it runs on the configured cadence
+whenever an admin loads the roster.
+
+### What it will and won't do
+
+- **Positions are matched, never created** — the same rule the spreadsheet
+  import follows, so one typo on a board can't add a column to the dashboard.
+  A row naming a position that doesn't exist syncs the person with no position,
+  and Test connection lists those titles.
+- **People added by hand are invisible to it.** Matching is on the Monday item
+  id stored against the employee, so anyone without one is never touched,
+  however the board changes. It also means renaming someone on the board
+  renames them here instead of creating a duplicate.
+- **It is idempotent.** A row whose values already match is counted, not
+  rewritten, so a scheduled sync on an unchanged board writes nothing and logs
+  nothing.
+- **A row reappearing is a rehire** — the person is brought back rather than
+  left terminated.
+
+### Terminating people removed from the board
+
+Off by default. Switched on, an employee whose row disappears is terminated
+exactly as the Terminate button does it, so Reactivate works the same way.
+Three guards, because this is the one thing here that can take someone off the
+board on its own:
+
+- never applied to anyone with a **login** (LEAD/SUPERVISOR/ADMIN) — they're
+  reported instead, for a human to decide;
+- **held back entirely if the board comes back empty**, which reads as a wrong
+  board ID or a bad response rather than as everyone leaving;
+- **held back if it would terminate more than half** the synced roster.
+
+When terminations are held, the sync says so and changes nothing else about
+them.
+
+### Notes
+
+`MONDAY_API_URL` overrides the API endpoint. Monday runs regional endpoints for
+data residency, so an EU account is not on the global host; it also lets the
+sync be exercised against a stand-in API. The **API version** is a per-location
+setting rather than hard-coded, because Monday dates its versions and retires
+old ones — if a response shape changes, set a newer version here instead of
+patching the code.
+
+The API token is stored per location and is never sent back to the browser (the
+settings endpoint returns `hasApiToken` only).
+
 ## Embedding the dashboard in another app (Monday, etc.)
 
 The dashboard can run inside an iframe in another product — a Monday board view,

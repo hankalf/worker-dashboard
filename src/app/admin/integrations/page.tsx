@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { MondaySection } from "@/components/MondaySection";
 
 type Config = {
   enabled: boolean;
@@ -561,6 +562,8 @@ export default function IntegrationsPage() {
           </div>
         )}
       </div>
+
+      <MondaySection />
     </div>
   );
 }

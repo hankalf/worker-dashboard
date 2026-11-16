@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyDueSchedules } from "@/lib/scheduleServer";
+import { syncIfDue } from "@/lib/monday";
 
 const LEVELS = ["NONE", "LEAD", "SUPERVISOR", "ADMIN"];
 
@@ -15,6 +16,9 @@ export async function GET(req: Request) {
   // Ensure today's plan (if any) has been pushed onto the live board even if the
   // public display hasn't loaded yet today. Guarded — runs its work once/day.
   await applyDueSchedules();
+  // Pull the Monday board in on its configured cadence. Guarded and silent:
+  // a Monday outage must never stop the roster loading.
+  await syncIfDue();
 
   const includeTerminated =
     new URL(req.url).searchParams.get("includeTerminated") === "1";

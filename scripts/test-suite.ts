@@ -28,6 +28,14 @@ import {
   DEFAULT_SHIFT_BOUNDS,
 } from "@/lib/shift";
 import {
+  mapRow,
+  planSync,
+  parseShift,
+  describePlan,
+  type MappedPerson,
+  type ExistingEmployee,
+} from "@/lib/mondaySync";
+import {
   frameAncestors,
   frameAncestorsCsp,
   crossSiteCookies,
@@ -430,6 +438,212 @@ function unitTests() {
   const unscheduled = lunchConflicts([row("a", null), row("b", "11:00")], cap1);
   eq("rows without a lunch are ignored", unscheduled.has("a"), false);
   eq("and do not inflate the count", unscheduled.get("b")?.concurrent, 1);
+
+  // ---- Monday board sync --------------------------------------------------
+  const MAP = {
+    nameColumn: "",
+    positionColumn: "pos",
+    shiftColumn: "sh",
+    employeeNumberColumn: "num",
+    misc1Column: "",
+    misc2Column: "",
+  };
+  const boardRow = (itemId: string, name: string, cells: Record<string, string> = {}) => ({
+    itemId,
+    name,
+    cells,
+  });
+
+  group("mondaySync.parseShift");
+  eq("digit", parseShift("1"), "FIRST");
+  eq("ordinal", parseShift("2nd"), "SECOND");
+  eq("word", parseShift("Third"), "THIRD");
+  eq("spelled out", parseShift("first shift"), "FIRST");
+  eq("blank", parseShift(""), null);
+  eq("nonsense", parseShift("nights"), null);
+
+  group("mondaySync.mapRow");
+  eq(
+    "row title is the name by default",
+    mapRow(boardRow("1", "Jamie Smith"), MAP)?.name,
+    "Jamie Smith"
+  );
+  eq(
+    "maps the other columns",
+    mapRow(boardRow("1", "Jamie", { pos: "Picking", sh: "2", num: "00417" }), MAP),
+    {
+      itemId: "1",
+      name: "Jamie",
+      positionTitle: "Picking",
+      shift: "SECOND",
+      employeeNumber: "00417",
+      misc1: null,
+      misc2: null,
+    }
+  );
+  eq(
+    "a name column overrides the row title",
+    mapRow(boardRow("1", "Row title", { who: "Real Name" }), { ...MAP, nameColumn: "who" })?.name,
+    "Real Name"
+  );
+  eq("a nameless row is not a person", mapRow(boardRow("1", "   "), MAP), null);
+  eq("a row with no id is not a person", mapRow(boardRow("", "Jamie"), MAP), null);
+  eq(
+    "unmapped columns stay null",
+    mapRow(boardRow("1", "Jamie"), MAP)?.positionTitle,
+    null
+  );
+
+  group("mondaySync.planSync");
+  const person = (itemId: string, name: string): MappedPerson => ({
+    itemId,
+    name,
+    positionTitle: null,
+    shift: null,
+    employeeNumber: null,
+    misc1: null,
+    misc2: null,
+  });
+  const emp = (
+    id: string,
+    name: string,
+    mondayItemId: string | null,
+    accessLevel = "NONE"
+  ): ExistingEmployee => ({ id, name, mondayItemId, accessLevel, terminatedAt: null });
+  const opts = (over: Partial<Parameters<typeof planSync>[2]> = {}) => ({
+    terminateMissing: true,
+    rowCount: 10,
+    ...over,
+  });
+
+  let plan = planSync([person("i1", "A"), person("i2", "B")], [], opts());
+  eq("new rows are created", plan.create.length, 2);
+  eq("nothing to update", plan.update.length, 0);
+
+  plan = planSync([person("i1", "A renamed")], [emp("e1", "A", "i1")], opts());
+  eq("a linked row updates rather than duplicating", plan.update.length, 1);
+  eq("and creates nothing", plan.create.length, 0);
+  eq("carrying the new name", plan.update[0]?.person.name, "A renamed");
+
+  // The core safety property: people added by hand are invisible to the sync.
+  plan = planSync([], [emp("e1", "Hand added", null)], opts());
+  eq("an unlinked employee is never terminated", plan.terminate.length, 0);
+  eq("nor updated", plan.update.length, 0);
+
+  plan = planSync([person("i1", "A")], [emp("e1", "A", "i1"), emp("e2", "B", "i2")], opts());
+  eq("a linked row that vanished is terminated", plan.terminate.length, 1);
+  eq("the right one", plan.terminate[0]?.name, "B");
+
+  plan = planSync([person("i1", "A")], [emp("e1", "A", "i1"), emp("e2", "B", "i2")], opts({ terminateMissing: false }));
+  eq("terminations off means none happen", plan.terminate.length, 0);
+  eq("and it says why", plan.terminationsHeld?.count, 1);
+
+  // A login account must not lose access because a board row moved.
+  plan = planSync(
+    [],
+    [emp("e1", "Boss", "i1", "ADMIN"), emp("e2", "Worker", "i2")],
+    opts()
+  );
+  eq("the admin is protected", plan.protected.length, 1);
+  eq("by name", plan.protected[0]?.name, "Boss");
+  eq("the worker is still terminated", plan.terminate.length, 1);
+
+  // An empty board reads as a broken config, not as everyone leaving.
+  plan = planSync([], [emp("e1", "A", "i1"), emp("e2", "B", "i2")], opts({ rowCount: 0 }));
+  eq("an empty board terminates nobody", plan.terminate.length, 0);
+  ok(
+    "and says the board came back empty",
+    (plan.terminationsHeld?.reason ?? "").includes("empty")
+  );
+  eq("counting what it held", plan.terminationsHeld?.count, 2);
+
+  // A wrong board id looks like a mass exodus; hold it.
+  plan = planSync(
+    [person("i1", "A")],
+    [emp("e1", "A", "i1"), emp("e2", "B", "i2"), emp("e3", "C", "i3"), emp("e4", "D", "i4")],
+    opts()
+  );
+  eq("3 of 4 leaving is held back", plan.terminate.length, 0);
+  eq("held count", plan.terminationsHeld?.count, 3);
+
+  // Half or fewer is a normal week and goes through.
+  plan = planSync(
+    [person("i1", "A"), person("i2", "B"), person("i3", "C")],
+    [emp("e1", "A", "i1"), emp("e2", "B", "i2"), emp("e3", "C", "i3"), emp("e4", "D", "i4")],
+    opts()
+  );
+  eq("1 of 4 leaving goes through", plan.terminate.length, 1);
+  eq("nothing held", plan.terminationsHeld, null);
+
+  // Already-terminated people are not re-terminated every sync.
+  plan = planSync([], [{ ...emp("e1", "Gone", "i1"), terminatedAt: new Date() }], opts());
+  eq("an already-terminated person is left alone", plan.terminate.length, 0);
+
+  // Idempotency: a row whose values already match is not written again. Without
+  // this every scheduled sync would "update" the whole roster and fill the
+  // activity log with no-ops.
+  const unchangedEmp: ExistingEmployee = {
+    ...emp("e1", "A", "i1"),
+    positionId: null,
+    shift: null,
+    employeeNumber: null,
+    misc1: null,
+    misc2: null,
+  };
+  plan = planSync([person("i1", "A")], [unchangedEmp], opts());
+  eq("an identical row is not updated", plan.update.length, 0);
+  eq("it is counted as unchanged", plan.unchanged, 1);
+  eq("and described as such", describePlan(plan), "nothing to change (1 already in step)");
+
+  plan = planSync([{ ...person("i1", "A"), shift: "SECOND" }], [unchangedEmp], opts());
+  eq("a changed field does update", plan.update.length, 1);
+
+  // Blank and null are the same thing on a roster field, so a blank board cell
+  // must not read as a change on every sync.
+  plan = planSync(
+    [person("i1", "A")],
+    [{ ...unchangedEmp, employeeNumber: null }],
+    opts()
+  );
+  eq("blank vs null is not a change", plan.update.length, 0);
+
+  // A terminated person whose row reappears is a rehire, not an unchanged row.
+  plan = planSync(
+    [person("i1", "A")],
+    [{ ...unchangedEmp, terminatedAt: new Date() }],
+    opts()
+  );
+  eq("a returning row is updated (rehire)", plan.update.length, 1);
+  eq("not counted as unchanged", plan.unchanged, 0);
+
+  // The position resolver is what decides whether a position counts as changed.
+  plan = planSync(
+    [{ ...person("i1", "A"), positionTitle: "Picking" }],
+    [{ ...unchangedEmp, positionId: "p1" }],
+    opts({ positionIdFor: () => "p1" })
+  );
+  eq("same resolved position is unchanged", plan.update.length, 0);
+  plan = planSync(
+    [{ ...person("i1", "A"), positionTitle: "Unknown Dept" }],
+    [{ ...unchangedEmp, positionId: "p1" }],
+    opts({ positionIdFor: () => null })
+  );
+  eq("an unmatched position clears it, which is a change", plan.update.length, 1);
+
+  plan = planSync([person("i1", "A"), person("i1", "A again")], [], opts());
+  eq("a duplicated row id is only created once", plan.create.length, 1);
+  eq("and warns", plan.warnings.length, 1);
+
+  group("mondaySync.describePlan");
+  eq(
+    "nothing to do",
+    describePlan(planSync([], [], opts())),
+    "nothing to change"
+  );
+  ok(
+    "counts the work",
+    describePlan(planSync([person("i1", "A")], [], opts())).includes("1 added")
+  );
 
   // ---- embedding (iframe cookies + frame-ancestors) -----------------------
   group("embed.frameAncestors");
