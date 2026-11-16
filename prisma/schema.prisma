@@ -164,6 +164,11 @@ model Employee {
   // zeros and letters. Admin-facing only — kept off the public board, like the
   // two misc fields below.
   employeeNumber String?
+  // The Monday.com item (board row) this person came from, when the roster is
+  // synced from a board. Matching on this rather than on the name means
+  // renaming someone on the board renames them here instead of creating a
+  // duplicate. Null for anyone added by hand, and the sync never touches those.
+  mondayItemId String?
   // Two free-text fields for whatever this warehouse needs to record against a
   // person (locker, badge, uniform size, notes). ADMIN-ONLY: stripped from the
   // roster the Assign board fetches, and omitted from the public board payload
@@ -176,6 +181,8 @@ model Employee {
   birthDate    String?
   terminatedAt DateTime?
   createdAt    DateTime  @default(now())
+
+  @@unique([locationId, mondayItemId])
 }
 
 // Physical equipment / certifications an employee can operate. NOTE: the model
