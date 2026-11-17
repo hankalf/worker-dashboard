@@ -28,6 +28,14 @@ import {
   DEFAULT_SHIFT_BOUNDS,
 } from "@/lib/shift";
 import {
+  mintKey,
+  hashKey,
+  hashesMatch,
+  parseScopes,
+  keyFromRequest,
+  isScope,
+} from "@/lib/apiKey";
+import {
   mapRow,
   planSync,
   parseShift,
@@ -438,6 +446,63 @@ function unitTests() {
   const unscheduled = lunchConflicts([row("a", null), row("b", "11:00")], cap1);
   eq("rows without a lunch are ignored", unscheduled.has("a"), false);
   eq("and do not inflate the count", unscheduled.get("b")?.concurrent, 1);
+
+  // ---- API keys -----------------------------------------------------------
+  group("apiKey.mintKey");
+  const minted = mintKey();
+  ok("is recognisable on sight", minted.key.startsWith("wd_live_"));
+  ok("carries real entropy", minted.key.length > 40);
+  ok("the prefix is a prefix of the key", minted.key.startsWith(minted.prefix));
+  ok("the prefix is not the whole key", minted.prefix.length < minted.key.length);
+  eq("the stored hash matches the key", minted.hash, hashKey(minted.key));
+  ok("the hash is not the key", minted.hash !== minted.key);
+  ok("two keys differ", mintKey().key !== mintKey().key);
+  // The prefix is shown in the admin list, so it must not be enough to rebuild
+  // the key or its hash.
+  ok("the prefix does not hash to the stored hash", hashKey(minted.prefix) !== minted.hash);
+
+  group("apiKey.hashesMatch");
+  ok("equal digests match", hashesMatch(minted.hash, hashKey(minted.key)));
+  ok("different digests do not", !hashesMatch(minted.hash, hashKey(mintKey().key)));
+  ok("empty is never a match", !hashesMatch("", ""));
+  ok("a short digest is not a match", !hashesMatch(minted.hash, "ab"));
+  ok("non-hex is not a match", !hashesMatch(minted.hash, "zz"));
+
+  group("apiKey.parseScopes");
+  eq("from a comma string", parseScopes("read,jobs:write"), ["read", "jobs:write"]);
+  eq("from an array", parseScopes(["read"]), ["read"]);
+  eq("trims", parseScopes(" read , jobs:write "), ["read", "jobs:write"]);
+  eq("drops unknown scopes", parseScopes("read,wat,*"), ["read"]);
+  eq("de-duplicates", parseScopes("read,read"), ["read"]);
+  eq("nothing from junk", parseScopes(42), []);
+  eq("nothing from empty", parseScopes(""), []);
+  ok("a real scope is a scope", isScope("employees:write"));
+  ok("a made-up one is not", !isScope("employees:delete"));
+
+  group("apiKey.keyFromRequest");
+  const reqWith = (headers: Record<string, string>) =>
+    new Request("https://example.com/api/v1/ping", { headers });
+  eq(
+    "reads a bearer token",
+    keyFromRequest(reqWith({ authorization: "Bearer wd_live_abc" })),
+    "wd_live_abc"
+  );
+  eq(
+    "case-insensitive scheme",
+    keyFromRequest(reqWith({ authorization: "bearer wd_live_abc" })),
+    "wd_live_abc"
+  );
+  eq(
+    "reads X-API-Key",
+    keyFromRequest(reqWith({ "x-api-key": "wd_live_abc" })),
+    "wd_live_abc"
+  );
+  eq("nothing when absent", keyFromRequest(reqWith({})), null);
+  eq(
+    "ignores a non-bearer Authorization",
+    keyFromRequest(reqWith({ authorization: "Basic abc" })),
+    null
+  );
 
   // ---- Monday board sync --------------------------------------------------
   const MAP = {
@@ -1280,6 +1345,152 @@ async function login(username: string, password: string): Promise<string> {
   return hasSession ? cookie() : "";
 }
 
+// The v1 machine API over real HTTP, with the property that matters most: a
+// key belongs to one location and cannot reach another's rows, not even by
+// naming an id from it. That was broken once — the tenant extension does not
+// scope findUnique-by-id — so it is pinned here.
+async function apiKeyTests() {
+  const mintFor = async (locationId: string, name: string, scopes: string) => {
+    const { key, prefix, hash } = mintKey();
+    await db.apiKey.create({ data: { locationId, name, prefix, hash, scopes } });
+    return key;
+  };
+  const call = (key: string | null, path: string, init: RequestInit = {}) =>
+    fetch(BASE + path, {
+      ...init,
+      headers: {
+        ...(init.headers ?? {}),
+        ...(key ? { authorization: `Bearer ${key}` } : {}),
+        ...(init.body ? { "content-type": "application/json" } : {}),
+      },
+    });
+
+  await db.apiKey.deleteMany({});
+  const other = await db.location.upsert({
+    where: { slug: "suite-other" },
+    update: {},
+    create: { name: "Other Warehouse", slug: "suite-other" },
+  });
+  await db.employee.upsert({
+    where: { id: "suite_other_emp" },
+    update: {},
+    create: { id: "suite_other_emp", name: "Other Person", locationId: other.id },
+  });
+
+  const full = "read,employees:write,attendance:write,jobs:write,notices:write";
+  const keyA = await mintFor(LOCATION_ID, "Suite A", full);
+  const keyB = await mintFor(other.id, "Suite B", full);
+  const readOnly = await mintFor(LOCATION_ID, "Suite read-only", "read");
+  const revoked = await mintFor(LOCATION_ID, "Suite revoked", full);
+  await db.apiKey.updateMany({
+    where: { name: "Suite revoked" },
+    data: { revokedAt: new Date() },
+  });
+
+  group("http: api v1 auth");
+  eq("no key is 401", (await call(null, "/api/v1/ping")).status, 401);
+  eq("an invented key is 401", (await call("wd_live_nope", "/api/v1/ping")).status, 401);
+  eq("a revoked key is 401", (await call(revoked, "/api/v1/ping")).status, 401);
+  eq("a good key is 200", (await call(keyA, "/api/v1/ping")).status, 200);
+  eq(
+    "a read-only key cannot write",
+    (await call(readOnly, "/api/v1/jobs", { method: "POST", body: JSON.stringify({ title: "nope" }) })).status,
+    403
+  );
+  eq(
+    "but can read",
+    (await call(readOnly, "/api/v1/employees")).status,
+    200
+  );
+  const ping = await (await call(keyA, "/api/v1/ping")).json();
+  eq("ping names the key's location", ping.location?.id, LOCATION_ID);
+  ok("ping does not echo the key", !JSON.stringify(ping).includes(keyA));
+
+  group("http: api v1 tenant isolation");
+  const job = await db.job.create({ data: { title: "Isolation job", locationId: LOCATION_ID } });
+  const victim = await db.employee.findFirst({
+    where: { locationId: LOCATION_ID, terminatedAt: null },
+  });
+
+  const listB = await (await call(keyB, "/api/v1/employees")).json();
+  ok(
+    "B's roster excludes A's people",
+    !listB.employees.some((e: { id: string }) => e.id === victim!.id)
+  );
+  ok(
+    "B's roster includes B's own",
+    listB.employees.some((e: { id: string }) => e.id === "suite_other_emp")
+  );
+  const jobsB = await (await call(keyB, "/api/v1/jobs")).json();
+  ok("B's jobs exclude A's", !jobsB.jobs.some((j: { id: string }) => j.id === job.id));
+
+  eq(
+    "B cannot PATCH A's job by id",
+    (await call(keyB, `/api/v1/jobs/${job.id}`, { method: "PATCH", body: JSON.stringify({ title: "HIJACKED" }) })).status,
+    404
+  );
+  eq(
+    "B cannot DELETE A's job by id",
+    (await call(keyB, `/api/v1/jobs/${job.id}`, { method: "DELETE" })).status,
+    404
+  );
+  const hijack = await (
+    await call(keyB, "/api/v1/employees", {
+      method: "POST",
+      body: JSON.stringify({ id: victim!.id, name: "HIJACKED" }),
+    })
+  ).json();
+  eq("B cannot update A's employee by id", hijack.updated, 0);
+  ok("and is told it does not exist", (hijack.errors ?? []).length === 1);
+  const att = await (
+    await call(keyB, "/api/v1/attendance", {
+      method: "POST",
+      body: JSON.stringify({ id: victim!.id, attendance: "ABSENT" }),
+    })
+  ).json();
+  eq("B cannot set attendance on A's employee", att.updated, 0);
+
+  const jobAfter = await db.job.findUnique({ where: { id: job.id } });
+  const empAfter = await db.employee.findUnique({ where: { id: victim!.id } });
+  eq("A's job is untouched", jobAfter?.title, "Isolation job");
+  eq("A's employee is untouched", empAfter?.name, victim!.name);
+  eq("and still present", empAfter?.attendance, victim!.attendance);
+
+  group("http: api v1 writes");
+  const made = await (
+    await call(keyA, "/api/v1/employees", {
+      method: "POST",
+      body: JSON.stringify({ name: "API Made", employeeNumber: "API-1", position: "Nope Dept" }),
+    })
+  ).json();
+  eq("creates an employee", made.created, 1);
+  ok("and warns about the unknown position", !!made.results[0].warning);
+  const upsert = await (
+    await call(keyA, "/api/v1/employees", {
+      method: "POST",
+      body: JSON.stringify({ employeeNumber: "API-1", shift: "SECOND" }),
+    })
+  ).json();
+  eq("upserts by employeeNumber rather than duplicating", upsert.updated, 1);
+  eq("and creates nothing", upsert.created, 0);
+  eq(
+    "rejects a bad shift",
+    (
+      await (
+        await call(keyA, "/api/v1/employees", {
+          method: "POST",
+          body: JSON.stringify({ name: "Bad", shift: "NIGHTS" }),
+        })
+      ).json()
+    ).errors.length,
+    1
+  );
+
+  await db.job.deleteMany({ where: { title: "Isolation job" } });
+  await db.employee.deleteMany({ where: { employeeNumber: "API-1" } });
+  await db.apiKey.deleteMany({});
+}
+
 async function httpTests(roster: { length: number }) {
   const j = async (path: string, cookie = "") => {
     const res = await fetch(BASE + path, cookie ? { headers: { cookie } } : undefined);
@@ -1403,6 +1614,7 @@ async function main() {
   rotationTests(specs);
   try {
     await httpTests(roster);
+    await apiKeyTests();
   } catch (err) {
     group("http");
     ok("dev server reachable on :3000", false, String(err));
