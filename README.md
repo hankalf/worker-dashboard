@@ -107,6 +107,95 @@ Two paths, both bundling the app + Postgres via Docker Compose:
 
 Either way the container migrates, seeds the admin/superadmin, and serves on `http://<box-ip>:${APP_PORT:-3000}`. Point wall displays at `/screen/<token>`.
 
+## Connecting another app: the v1 API
+
+Admin → Integrations → **API keys** mints a key so an outside system — a
+central-ops app, an automation — can read and change a location over HTTP
+without a human session. Everything else in the app authenticates with a
+NextAuth session cookie, which an outside app cannot hold.
+
+```bash
+curl -H "Authorization: Bearer wd_live_…" https://your-dashboard/api/v1/ping
+```
+
+`Authorization: Bearer <key>` or `X-API-Key: <key>`; either is fine. Start with
+`GET /api/v1/ping`, which confirms the key and names the location and scopes it
+has.
+
+### Scopes
+
+A key is confined to what it was granted, so the app that posts notices cannot
+terminate anybody:
+
+| Scope | Allows |
+|---|---|
+| `read` | `GET` the roster, jobs and notices |
+| `employees:write` | add, update and terminate employees |
+| `attendance:write` | attendance, lunches, breaks, coming-in, stay-over |
+| `jobs:write` | create, change and delete jobs |
+| `notices:write` | post and remove notices |
+
+### Endpoints
+
+| Method | Path | Scope |
+|---|---|---|
+| GET | `/api/v1/ping` | `read` |
+| GET | `/api/v1/employees` *(`?includeTerminated=1`)* | `read` |
+| POST | `/api/v1/employees` | `employees:write` |
+| POST | `/api/v1/attendance` | `attendance:write` |
+| GET | `/api/v1/jobs` *(`?includeDone=1`)* | `read` |
+| POST | `/api/v1/jobs` | `jobs:write` |
+| PATCH / DELETE | `/api/v1/jobs/{id}` | `jobs:write` |
+| GET | `/api/v1/notices` | `read` |
+| POST | `/api/v1/notices` | `notices:write` |
+| DELETE | `/api/v1/notices/{id}` | `notices:write` |
+
+`POST /api/v1/employees` and `POST /api/v1/attendance` take either a single
+object or a batch (`{ "employees": [...] }` / `{ "entries": [...] }`, 500 max).
+They upsert: an employee is matched by `id`, else by `employeeNumber`, else
+created. **Only the fields you send are changed**, so a partial payload does
+not blank out everything it left out. A batch with some bad rows answers `207`
+with a per-row `errors` array and applies the rest.
+
+```bash
+curl -X POST https://your-dashboard/api/v1/employees \
+  -H "Authorization: Bearer wd_live_…" -H "Content-Type: application/json" \
+  -d '{"employees":[{"name":"Dana Reyes","employeeNumber":"00901","position":"Picking","shift":"FIRST"}]}'
+
+curl -X POST https://your-dashboard/api/v1/attendance \
+  -H "Authorization: Bearer wd_live_…" -H "Content-Type: application/json" \
+  -d '{"entries":[{"employeeNumber":"00901","attendance":"CALLED_OUT"}]}'
+```
+
+Errors carry a stable `error` code plus a human `message`, so the calling app
+can branch on the code: `unauthorized` (401), `forbidden` (403, with the scope
+it needed), `bad_request` (400), `not_found` (404), `conflict` (409).
+
+### What the keys guarantee
+
+- **A key is tied to one location.** It cannot read or change another
+  warehouse's rows, including by naming an id from one — those come back `404`
+  or "no employee with that id". There are 11 tests on this; see the note
+  below.
+- **Positions are matched, never created**, the same rule the spreadsheet
+  import and the Monday sync follow. A row naming a position that doesn't
+  exist saves with no position and returns a warning.
+- **A key cannot grant access.** Access levels and passwords are not writable
+  through v1, so a key can never mint a login or escalate one.
+- **Every change is attributed.** The activity log records the key's name, so
+  nothing a key does looks like it happened by itself.
+- **Keys are stored hashed** (SHA-256 of 32 random bytes) and shown once. The
+  admin list shows only the prefix. Revoking takes effect immediately and keeps
+  the key's name in the log.
+
+> **Implementation note for anyone adding a v1 endpoint.** The Prisma tenant
+> extension scopes collection reads and bulk writes, but deliberately *not*
+> `findUnique`/`update`/`delete` keyed by id (see `src/lib/prisma.ts`). That is
+> fine for the admin UI, where a human only ever holds ids from their own
+> location, and unsafe here, where the caller supplies the id. **Always look a
+> caller-supplied id up with `findFirst` and an explicit `locationId`.** This
+> was wrong in the first draft and is now pinned by the isolation tests.
+
 ## Syncing the roster from a Monday.com board
 
 Admin → Integrations → **Monday.com board** keeps the employee roster in step

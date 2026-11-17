@@ -73,6 +73,7 @@ model Location {
   activityLogs         ActivityLog[]
   screens              Screen[]
   settings             LocationSetting[]
+  apiKeys              ApiKey[]
 }
 
 // Per-location display settings (dashboard name, branding, scroll speed,
@@ -244,6 +245,36 @@ model Position {
   requiredCapabilityId String?
 
   @@unique([locationId, title])
+}
+
+// A machine credential for the v1 API, so an outside system (a central-ops
+// app, an automation) can drive this location without a human session.
+//
+// Only a SHA-256 hash of the key is stored. That is deliberate rather than
+// bcrypt: the key is 32 bytes of CSPRNG output, so there is nothing to brute
+// force and a slow KDF would only add latency to every request. The plaintext
+// is shown once at creation and never again.
+model ApiKey {
+  id         String    @id @default(cuid())
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String
+  // What this key is for, shown in the admin list ("Central ops app").
+  name       String
+  // The key's public half: how a presented key is looked up before the hash is
+  // compared, and the only part ever shown again ("wd_live_4f2a…").
+  prefix     String    @unique
+  hash       String
+  // Comma-separated scopes (see src/lib/apiKey.ts). A key is confined to the
+  // surfaces it was granted, so an app that only posts notices cannot
+  // terminate anybody.
+  scopes     String
+  lastUsedAt DateTime?
+  // Revoked rather than deleted, so the activity log keeps naming the key that
+  // made each change after the key is turned off.
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([locationId])
 }
 
 // Notices shown on the dashboards. The board shows up to 5 active notices at a

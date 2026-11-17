@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { MondaySection } from "@/components/MondaySection";
+import { ApiKeysSection } from "@/components/ApiKeysSection";
 
 type Config = {
   enabled: boolean;
@@ -564,6 +565,8 @@ export default function IntegrationsPage() {
       </div>
 
       <MondaySection />
+
+      <ApiKeysSection />
     </div>
   );
 }
